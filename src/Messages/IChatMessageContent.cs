@@ -1,4 +1,4 @@
-namespace WinFormsChat.Messages;
+namespace TinyChat.Messages;
 
 /// <summary>
 /// Represents the content of a chat message.

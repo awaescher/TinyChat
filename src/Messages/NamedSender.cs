@@ -1,6 +1,6 @@
-using WinFormsChat.Messages;
+using TinyChat.Messages;
 
-namespace WinFormsChat;
+namespace TinyChat;
 
 /// <summary>
 /// Represents a sender identified by their name.

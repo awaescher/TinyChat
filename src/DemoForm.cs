@@ -1,7 +1,7 @@
 
-using WinFormsChat.Messages;
+using TinyChat.Messages;
 
-namespace WinFormsChat;
+namespace TinyChat;
 
 public partial class DemoForm : Form
 {

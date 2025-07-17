@@ -1,8 +1,8 @@
 using System.ComponentModel;
-using WinFormsChat.Controls;
-using WinFormsChat.Messages;
+using TinyChat.Controls;
+using TinyChat.Messages;
 
-namespace WinFormsChat;
+namespace TinyChat;
 
 /// <summary>
 /// A user control that provides a chat interface with message display and text input functionality.

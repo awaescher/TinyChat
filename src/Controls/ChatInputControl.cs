@@ -1,6 +1,6 @@
-using WinFormsChat.Messages;
+using TinyChat.Messages;
 
-namespace WinFormsChat.Controls;
+namespace TinyChat.Controls;
 
 /// <summary>
 /// A text input control that allows users to type and send chat messages.

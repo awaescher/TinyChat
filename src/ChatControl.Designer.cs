@@ -1,4 +1,4 @@
-namespace WinFormsChat
+namespace TinyChat
 {
 	partial class ChatControl
 	{

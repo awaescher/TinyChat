@@ -1,4 +1,4 @@
-namespace WinFormsChat.Controls;
+namespace TinyChat.Controls;
 
 public class TableLayoutMessageHistoryControl : TableLayoutPanel, IChatMessageHistoryControl
 {

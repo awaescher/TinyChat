@@ -1,4 +1,4 @@
-namespace WinFormsChat;
+namespace TinyChat;
 
 internal static class Program
 {
