@@ -9,6 +9,7 @@ public partial class ChatControl : UserControl
 {
 	private Control? _messageHistoryControl;
 	private Control? _textBox;
+	private int _messageChatControlCount;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="ChatControl"/> class.
@@ -26,15 +27,17 @@ public partial class ChatControl : UserControl
 		base.OnCreateControl();
 
 		_messageHistoryControl = (Control)CreateMessageHistoryControl();
+		_messageHistoryControl.Name = "messageHistoryControl";
 		Controls.Add(_messageHistoryControl);
 		LayoutMessageHistoryControl(_messageHistoryControl);
 
-		var textBox = CreateTextBox();
+		var textBox = CreateChatInputControl();
 		textBox.Send += (sender, content) => SendMessage(content);
 		_textBox = (Control)textBox;
+		_textBox.Name = "chatInputControl";
 
 		Controls.Add(_textBox);
-		LayoutTextBox(_textBox);
+		LayoutChatInputControl(_textBox);
 	}
 
 	/// <summary>
@@ -45,7 +48,8 @@ public partial class ChatControl : UserControl
 	{
 		base.OnDataContextChanged(e);
 
-		_messageHistoryControl?.Controls.Clear();
+		((IChatMessageHistoryControl)_messageHistoryControl)?.ClearMessageControls();
+		_messageChatControlCount = 0;
 
 		foreach (var message in DataContext as IEnumerable<IChatMessage> ?? [])
 			AppendMessage(message);
@@ -59,7 +63,9 @@ public partial class ChatControl : UserControl
 	{
 		var messageControl = CreateMessageControl(message);
 		messageControl.Message = message;
-		LayoutMessageControl(_messageHistoryControl, (Control)messageControl);
+		var control = (Control)messageControl;
+		control.Name = $"messageChatControl{++_messageChatControlCount}";
+		LayoutMessageControl(_messageHistoryControl, control);
 		((IChatMessageHistoryControl)_messageHistoryControl).AppendMessage(messageControl);
 	}
 
@@ -67,14 +73,14 @@ public partial class ChatControl : UserControl
 	/// Creates the container control that will hold all chat messages.
 	/// </summary>
 	/// <returns>A <see cref="Control"/> that serves as the messages container.</returns>
-	protected virtual IChatMessageHistoryControl CreateMessageHistoryControl() => new TableLayoutMessageHistoryControl { Visible = true };
+	protected virtual IChatMessageHistoryControl CreateMessageHistoryControl() => new TableLayoutMessageHistoryControl();
 
 	/// <summary>
 	/// Creates a message control for displaying a specific chat message.
 	/// </summary>
 	/// <param name="message">The chat message to create a control for.</param>
 	/// <returns>An <see cref="IChatMessageControl"/> instance for the message.</returns>
-	protected virtual IChatMessageControl CreateMessageControl(IChatMessage message) => new ChatMessageControl() { Visible = true };
+	protected virtual IChatMessageControl CreateMessageControl(IChatMessage message) => new ChatMessageControl();
 
 	/// <summary>
 	/// Applies layout settings to the messages container control.
@@ -99,13 +105,13 @@ public partial class ChatControl : UserControl
 	/// Creates the text input control for sending new messages.
 	/// </summary>
 	/// <returns>An <see cref="IChatInputControl"/> instance for message input.</returns>
-	protected virtual IChatInputControl CreateTextBox() => new ChatInputControl { Visible = true };
+	protected virtual IChatInputControl CreateChatInputControl() => new ChatInputControl();
 
 	/// <summary>
 	/// Applies layout settings to the text input control.
 	/// </summary>
 	/// <param name="textBox">The text box control to layout.</param>
-	protected virtual void LayoutTextBox(Control textBox) => textBox.Dock = DockStyle.Bottom;
+	protected virtual void LayoutChatInputControl(Control textBox) => textBox.Dock = DockStyle.Bottom;
 
 	/// <summary>
 	/// Sends a new message by appending it to the chat.

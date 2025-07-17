@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TinyChat", "src\TinyChat.cs
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WinFormsDemo", "WinFormsDemo\WinFormsDemo.csproj", "{D89E96EA-39ED-41A4-8CA6-41E8BB494039}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DevExpressDemo", "DevExpressDemo\DevExpressDemo.csproj", "{272BF95F-9FB5-4FAB-9CA1-0EC70E81610A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{D89E96EA-39ED-41A4-8CA6-41E8BB494039}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D89E96EA-39ED-41A4-8CA6-41E8BB494039}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D89E96EA-39ED-41A4-8CA6-41E8BB494039}.Release|Any CPU.Build.0 = Release|Any CPU
+		{272BF95F-9FB5-4FAB-9CA1-0EC70E81610A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{272BF95F-9FB5-4FAB-9CA1-0EC70E81610A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{272BF95F-9FB5-4FAB-9CA1-0EC70E81610A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{272BF95F-9FB5-4FAB-9CA1-0EC70E81610A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

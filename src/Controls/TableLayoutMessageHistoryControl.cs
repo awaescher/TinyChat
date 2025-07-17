@@ -20,6 +20,11 @@ public class TableLayoutMessageHistoryControl : TableLayoutPanel, IChatMessageHi
 		ScrollControlIntoView(control);
 	}
 
+	public void ClearMessageControls()
+	{
+		Controls.Clear();
+	}
+
 	protected override void OnClientSizeChanged(EventArgs e)
 	{
 		base.OnClientSizeChanged(e);
