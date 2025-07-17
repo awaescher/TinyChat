@@ -1,6 +1,4 @@
-using TinyChat.Messages;
-
-namespace TinyChat.Controls;
+namespace TinyChat;
 
 /// <summary>
 /// Represents a control that can display a chat message.

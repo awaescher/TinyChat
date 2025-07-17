@@ -1,6 +1,4 @@
 using System.ComponentModel;
-using TinyChat.Controls;
-using TinyChat.Messages;
 
 namespace TinyChat;
 

@@ -1,4 +1,4 @@
-namespace TinyChat.Messages;
+namespace TinyChat;
 
 /// <summary>
 /// Represents text-based message content.

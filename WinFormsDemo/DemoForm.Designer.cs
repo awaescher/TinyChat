@@ -1,4 +1,6 @@
-namespace TinyChat
+using TinyChat;
+
+namespace WinFormsDemo
 {
     partial class DemoForm
     {
@@ -39,14 +41,14 @@ namespace TinyChat
 			chatControl1.Size = new Size(373, 628);
 			chatControl1.TabIndex = 0;
 			// 
-			// Form1
+			// DemoForm
 			// 
 			AutoScaleDimensions = new SizeF(7F, 15F);
 			AutoScaleMode = AutoScaleMode.Font;
 			ClientSize = new Size(373, 628);
 			Controls.Add(chatControl1);
-			Name = "Form1";
-			Text = "Form1";
+			Name = "DemoForm";
+			Text = "TinyChat WinForms Demo";
 			ResumeLayout(false);
 		}
 

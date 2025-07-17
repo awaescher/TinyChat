@@ -1,6 +1,4 @@
-using TinyChat.Messages;
-
-namespace TinyChat.Controls;
+namespace TinyChat;
 
 /// <summary>
 /// Represents a text input control for sending chat messages.

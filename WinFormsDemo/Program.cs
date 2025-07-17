@@ -1,4 +1,4 @@
-namespace TinyChat;
+namespace WinFormsDemo;
 
 internal static class Program
 {

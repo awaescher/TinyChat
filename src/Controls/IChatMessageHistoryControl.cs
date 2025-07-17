@@ -1,4 +1,4 @@
-namespace TinyChat.Controls;
+namespace TinyChat;
 
 public interface IChatMessageHistoryControl
 {

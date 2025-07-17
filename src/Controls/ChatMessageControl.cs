@@ -1,7 +1,6 @@
 using System.ComponentModel;
-using TinyChat.Messages;
 
-namespace TinyChat.Controls;
+namespace TinyChat;
 
 /// <summary>
 /// A panel control that displays a chat message with sender name and content.
