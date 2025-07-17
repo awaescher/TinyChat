@@ -41,4 +41,16 @@ public class ChatMessageControl : Panel, IChatMessageControl
 			_messageLabel.Text = Message?.Content?.Render() ?? string.Empty;
 		}
 	}
+
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+	public override Size MaximumSize
+	{
+		get => base.MaximumSize;
+		set
+		{
+			base.MaximumSize = value;
+			_senderLabel.MaximumSize = new Size(value.Width - Padding.Horizontal, 0);
+			_messageLabel.MaximumSize = new Size(value.Width - Padding.Horizontal, 0);
+		}
+	}
 }
