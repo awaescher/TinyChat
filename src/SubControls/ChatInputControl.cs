@@ -1,31 +1,26 @@
-using DevExpress.XtraEditors;
-using System;
-using System.Drawing;
-using System.Windows.Forms;
-using TinyChat;
+namespace TinyChat;
 
-namespace DevExpressDemo;
-
-public class DXChatInputControl : Control, IChatInputControl
+/// <summary>
+/// A text input control that allows users to type and send chat messages.
+/// </summary>
+public class ChatInputControl : Control, IChatInputControl
 {
 	/// <summary>
 	/// Occurs when a message is sent from the text box.
 	/// </summary>
 	public event EventHandler<IChatMessageContent> Send;
 
-	private MemoEdit _textBox;
+	private readonly TextBox _textBox;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="ChatInputControl"/> class.
 	/// </summary>
-	public DXChatInputControl()
+	public ChatInputControl()
 	{
-		_textBox = new MemoEdit { Visible = true, Dock = DockStyle.Fill };
-		var panel = new PanelControl { Padding = new Padding(8), Dock = DockStyle.Fill, BorderStyle = DevExpress.XtraEditors.Controls.BorderStyles.NoBorder };
+		_textBox = new TextBox { Multiline = true, Visible = true, Dock = DockStyle.Fill };
+		var panel = new Panel { Padding = new Padding(8), Dock = DockStyle.Fill };
 		Controls.Add(panel);
 		panel.Controls.Add(_textBox);
-
-		MinimumSize = new Size(0, 100);
 
 		_textBox.KeyPress += TextBox_KeyPress;
 	}

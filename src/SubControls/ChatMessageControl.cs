@@ -8,8 +8,8 @@ namespace TinyChat;
 public class ChatMessageControl : Panel, IChatMessageControl
 {
 	private IChatMessage? _message;
-	private Label _senderLabel;
-	private Label _messageLabel;
+	private readonly Label _senderLabel;
+	private readonly Label _messageLabel;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="ChatMessageControl"/> class.
@@ -29,7 +29,12 @@ public class ChatMessageControl : Panel, IChatMessageControl
 
 	/// <summary>
 	/// Gets or sets the chat message displayed by this control.
+	/// When set, the control updates to display the sender's name and rendered message content.
+	/// If the message is null, both the sender and content labels will display empty strings.
 	/// </summary>
+	/// <value>
+	/// The <see cref="IChatMessage"/> instance to display, or null to clear the display.
+	/// </value>
 	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
 	public IChatMessage? Message
 	{
@@ -42,6 +47,7 @@ public class ChatMessageControl : Panel, IChatMessageControl
 		}
 	}
 
+	/// <inheritdoc />
 	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
 	public override Size MaximumSize
 	{

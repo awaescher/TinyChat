@@ -30,30 +30,82 @@ namespace WinFormsDemo
 		/// </summary>
 		private void InitializeComponent()
 		{
-			chatControl1 = new ChatControl();
+			chatControl = new ChatControl();
+			splitContainer = new SplitContainer();
+			propertyGrid = new PropertyGrid();
+			typeLabel = new Label();
+			((System.ComponentModel.ISupportInitialize)splitContainer).BeginInit();
+			splitContainer.Panel1.SuspendLayout();
+			splitContainer.Panel2.SuspendLayout();
+			splitContainer.SuspendLayout();
 			SuspendLayout();
 			// 
 			// chatControl1
 			// 
-			chatControl1.Dock = DockStyle.Fill;
-			chatControl1.Location = new Point(0, 0);
-			chatControl1.Name = "chatControl1";
-			chatControl1.Size = new Size(373, 628);
-			chatControl1.TabIndex = 0;
+			chatControl.Dock = DockStyle.Fill;
+			chatControl.Location = new Point(0, 0);
+			chatControl.Name = "chatControl1";
+			chatControl.Size = new Size(313, 628);
+			chatControl.TabIndex = 0;
+			// 
+			// splitContainer1
+			// 
+			splitContainer.Dock = DockStyle.Fill;
+			splitContainer.FixedPanel = FixedPanel.Panel2;
+			splitContainer.Location = new Point(0, 0);
+			splitContainer.Name = "splitContainer1";
+			// 
+			// splitContainer1.Panel1
+			// 
+			splitContainer.Panel1.Controls.Add(chatControl);
+			// 
+			// splitContainer1.Panel2
+			// 
+			splitContainer.Panel2.Controls.Add(propertyGrid);
+			splitContainer.Panel2.Controls.Add(typeLabel);
+			splitContainer.Size = new Size(648, 628);
+			splitContainer.SplitterDistance = 313;
+			splitContainer.TabIndex = 1;
+			// 
+			// propertyGrid1
+			// 
+			propertyGrid.BackColor = SystemColors.Control;
+			propertyGrid.Dock = DockStyle.Fill;
+			propertyGrid.Location = new Point(0, 23);
+			propertyGrid.Name = "propertyGrid1";
+			propertyGrid.Size = new Size(331, 605);
+			propertyGrid.TabIndex = 0;
+			// 
+			// label1
+			// 
+			typeLabel.Dock = DockStyle.Top;
+			typeLabel.Font = new Font("Segoe UI", 9.75F, FontStyle.Regular, GraphicsUnit.Point, 0);
+			typeLabel.Location = new Point(0, 0);
+			typeLabel.Name = "label1";
+			typeLabel.Size = new Size(331, 23);
+			typeLabel.TabIndex = 1;
+			typeLabel.Text = "Control";
 			// 
 			// DemoForm
 			// 
 			AutoScaleDimensions = new SizeF(7F, 15F);
 			AutoScaleMode = AutoScaleMode.Font;
-			ClientSize = new Size(373, 628);
-			Controls.Add(chatControl1);
+			ClientSize = new Size(648, 628);
+			Controls.Add(splitContainer);
 			Name = "DemoForm";
 			Text = "TinyChat WinForms Demo";
+			splitContainer.Panel1.ResumeLayout(false);
+			splitContainer.Panel2.ResumeLayout(false);
+			((System.ComponentModel.ISupportInitialize)splitContainer).EndInit();
+			splitContainer.ResumeLayout(false);
 			ResumeLayout(false);
 		}
 
 		#endregion
 
-		private ChatControl chatControl1;
+		private ChatControl chatControl;
+		private SplitContainer splitContainer;
+		private PropertyGrid propertyGrid;
+		private Label typeLabel;
 	}
 }

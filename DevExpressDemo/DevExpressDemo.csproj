@@ -15,8 +15,4 @@
     <ProjectReference Include="..\WinFormsDemo\WinFormsDemo.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Controls\" />
-  </ItemGroup>
-
 </Project>

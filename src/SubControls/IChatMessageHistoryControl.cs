@@ -1,5 +1,8 @@
 namespace TinyChat;
 
+/// <summary>
+/// Provides functionality for managing chat message history controls.
+/// </summary>
 public interface IChatMessageHistoryControl
 {
 	/// <summary>
@@ -7,5 +10,9 @@ public interface IChatMessageHistoryControl
 	/// </summary>
 	/// <param name="messageControl">The chat message control to append.</param>
 	void AppendMessage(IChatMessageControl messageControl);
+
+	/// <summary>
+	/// Clears all message controls from the history.
+	/// </summary>
 	void ClearMessageControls();
 }

@@ -9,7 +9,6 @@ public partial class ChatControl : UserControl
 {
 	private Control? _messageHistoryControl;
 	private Control? _textBox;
-	private int _messageChatControlCount;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="ChatControl"/> class.
@@ -26,17 +25,20 @@ public partial class ChatControl : UserControl
 	{
 		base.OnCreateControl();
 
+		var splitter = CreateSplitContainerControl();
+		var splitterControl = (Control)splitter;
+		Controls.Add(splitterControl);
+		LayoutSplitContainerControl(splitterControl);
+
 		_messageHistoryControl = (Control)CreateMessageHistoryControl();
-		_messageHistoryControl.Name = "messageHistoryControl";
-		Controls.Add(_messageHistoryControl);
+		splitter.HistoryPanel.Controls.Add(_messageHistoryControl);
 		LayoutMessageHistoryControl(_messageHistoryControl);
 
 		var textBox = CreateChatInputControl();
 		textBox.Send += (sender, content) => SendMessage(content);
 		_textBox = (Control)textBox;
-		_textBox.Name = "chatInputControl";
 
-		Controls.Add(_textBox);
+		splitter.ChatInputPanel.Controls.Add(_textBox);
 		LayoutChatInputControl(_textBox);
 	}
 
@@ -49,7 +51,6 @@ public partial class ChatControl : UserControl
 		base.OnDataContextChanged(e);
 
 		((IChatMessageHistoryControl)_messageHistoryControl)?.ClearMessageControls();
-		_messageChatControlCount = 0;
 
 		foreach (var message in DataContext as IEnumerable<IChatMessage> ?? [])
 			AppendMessage(message);
@@ -64,9 +65,16 @@ public partial class ChatControl : UserControl
 		var messageControl = CreateMessageControl(message);
 		messageControl.Message = message;
 		var control = (Control)messageControl;
-		control.Name = $"messageChatControl{++_messageChatControlCount}";
 		LayoutMessageControl(_messageHistoryControl, control);
 		((IChatMessageHistoryControl)_messageHistoryControl).AppendMessage(messageControl);
+	}
+
+	protected virtual ISplitContainerControl CreateSplitContainerControl() => new ChatSplitContainerControl();
+
+	protected virtual void LayoutSplitContainerControl(Control splitter)
+	{
+		splitter.Dock = DockStyle.Fill;
+		((ISplitContainerControl)splitter).SplitterPosition = 100;
 	}
 
 	/// <summary>
@@ -111,7 +119,7 @@ public partial class ChatControl : UserControl
 	/// Applies layout settings to the text input control.
 	/// </summary>
 	/// <param name="textBox">The text box control to layout.</param>
-	protected virtual void LayoutChatInputControl(Control textBox) => textBox.Dock = DockStyle.Bottom;
+	protected virtual void LayoutChatInputControl(Control textBox) => textBox.Dock = DockStyle.Fill;
 
 	/// <summary>
 	/// Sends a new message by appending it to the chat.
