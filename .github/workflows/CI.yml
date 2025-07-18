@@ -17,7 +17,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Allow unsecure commands
+    - name: Allow unsecure commands # required to download the dotnet sdk below
       run: echo 'ACTIONS_ALLOW_UNSECURE_COMMANDS=true' >> $GITHUB_ENV
 
     - name: Fetch all history for all tags and branches
