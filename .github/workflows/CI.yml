@@ -6,7 +6,7 @@ on:
     paths: [ 'src/**', '.github/workflows/CI.yml' ]
   pull_request:
     branches: [ "main", "master" ]
-    paths: [ 'src/**', '.github/workflows/CI.yml' ]
+    paths: [ 'src/**' ]
 
 
 jobs:
