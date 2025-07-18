@@ -40,26 +40,27 @@ namespace WinFormsDemo
 			splitContainer.SuspendLayout();
 			SuspendLayout();
 			// 
-			// chatControl1
+			// chatControl
 			// 
 			chatControl.Dock = DockStyle.Fill;
 			chatControl.Location = new Point(0, 0);
-			chatControl.Name = "chatControl1";
+			chatControl.Name = "chatControl";
 			chatControl.Size = new Size(313, 628);
 			chatControl.TabIndex = 0;
+			chatControl.MessageSent += chatControl_MessageSent;
 			// 
-			// splitContainer1
+			// splitContainer
 			// 
 			splitContainer.Dock = DockStyle.Fill;
 			splitContainer.FixedPanel = FixedPanel.Panel2;
 			splitContainer.Location = new Point(0, 0);
-			splitContainer.Name = "splitContainer1";
+			splitContainer.Name = "splitContainer";
 			// 
-			// splitContainer1.Panel1
+			// splitContainer.Panel1
 			// 
 			splitContainer.Panel1.Controls.Add(chatControl);
 			// 
-			// splitContainer1.Panel2
+			// splitContainer.Panel2
 			// 
 			splitContainer.Panel2.Controls.Add(propertyGrid);
 			splitContainer.Panel2.Controls.Add(typeLabel);
@@ -67,21 +68,21 @@ namespace WinFormsDemo
 			splitContainer.SplitterDistance = 313;
 			splitContainer.TabIndex = 1;
 			// 
-			// propertyGrid1
+			// propertyGrid
 			// 
 			propertyGrid.BackColor = SystemColors.Control;
 			propertyGrid.Dock = DockStyle.Fill;
 			propertyGrid.Location = new Point(0, 23);
-			propertyGrid.Name = "propertyGrid1";
+			propertyGrid.Name = "propertyGrid";
 			propertyGrid.Size = new Size(331, 605);
 			propertyGrid.TabIndex = 0;
 			// 
-			// label1
+			// typeLabel
 			// 
 			typeLabel.Dock = DockStyle.Top;
 			typeLabel.Font = new Font("Segoe UI", 9.75F, FontStyle.Regular, GraphicsUnit.Point, 0);
 			typeLabel.Location = new Point(0, 0);
-			typeLabel.Name = "label1";
+			typeLabel.Name = "typeLabel";
 			typeLabel.Size = new Size(331, 23);
 			typeLabel.TabIndex = 1;
 			typeLabel.Text = "Control";

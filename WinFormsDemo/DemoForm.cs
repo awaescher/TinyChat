@@ -1,3 +1,5 @@
+using TinyChat;
+
 namespace WinFormsDemo;
 
 /// <summary>
@@ -90,6 +92,11 @@ public partial class DemoForm : Form, IMessageFilter
 	{
 		propertyGrid.SelectedObject = control;
 		typeLabel.Text = control?.GetType().Name ?? "";
+	}
+
+	private void chatControl_MessageSent(object sender, MessageSentEventArgs e)
+	{
+		chatControl.AddStreamingMessage(new NamedSender("A"), DemoData.StreamAiAnswer());
 	}
 }
 

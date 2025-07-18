@@ -58,6 +58,7 @@ namespace DevExpressDemo
 			dxChatControl.Name = "dxChatControl";
 			dxChatControl.Size = new System.Drawing.Size(336, 643);
 			dxChatControl.TabIndex = 1;
+			dxChatControl.MessageSent += dxChatControl_MessageSent;
 			// 
 			// splitMain
 			// 
@@ -80,40 +81,40 @@ namespace DevExpressDemo
 			splitMain.SplitterPosition = 341;
 			splitMain.TabIndex = 2;
 			// 
-			// propertyGridControl1
+			// propertyGridControl
 			// 
 			propertyGridControl.Dock = System.Windows.Forms.DockStyle.Fill;
 			propertyGridControl.Location = new System.Drawing.Point(0, 26);
-			propertyGridControl.Name = "propertyGridControl1";
+			propertyGridControl.Name = "propertyGridControl";
 			propertyGridControl.OptionsView.AllowReadOnlyRowAppearance = DevExpress.Utils.DefaultBoolean.True;
 			propertyGridControl.Size = new System.Drawing.Size(341, 617);
 			propertyGridControl.TabIndex = 0;
 			// 
-			// labelControl1
+			// typeLabelControl
 			// 
 			typeLabelControl.Appearance.Font = new System.Drawing.Font("Tahoma", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, 0);
 			typeLabelControl.Appearance.Options.UseFont = true;
 			typeLabelControl.AutoSizeMode = DevExpress.XtraEditors.LabelAutoSizeMode.None;
 			typeLabelControl.Dock = System.Windows.Forms.DockStyle.Top;
 			typeLabelControl.Location = new System.Drawing.Point(0, 0);
-			typeLabelControl.Name = "labelControl1";
+			typeLabelControl.Name = "typeLabelControl";
 			typeLabelControl.Padding = new System.Windows.Forms.Padding(8);
 			typeLabelControl.Size = new System.Drawing.Size(341, 26);
 			typeLabelControl.TabIndex = 1;
 			typeLabelControl.Text = "Control";
 			// 
-			// toolbarFormControl1
+			// toolbarFormControl
 			// 
 			toolbarFormControl.Location = new System.Drawing.Point(0, 0);
 			toolbarFormControl.Manager = toolbarFormManager;
-			toolbarFormControl.Name = "toolbarFormControl1";
+			toolbarFormControl.Name = "toolbarFormControl";
 			toolbarFormControl.Size = new System.Drawing.Size(687, 31);
 			toolbarFormControl.TabIndex = 3;
 			toolbarFormControl.TabStop = false;
 			toolbarFormControl.TitleItemLinks.Add(skinDropDownButtonItem);
 			toolbarFormControl.ToolbarForm = this;
 			// 
-			// toolbarFormManager1
+			// toolbarFormManager
 			// 
 			toolbarFormManager.DockControls.Add(barDockControlTop);
 			toolbarFormManager.DockControls.Add(barDockControlBottom);
@@ -155,11 +156,11 @@ namespace DevExpressDemo
 			barDockControlRight.Manager = toolbarFormManager;
 			barDockControlRight.Size = new System.Drawing.Size(0, 643);
 			// 
-			// skinDropDownButtonItem1
+			// skinDropDownButtonItem
 			// 
 			skinDropDownButtonItem.Alignment = DevExpress.XtraBars.BarItemLinkAlignment.Right;
 			skinDropDownButtonItem.Id = 2;
-			skinDropDownButtonItem.Name = "skinDropDownButtonItem1";
+			skinDropDownButtonItem.Name = "skinDropDownButtonItem";
 			// 
 			// DemoForm
 			// 

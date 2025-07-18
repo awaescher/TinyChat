@@ -43,7 +43,10 @@ public class ChatMessageControl : Panel, IChatMessageControl
 		{
 			_message = value;
 			_senderLabel.Text = Message?.Sender?.Name ?? string.Empty;
-			_messageLabel.Text = Message?.Content?.Render() ?? string.Empty;
+
+			_messageLabel.DataBindings.Clear();
+			if (Message is not null)
+				_messageLabel.DataBindings.Add(nameof(_messageLabel.Text), Message.Content, nameof(Message.Content.Content));
 		}
 	}
 

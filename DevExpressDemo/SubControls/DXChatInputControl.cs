@@ -12,9 +12,9 @@ namespace DevExpressDemo;
 public class DXChatInputControl : Control, IChatInputControl
 {
 	/// <summary>
-	/// Occurs when a message is sent from the text box.
+	/// Occurs before a message is sent from the text box.
 	/// </summary>
-	public event EventHandler<IChatMessageContent> Send;
+	public event EventHandler<MessageSendingEventArgs> MessageSending;
 
 	private readonly MemoEdit _textBox;
 
@@ -42,8 +42,12 @@ public class DXChatInputControl : Control, IChatInputControl
 		if (e.KeyChar == (char)Keys.Enter)
 		{
 			e.Handled = true;
-			Send?.Invoke(this, new StringMessageContent(_textBox.Text));
-			_textBox.Clear();
+
+			var sendArgs = new MessageSendingEventArgs(null! /* we dont know the sender but the ChatControl does */, new StringMessageContent(_textBox.Text));
+			MessageSending?.Invoke(this, sendArgs);
+
+			if (!sendArgs.Cancel)
+				_textBox.Clear();
 		}
 	}
 }

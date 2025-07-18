@@ -2,6 +2,7 @@ using System;
 using System.Windows.Forms;
 using DevExpress.LookAndFeel;
 using DevExpress.XtraBars.ToolbarForm;
+using TinyChat;
 using WinFormsDemo;
 
 namespace DevExpressDemo;
@@ -105,5 +106,10 @@ public partial class DemoForm : ToolbarForm, IMessageFilter
 	{
 		propertyGridControl.SelectedObject = control;
 		typeLabelControl.Text = control?.GetType().Name ?? "";
+	}
+
+	private void dxChatControl_MessageSent(object sender, TinyChat.MessageSentEventArgs e)
+	{
+		dxChatControl.AddStreamingMessage(new NamedSender(DemoData.AssistantName), DemoData.StreamAiAnswer());
 	}
 }

@@ -1,3 +1,5 @@
+using System.ComponentModel;
+
 namespace TinyChat;
 
 /// <summary>
@@ -5,10 +7,13 @@ namespace TinyChat;
 /// </summary>
 public class StringMessageContent : IChatMessageContent
 {
+	private readonly string? _value;
+
 	/// <summary>
-	/// Gets the string value of the message content.
+	/// Occurs then the value of the message content changes.
 	/// </summary>
-	public string? Value { get; }
+	public event PropertyChangedEventHandler? PropertyChanged;
+
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="StringMessageContent"/> class.
@@ -16,12 +21,19 @@ public class StringMessageContent : IChatMessageContent
 	/// <param name="value">The string value of the message content.</param>
 	public StringMessageContent(string? value)
 	{
-		Value = value;
+		if (string.Equals(_value, value))
+			return;
+
+		_value = value;
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(_value)));
 	}
 
 	/// <summary>
 	/// Renders the content as a string for display.
 	/// </summary>
 	/// <returns>The string value of the content.</returns>
-	public string? Render() => Value;
+	public string? Render() => _value;
+
+	/// <inheritdoc />
+	public object? Content => _value;
 }
