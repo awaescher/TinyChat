@@ -37,7 +37,7 @@ public class ChangingMessageContent : IChatMessageContent
 	/// Renders the content as a string for display.
 	/// </summary>
 	/// <returns>The string value of the content.</returns>
-	public string? Render() => _value?.ToString();
+	public string Render() => _value?.ToString() ?? string.Empty;
 
 	/// <inheritdoc />
 	public object? Content => _value;

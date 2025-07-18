@@ -11,7 +11,7 @@ public interface IChatMessageContent : INotifyPropertyChanged
 	/// Renders the content as a string for display.
 	/// </summary>
 	/// <returns>The rendered content as a string, or null if no content.</returns>
-	string? Render();
+	string Render();
 
 	/// <summary>
 	/// Gets the content of the message.

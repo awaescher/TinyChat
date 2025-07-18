@@ -14,7 +14,6 @@ public class StringMessageContent : IChatMessageContent
 	/// </summary>
 	public event PropertyChangedEventHandler? PropertyChanged;
 
-
 	/// <summary>
 	/// Initializes a new instance of the <see cref="StringMessageContent"/> class.
 	/// </summary>
@@ -32,8 +31,11 @@ public class StringMessageContent : IChatMessageContent
 	/// Renders the content as a string for display.
 	/// </summary>
 	/// <returns>The string value of the content.</returns>
-	public string? Render() => _value;
+	public string Render() => _value ?? string.Empty;
 
 	/// <inheritdoc />
 	public object? Content => _value;
+
+	/// <inheritdoc />
+	public override string ToString() => Render();
 }

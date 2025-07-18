@@ -45,6 +45,7 @@ public class DemoData
 		}
 	}
 
+	[System.Diagnostics.DebuggerDisplay("{Sender.Name}: {Content.Content}")]
 	public class DemoChatMessage : IChatMessage
 	{
 		public DemoChatMessage(string sender, string message)

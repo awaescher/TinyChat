@@ -139,26 +139,11 @@ public partial class ChatControl : UserControl
 		return messageControl;
 	}
 
-	protected virtual ISplitContainerControl CreateSplitContainerControl() => new ChatSplitContainerControl();
-
-	protected virtual void LayoutSplitContainerControl(Control splitter)
-	{
-		splitter.Dock = DockStyle.Fill;
-		((ISplitContainerControl)splitter).SplitterPosition = 100;
-	}
-
 	/// <summary>
 	/// Creates the container control that will hold all chat messages.
 	/// </summary>
 	/// <returns>A <see cref="Control"/> that serves as the messages container.</returns>
 	protected virtual IChatMessageHistoryControl CreateMessageHistoryControl() => new TableLayoutMessageHistoryControl();
-
-	/// <summary>
-	/// Creates a message control for displaying a specific chat message.
-	/// </summary>
-	/// <param name="message">The chat message to create a control for.</param>
-	/// <returns>An <see cref="IChatMessageControl"/> instance for the message.</returns>
-	protected virtual IChatMessageControl CreateMessageControl(IChatMessage message) => new ChatMessageControl();
 
 	/// <summary>
 	/// Applies layout settings to the messages container control.
@@ -170,6 +155,13 @@ public partial class ChatControl : UserControl
 	}
 
 	/// <summary>
+	/// Creates a message control for displaying a specific chat message.
+	/// </summary>
+	/// <param name="message">The chat message to create a control for.</param>
+	/// <returns>An <see cref="IChatMessageControl"/> instance for the message.</returns>
+	protected virtual IChatMessageControl CreateMessageControl(IChatMessage message) => new ChatMessageControl();
+
+	/// <summary>
 	/// Applies layout settings to a chat message control and adds it to the container.
 	/// </summary>
 	/// <param name="container">The container to add the message control to.</param>
@@ -177,6 +169,22 @@ public partial class ChatControl : UserControl
 	protected virtual void LayoutMessageControl(Control? container, Control? chatMessageControl)
 	{
 		chatMessageControl.Dock = DockStyle.Fill;
+	}
+
+	/// <summary>
+	/// Creates the split container control that holds the message history and input controls.
+	/// </summary>
+	/// <returns></returns>
+	protected virtual ISplitContainerControl CreateSplitContainerControl() => new ChatSplitContainerControl();
+
+	/// <summary>
+	/// Applies layout settings to the split container control.
+	/// </summary>
+	/// <param name="splitter"></param>
+	protected virtual void LayoutSplitContainerControl(Control splitter)
+	{
+		splitter.Dock = DockStyle.Fill;
+		((ISplitContainerControl)splitter).SplitterPosition = 100;
 	}
 
 	/// <summary>
