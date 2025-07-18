@@ -21,6 +21,8 @@ That's why I quickly hacked down TinyChat. I hope this might help anyone out the
 
 ## 🤷‍♂️ Not implemented
 
+### Not planned
+
 These features are not implemented and I don't plan to implement them. However, I'd be happy to review pull-requests.
 
 - Rich text message support
@@ -28,6 +30,15 @@ These features are not implemented and I don't plan to implement them. However, 
 - File attachment support
 - Image support
 - everything else you know from chatbots
+
+### Might come
+- [Basic HTML support with DevExpress labels](https://docs.devexpress.com/WindowsForms/4874/common-features/html-text-formatting)
+- Designer support for properties like UI settings like Fonts, Splitter position, ...
+- Select and copy texts
+- Send button
+- Shortcuts
+- Requesting cancellation
+- Starting new chats
 
 ## 🚀 Quick Start
 
