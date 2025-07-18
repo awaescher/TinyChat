@@ -8,7 +8,7 @@ public class ChatInputControl : Control, IChatInputControl
 	/// <summary>
 	/// Occurs before a message is sent from the text box.
 	/// </summary>
-	public event EventHandler<MessageSendingEventArgs> MessageSending;
+	public event EventHandler<MessageSendingEventArgs>? MessageSending;
 
 	private readonly TextBox _textBox;
 

@@ -88,13 +88,13 @@ public partial class DemoForm : Form, IMessageFilter
 	/// Selects the specified control in the property grid and updates the control type label.
 	/// </summary>
 	/// <param name="control">The control to select. Can be null.</param>
-	private void SelectControl(Control control)
+	private void SelectControl(Control? control)
 	{
 		propertyGrid.SelectedObject = control;
 		typeLabel.Text = control?.GetType().Name ?? "";
 	}
 
-	private void chatControl_MessageSent(object sender, MessageSentEventArgs e)
+	private void ChatControl_MessageSent(object sender, MessageSentEventArgs e)
 	{
 		chatControl.AddStreamingMessage(new NamedSender(DemoData.AssistantName), DemoData.StreamAiAnswer());
 	}

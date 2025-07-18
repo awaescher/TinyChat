@@ -15,7 +15,7 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl
 	/// <summary>
 	/// The chat message displayed by this control.
 	/// </summary>
-	private IChatMessage _message;
+	private IChatMessage? _message;
 
 	/// <summary>
 	/// Label control that displays the sender's name.
@@ -58,7 +58,7 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl
 	/// The <see cref="IChatMessage"/> instance to display, or null if no message is set.
 	/// </value>
 	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-	public IChatMessage Message
+	public IChatMessage? Message
 	{
 		get => _message;
 		set

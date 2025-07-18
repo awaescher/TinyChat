@@ -8,5 +8,5 @@ public interface IChatMessageControl
 	/// <summary>
 	/// Gets or sets the chat message displayed by this control.
 	/// </summary>
-	IChatMessage Message { get; set; }
+	IChatMessage? Message { get; set; }
 }

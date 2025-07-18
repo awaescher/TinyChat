@@ -102,13 +102,13 @@ public partial class DemoForm : ToolbarForm, IMessageFilter
 	/// the label to display the control's type name.
 	/// </summary>
 	/// <param name="control">The control to select for property inspection. Can be null.</param>
-	private void SelectControl(Control control)
+	private void SelectControl(Control? control)
 	{
 		propertyGridControl.SelectedObject = control;
 		typeLabelControl.Text = control?.GetType().Name ?? "";
 	}
 
-	private void dxChatControl_MessageSent(object sender, MessageSentEventArgs e)
+	private void DxChatControl_MessageSent(object sender, MessageSentEventArgs e)
 	{
 		dxChatControl.AddStreamingMessage(new NamedSender(DemoData.AssistantName), DemoData.StreamAiAnswer());
 	}

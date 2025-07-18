@@ -49,7 +49,7 @@ public class TableLayoutMessageHistoryControl : TableLayoutPanel, IChatMessageHi
 	/// <param name="message">The message to remove the control for</param>
 	public void RemoveMessageControl(IChatMessage message)
 	{
-		if (Controls.OfType<IChatMessageControl>().FirstOrDefault(mc => mc.Message.Equals(message)) is Control control)
+		if (Controls.OfType<IChatMessageControl>().FirstOrDefault(mc => mc.Message?.Equals(message) ?? false) is Control control)
 			Controls.Remove(control);
 	}
 

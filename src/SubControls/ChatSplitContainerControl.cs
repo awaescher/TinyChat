@@ -21,13 +21,11 @@ public class ChatSplitContainerControl : SplitContainer, ISplitContainerControl
 	/// <summary>
 	/// Gets the top panel of the split container, typically used for displaying chat history.
 	/// </summary>
-	/// <value>The <see cref="Panel1"/> control or null if not available.</value>
 	public Control? HistoryPanel => Panel1;
 
 	/// <summary>
 	/// Gets the bottom panel of the split container, typically used for chat input controls.
 	/// </summary>
-	/// <value>The <see cref="Panel2"/> control or null if not available.</value>
 	public Control? ChatInputPanel => Panel2;
 
 	/// <summary>

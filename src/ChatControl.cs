@@ -9,17 +9,17 @@ public partial class ChatControl : UserControl
 {
 	private Control? _messageHistoryControl;
 	private Control? _textBox;
-	private List<IChatMessage> _messages;
+	private List<IChatMessage> _messages = [];
 
 	/// <summary>
 	/// Occurs when a message is sent from the text box and allows the cancellation of sending.
 	/// </summary>
-	public event EventHandler<MessageSendingEventArgs> MessageSending;
+	public event EventHandler<MessageSendingEventArgs>? MessageSending;
 
 	/// <summary>
 	/// Occurs when a message has been sent from the user interface.
 	/// </summary>
-	public event EventHandler<MessageSentEventArgs> MessageSent;
+	public event EventHandler<MessageSentEventArgs>? MessageSent;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="ChatControl"/> class.
@@ -40,7 +40,8 @@ public partial class ChatControl : UserControl
 		{
 			_messages = value is null ? [] : [.. value];
 
-			((IChatMessageHistoryControl)_messageHistoryControl)?.ClearMessageControls();
+			if (_messageHistoryControl is IChatMessageHistoryControl casted)
+				casted.ClearMessageControls();
 
 			foreach (var message in _messages)
 				AppendMessageControl(message);
@@ -98,7 +99,9 @@ public partial class ChatControl : UserControl
 	public virtual void RemoveMessage(IChatMessage message)
 	{
 		_messages.Remove(message);
-		((IChatMessageHistoryControl)_messageHistoryControl)?.RemoveMessageControl(message);
+
+		if (_messageHistoryControl is IChatMessageHistoryControl casted)
+			casted.RemoveMessageControl(message);
 	}
 
 	/// <summary>
@@ -109,19 +112,23 @@ public partial class ChatControl : UserControl
 		base.OnCreateControl();
 
 		var splitter = CreateSplitContainerControl();
-		var splitterControl = (Control)splitter;
-		Controls.Add(splitterControl);
-		LayoutSplitContainerControl(splitterControl);
+		var splitterControl = splitter as Control;
+
+		if (splitterControl is not null)
+		{
+			Controls.Add(splitterControl);
+			LayoutSplitContainerControl(splitterControl);
+		}
 
 		_messageHistoryControl = (Control)CreateMessageHistoryControl();
-		splitter.HistoryPanel.Controls.Add(_messageHistoryControl);
+		splitter?.HistoryPanel?.Controls.Add(_messageHistoryControl);
 		LayoutMessageHistoryControl(_messageHistoryControl);
 
 		var textBox = CreateChatInputControl();
 		textBox.MessageSending += (_, args) => InvokeSendMessage(args);
 		_textBox = (Control)textBox;
 
-		splitter.ChatInputPanel.Controls.Add(_textBox);
+		splitter?.ChatInputPanel?.Controls.Add(_textBox);
 		LayoutChatInputControl(_textBox);
 	}
 
@@ -134,8 +141,13 @@ public partial class ChatControl : UserControl
 		var messageControl = CreateMessageControl(message);
 		messageControl.Message = message;
 		var control = (Control)messageControl;
-		LayoutMessageControl(_messageHistoryControl, control);
-		((IChatMessageHistoryControl)_messageHistoryControl).AppendMessageControl(messageControl);
+
+		if (_messageHistoryControl is IChatMessageHistoryControl casted)
+		{
+			LayoutMessageControl(_messageHistoryControl, control);
+			casted.AppendMessageControl(messageControl);
+		}
+
 		return messageControl;
 	}
 
@@ -166,7 +178,7 @@ public partial class ChatControl : UserControl
 	/// </summary>
 	/// <param name="container">The container to add the message control to.</param>
 	/// <param name="chatMessageControl">The chat message control to layout and add.</param>
-	protected virtual void LayoutMessageControl(Control? container, Control? chatMessageControl)
+	protected virtual void LayoutMessageControl(Control container, Control chatMessageControl)
 	{
 		chatMessageControl.Dock = DockStyle.Fill;
 	}
@@ -202,7 +214,7 @@ public partial class ChatControl : UserControl
 	/// <summary>
 	/// Invokes the events before and after a message is sent
 	/// </summary>
-	/// <param name="content">The content of the message to send.</param>
+	/// <param name="args">The event arguments to send.</param>
 	protected virtual void InvokeSendMessage(MessageSendingEventArgs args)
 	{
 		var sender = args.Sender ?? Sender;

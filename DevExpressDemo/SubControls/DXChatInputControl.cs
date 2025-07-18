@@ -14,7 +14,7 @@ public class DXChatInputControl : Control, IChatInputControl
 	/// <summary>
 	/// Occurs before a message is sent from the text box.
 	/// </summary>
-	public event EventHandler<MessageSendingEventArgs> MessageSending;
+	public event EventHandler<MessageSendingEventArgs>? MessageSending;
 
 	private readonly MemoEdit _textBox;
 
@@ -37,7 +37,7 @@ public class DXChatInputControl : Control, IChatInputControl
 	/// </summary>
 	/// <param name="sender">The source of the event.</param>
 	/// <param name="e">A <see cref="KeyPressEventArgs"/> that contains the event data.</param>
-	private void TextBox_KeyPress(object sender, KeyPressEventArgs e)
+	private void TextBox_KeyPress(object? sender, KeyPressEventArgs e)
 	{
 		if (e.KeyChar == (char)Keys.Enter)
 		{

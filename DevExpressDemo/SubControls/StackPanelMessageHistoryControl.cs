@@ -61,7 +61,7 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 	/// <param name="message">The message to remove the control for</param>
 	public void RemoveMessageControl(IChatMessage message)
 	{
-		if (_stackPanel.Controls.OfType<IChatMessageControl>().FirstOrDefault(mc => mc.Message.Equals(message)) is Control control)
+		if (_stackPanel.Controls.OfType<IChatMessageControl>().FirstOrDefault(mc => mc.Message?.Equals(message) ?? false) is Control control)
 			_stackPanel.Controls.Remove(control);
 	}
 

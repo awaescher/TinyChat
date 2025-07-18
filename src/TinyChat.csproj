@@ -5,7 +5,35 @@
     <TargetFramework>net9.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
-    <ImplicitUsings>enable</ImplicitUsings>
-  </PropertyGroup>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+		<GenerateDocumentationFile>True</GenerateDocumentationFile>
+		<Title>TinyChat</Title>
+		<Copyright>Andreas Wäscher</Copyright>
+		<Authors>Andreas Wäscher</Authors>
+    <PackageIcon>TinyChat.png</PackageIcon>
+		<Description>A minimalistic but extensible chat control library for Windows Forms</Description>
+		<PackageProjectUrl>https://github.com/awaescher/TinyChat</PackageProjectUrl>
+		<PackageReadmeFile>Readme.md</PackageReadmeFile>
+		<RepositoryUrl>https://github.com/awaescher/TinyChat</RepositoryUrl>
+		<RepositoryType>git</RepositoryType>
+		<PackageTags>chat;winforms;llm;openai;ai;streaming;ichatclient</PackageTags>
+		<PackageLicenseFile>LICENSE</PackageLicenseFile>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<None Include="..\TinyChat.png">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+		<None Include="..\LICENSE">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+		<None Include="..\ReadMe.md">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+	</ItemGroup>
 
 </Project>
