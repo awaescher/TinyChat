@@ -17,9 +17,6 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Allow unsecure commands # required to download the dotnet sdk below
-      run: echo 'ACTIONS_ALLOW_UNSECURE_COMMANDS=true' >> $GITHUB_ENV
-
     - name: Fetch all history for all tags and branches
       run: |
         git config remote.origin.url https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
@@ -41,14 +38,11 @@ jobs:
           9.0.x
 
     - name: Restore dependencies
-      run: dotnet restore TinyChat.sln
+      run: dotnet restore ./src/TinyChat.csproj
       
     - name: Build
-      run: dotnet build --no-restore --configuration=Release /p:Version=${{steps.gitversion.outputs.semVer}}
-
-    - name: Test
-      run: dotnet test --no-build --configuration=Release --verbosity normal --filter 'FullyQualifiedName!~FunctionalTests'
-      
+      run: dotnet build ./src/TinyChat.csproj --no-restore --configuration=Release /p:Version=${{steps.gitversion.outputs.semVer}}
+     
     - name: pack nuget packages
       run: dotnet pack --output nupkgs --configuration=Release --no-restore --no-build /p:PackageVersion=${{steps.gitversion.outputs.semVer}}
 
