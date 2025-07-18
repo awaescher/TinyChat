@@ -77,3 +77,7 @@ The repository includes two pretty similar demo applications:
 dotnet run --project WinFormsDemo
 dotnet run --project DevExpressDemo
 ```
+
+## Credits
+
+The package icon was made by [Vectors Market](https://www.flaticon.com/authors/vectors-market) and is licensed by the [Flaticons license](https://www.flaticon.com/legal).
