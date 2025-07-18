@@ -12,10 +12,10 @@
 		<Title>TinyChat</Title>
 		<Copyright>Andreas Wäscher</Copyright>
 		<Authors>Andreas Wäscher</Authors>
-    <PackageIcon>TinyChat.png</PackageIcon>
+    	<PackageIcon>TinyChat.png</PackageIcon>
 		<Description>A minimalistic but extensible chat control library for Windows Forms</Description>
 		<PackageProjectUrl>https://github.com/awaescher/TinyChat</PackageProjectUrl>
-		<PackageReadmeFile>Readme.md</PackageReadmeFile>
+		<PackageReadmeFile>ReadMe.md</PackageReadmeFile>
 		<RepositoryUrl>https://github.com/awaescher/TinyChat</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
 		<PackageTags>chat;winforms;llm;openai;ai;streaming;ichatclient</PackageTags>
