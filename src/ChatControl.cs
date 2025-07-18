@@ -125,7 +125,7 @@ public partial class ChatControl : UserControl
 		LayoutMessageHistoryControl(_messageHistoryControl);
 
 		var textBox = CreateChatInputControl();
-		textBox.MessageSending += (_, args) => InvokeSendMessage(args);
+		textBox.MessageSending += (_, e) => InvokeSendMessage(e);
 		_textBox = (Control)textBox;
 
 		splitter?.ChatInputPanel?.Controls.Add(_textBox);
@@ -214,17 +214,17 @@ public partial class ChatControl : UserControl
 	/// <summary>
 	/// Invokes the events before and after a message is sent
 	/// </summary>
-	/// <param name="args">The event arguments to send.</param>
-	protected virtual void InvokeSendMessage(MessageSendingEventArgs args)
+	/// <param name="e">The event arguments to send.</param>
+	protected virtual void InvokeSendMessage(MessageSendingEventArgs e)
 	{
-		var sender = args.Sender ?? Sender;
+		var sender = e.Sender ?? Sender;
 
-		MessageSending?.Invoke(this, args);
+		MessageSending?.Invoke(this, e);
 
-		if (!args.Cancel)
+		if (!e.Cancel)
 		{
-			AppendMessageControl(AddChatMessage(sender, args.Content));
-			MessageSent?.Invoke(this, new MessageSentEventArgs(sender, args.Content));
+			AppendMessageControl(AddChatMessage(sender, e.Content));
+			MessageSent?.Invoke(this, new MessageSentEventArgs(sender, e.Content));
 		}
 	}
 
