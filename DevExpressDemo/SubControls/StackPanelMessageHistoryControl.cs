@@ -38,7 +38,7 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 	/// The control is automatically sized to fit the client width and scrolled into view.
 	/// </summary>
 	/// <param name="messageControl">The chat message control to add to the history.</param>
-	public void AppendMessage(IChatMessageControl messageControl)
+	public void AppendMessageControl(IChatMessageControl messageControl)
 	{
 		var control = (Control)messageControl;
 		_stackPanel.Controls.Add(control);

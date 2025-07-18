@@ -28,7 +28,7 @@ public class TableLayoutMessageHistoryControl : TableLayoutPanel, IChatMessageHi
 	/// Appends a new message control to the message history and scrolls it into view.
 	/// </summary>
 	/// <param name="messageControl">The chat message control to add to the history.</param>
-	public void AppendMessage(IChatMessageControl messageControl)
+	public void AppendMessageControl(IChatMessageControl messageControl)
 	{
 		var control = (Control)messageControl;
 		Controls.Add(control);

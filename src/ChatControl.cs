@@ -9,11 +9,17 @@ public partial class ChatControl : UserControl
 {
 	private Control? _messageHistoryControl;
 	private Control? _textBox;
+	private List<IChatMessage> _messages;
 
+	/// <summary>
+	/// Occurs when a message is sent from the text box and allows the cancellation of sending.
+	/// </summary>
 	public event EventHandler<MessageSendingEventArgs> MessageSending;
 
+	/// <summary>
+	/// Occurs when a message has been sent from the user interface.
+	/// </summary>
 	public event EventHandler<MessageSentEventArgs> MessageSent;
-
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="ChatControl"/> class.
@@ -21,6 +27,68 @@ public partial class ChatControl : UserControl
 	public ChatControl()
 	{
 		InitializeComponent();
+	}
+
+	/// <summary>
+	/// Gets or sets the message history displayed in the chat control.
+	/// </summary>
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	public IEnumerable<IChatMessage> Messages
+	{
+		get => _messages.AsReadOnly();
+		set
+		{
+			_messages = value is null ? [] : [.. value];
+
+			((IChatMessageHistoryControl)_messageHistoryControl)?.ClearMessageControls();
+
+			foreach (var message in _messages)
+				AppendMessageControl(message);
+		}
+	}
+
+	/// <summary>
+	/// Gets or sets the sender for messages sent from this chat control.
+	/// </summary>
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	public ISender Sender { get; set; } = new NamedSender(Environment.UserName);
+
+	/// <summary>
+	/// Adds a chat message to the message history control.
+	/// </summary>
+	/// <param name="sender">The sender of the message.</param>
+	/// <param name="content">The content of the message.</param>
+	/// <returns></returns>
+	public IChatMessageControl AddMessage(ISender sender, IChatMessageContent content)
+	{
+		var message = AddChatMessage(sender, content);
+		return AppendMessageControl(message);
+	}
+
+	/// <summary>
+	/// Adds a chat message with with support of streaming input, like when an AI assistant is streaming tokens
+	/// </summary>
+	/// <param name="sender">The sender of the streaming message.</param>
+	/// <param name="stream">The stream of the tokens.</param>
+	/// <param name="synchronizationContext">An optional synchronization context. Only required if the applications does not provide a default synchronization context.</param>
+	/// <param name="cancellationToken">The token to cancel the operation with.</param>
+	/// <returns></returns>
+	public IChatMessageControl AddStreamingMessage(ISender sender, IAsyncEnumerable<string> stream, SynchronizationContext? synchronizationContext = default, CancellationToken cancellationToken = default)
+	{
+		var stringBuilder = new NotifyingStringBuilder();
+		var content = new ChangingMessageContent(stringBuilder);
+		var message = AddChatMessage(sender, content);
+
+		var context = (synchronizationContext ?? SynchronizationContext.Current) ?? throw new InvalidOperationException("No synchronization context available. Please make sure a the default SynchronizationContext is available or pass in an SynchronizationContext as argument!");
+
+		// loop through the stream in a background thread and append the chunks to the string builder
+		context.Post(async (_) =>
+		{
+			await foreach (var chunk in stream.ConfigureAwait(true).WithCancellation(cancellationToken))
+				stringBuilder.Append(chunk);
+		}, state: null);
+
+		return AppendMessageControl(message);
 	}
 
 	/// <summary>
@@ -48,30 +116,16 @@ public partial class ChatControl : UserControl
 	}
 
 	/// <summary>
-	/// Raises the <see cref="Control.DataContextChanged"/> event and refreshes the displayed messages.
-	/// </summary>
-	/// <param name="e">An <see cref="EventArgs"/> that contains the event data.</param>
-	protected override void OnDataContextChanged(EventArgs e)
-	{
-		base.OnDataContextChanged(e);
-
-		((IChatMessageHistoryControl)_messageHistoryControl)?.ClearMessageControls();
-
-		foreach (var message in DataContext as IEnumerable<IChatMessage> ?? [])
-			AppendMessage(message);
-	}
-
-	/// <summary>
 	/// Appends a chat message to the message container.
 	/// </summary>
 	/// <param name="message">The chat message to append.</param>
-	protected virtual IChatMessageControl AppendMessage(IChatMessage message)
+	protected virtual IChatMessageControl AppendMessageControl(IChatMessage message)
 	{
 		var messageControl = CreateMessageControl(message);
 		messageControl.Message = message;
 		var control = (Control)messageControl;
 		LayoutMessageControl(_messageHistoryControl, control);
-		((IChatMessageHistoryControl)_messageHistoryControl).AppendMessage(messageControl);
+		((IChatMessageHistoryControl)_messageHistoryControl).AppendMessageControl(messageControl);
 		return messageControl;
 	}
 
@@ -139,7 +193,7 @@ public partial class ChatControl : UserControl
 
 		if (!args.Cancel)
 		{
-			AppendMessage(CreateChatMessage(sender, args.Content));
+			AppendMessageControl(AddChatMessage(sender, args.Content));
 			MessageSent?.Invoke(this, new MessageSentEventArgs(sender, args.Content));
 		}
 	}
@@ -153,100 +207,15 @@ public partial class ChatControl : UserControl
 	protected virtual IChatMessage CreateChatMessage(ISender sender, IChatMessageContent content) => new ChatMessage(sender, content);
 
 	/// <summary>
-	/// Adds a chat message to the message history control.
+	/// Creates a new chat message and adds it to the message history.
 	/// </summary>
 	/// <param name="sender">The sender of the message.</param>
 	/// <param name="content">The content of the message.</param>
-	/// <returns></returns>
-	public IChatMessageControl AddMessage(ISender sender, IChatMessageContent content)
+	/// <returns>A new <see cref="IChatMessage"/> instance.</returns>
+	protected virtual IChatMessage AddChatMessage(ISender sender, IChatMessageContent content)
 	{
 		var message = CreateChatMessage(sender, content);
-		return AppendMessage(message);
-	}
-
-	/// <summary>
-	/// Adds a chat message with with support of streaming input, like when an AI assistant is streaming tokens
-	/// </summary>
-	/// <param name="sender">The sender of the streaming message.</param>
-	/// <param name="stream">The stream of the tokens.</param>
-	/// <param name="synchronizationContext">An optional synchronization context. Only required if the applications does not provide a default synchronization context.</param>
-	/// <param name="cancellationToken">The token to cancel the operation with.</param>
-	/// <returns></returns>
-	public IChatMessageControl AddStreamingMessage(ISender sender, IAsyncEnumerable<string> stream, SynchronizationContext? synchronizationContext = default, CancellationToken cancellationToken = default)
-	{
-		var stringBuilder = new NotifyingStringBuilder();
-		var content = new ChangingMessageContent(stringBuilder);
-		var message = CreateChatMessage(sender, content);
-
-		var context = (synchronizationContext ?? SynchronizationContext.Current) ?? throw new InvalidOperationException("No synchronization context available. Please make sure a the default SynchronizationContext is available or pass in an SynchronizationContext as argument!");
-
-		// loop through the stream in a background thread and append the chunks to the string builder
-		context.Post(async (_) =>
-		{
-			await foreach (var chunk in stream.ConfigureAwait(true).WithCancellation(cancellationToken))
-				stringBuilder.Append(chunk);
-		}, state: null);
-
-		return AppendMessage(message);
-	}
-
-	/// <summary>
-	/// Gets or sets the sender for messages sent from this chat control.
-	/// </summary>
-	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-	public ISender Sender { get; set; } = new NamedSender(Environment.UserName);
-}
-
-/// <summary>
-/// Provides data and cancellation support for the event before a message gets sent.
-/// </summary>
-public class MessageSendingEventArgs : CancelEventArgs
-{
-	/// <summary>
-	/// Gets the message content being sent.
-	/// </summary>
-	public IChatMessageContent Content { get; }
-
-	/// <summary>
-	/// Gets the sender of the message.
-	/// </summary>
-	public ISender Sender { get; }
-
-	/// <summary>
-	/// Initializes a new instance of the <see cref="ChatSendEventArgs"/> class.
-	/// </summary>
-	/// <param name="sender">The sender of the message.</param>
-	/// <param name="content">The message content being sent.</param>
-	public MessageSendingEventArgs(ISender sender, IChatMessageContent content)
-	{
-		Content = content;
-		Sender = sender;
-	}
-}
-
-/// <summary>
-/// Provides data for the event when a message was sent
-/// </summary>
-public class MessageSentEventArgs : EventArgs
-{
-	/// <summary>
-	/// Gets the message content being sent.
-	/// </summary>
-	public IChatMessageContent Content { get; }
-
-	/// <summary>
-	/// Gets the sender of the message.
-	/// </summary>
-	public ISender Sender { get; }
-
-	/// <summary>
-	/// Initializes a new instance of the <see cref="ChatSendEventArgs"/> class.
-	/// </summary>
-	/// <param name="sender">The sender of the message.</param>
-	/// <param name="content">The message content being sent.</param>
-	public MessageSentEventArgs(ISender sender, IChatMessageContent content)
-	{
-		Content = content;
-		Sender = sender;
+		_messages.Add(message);
+		return message;
 	}
 }

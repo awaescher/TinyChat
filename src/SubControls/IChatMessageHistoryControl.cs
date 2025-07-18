@@ -9,7 +9,7 @@ public interface IChatMessageHistoryControl
 	/// Appends a chat message control to the history.
 	/// </summary>
 	/// <param name="messageControl">The chat message control to append.</param>
-	void AppendMessage(IChatMessageControl messageControl);
+	void AppendMessageControl(IChatMessageControl messageControl);
 
 	/// <summary>
 	/// Clears all message controls from the history.

@@ -42,7 +42,7 @@ public partial class DemoForm : ToolbarForm, IMessageFilter
 
 		UserLookAndFeel.Default.SetSkinStyle(SkinStyle.Office2010Blue);
 
-		dxChatControl.DataContext = DemoData.Create(Environment.UserName);
+		dxChatControl.Messages = DemoData.Create(Environment.UserName);
 		SelectControl(dxChatControl);
 	}
 
@@ -108,7 +108,7 @@ public partial class DemoForm : ToolbarForm, IMessageFilter
 		typeLabelControl.Text = control?.GetType().Name ?? "";
 	}
 
-	private void dxChatControl_MessageSent(object sender, TinyChat.MessageSentEventArgs e)
+	private void dxChatControl_MessageSent(object sender, MessageSentEventArgs e)
 	{
 		dxChatControl.AddStreamingMessage(new NamedSender(DemoData.AssistantName), DemoData.StreamAiAnswer());
 	}

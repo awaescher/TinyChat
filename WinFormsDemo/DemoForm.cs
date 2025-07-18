@@ -32,7 +32,7 @@ public partial class DemoForm : Form, IMessageFilter
 
 		Application.AddMessageFilter(this);
 
-		chatControl.DataContext = DemoData.Create(Environment.UserName);
+		chatControl.Messages = DemoData.Create(Environment.UserName);
 		SelectControl(chatControl);
 	}
 
