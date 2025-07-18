@@ -59,7 +59,7 @@ public partial class ChatControl : UserControl
 	/// <param name="sender">The sender of the message.</param>
 	/// <param name="content">The content of the message.</param>
 	/// <returns></returns>
-	public IChatMessageControl AddMessage(ISender sender, IChatMessageContent content)
+	public virtual IChatMessageControl AddMessage(ISender sender, IChatMessageContent content)
 	{
 		var message = AddChatMessage(sender, content);
 		return AppendMessageControl(message);
@@ -73,7 +73,7 @@ public partial class ChatControl : UserControl
 	/// <param name="synchronizationContext">An optional synchronization context. Only required if the applications does not provide a default synchronization context.</param>
 	/// <param name="cancellationToken">The token to cancel the operation with.</param>
 	/// <returns></returns>
-	public IChatMessageControl AddStreamingMessage(ISender sender, IAsyncEnumerable<string> stream, SynchronizationContext? synchronizationContext = default, CancellationToken cancellationToken = default)
+	public virtual IChatMessageControl AddStreamingMessage(ISender sender, IAsyncEnumerable<string> stream, SynchronizationContext? synchronizationContext = default, CancellationToken cancellationToken = default)
 	{
 		var stringBuilder = new NotifyingStringBuilder();
 		var content = new ChangingMessageContent(stringBuilder);
@@ -89,6 +89,16 @@ public partial class ChatControl : UserControl
 		}, state: null);
 
 		return AppendMessageControl(message);
+	}
+
+	/// <summary>
+	/// Removes a given message from the chat
+	/// </summary>
+	/// <param name="message"></param>
+	public virtual void RemoveMessage(IChatMessage message)
+	{
+		_messages.Remove(message);
+		((IChatMessageHistoryControl)_messageHistoryControl)?.RemoveMessageControl(message);
 	}
 
 	/// <summary>

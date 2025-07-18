@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Linq;
 using System.Windows.Forms;
 using DevExpress.Utils.Layout;
 using DevExpress.XtraEditors;
@@ -52,6 +53,16 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 	public void ClearMessageControls()
 	{
 		_stackPanel.Controls.Clear();
+	}
+
+	/// <summary>
+	/// Removes a message control by a given message
+	/// </summary>
+	/// <param name="message">The message to remove the control for</param>
+	public void RemoveMessageControl(IChatMessage message)
+	{
+		if (_stackPanel.Controls.OfType<IChatMessageControl>().FirstOrDefault(mc => mc.Message.Equals(message)) is Control control)
+			_stackPanel.Controls.Remove(control);
 	}
 
 	/// <summary>

@@ -44,6 +44,16 @@ public class TableLayoutMessageHistoryControl : TableLayoutPanel, IChatMessageHi
 	}
 
 	/// <summary>
+	/// Removes a message control by a given message
+	/// </summary>
+	/// <param name="message">The message to remove the control for</param>
+	public void RemoveMessageControl(IChatMessage message)
+	{
+		if (Controls.OfType<IChatMessageControl>().FirstOrDefault(mc => mc.Message.Equals(message)) is Control control)
+			Controls.Remove(control);
+	}
+
+	/// <summary>
 	/// Handles client size changes by updating the maximum width of all child controls
 	/// to match the new client area width, ensuring proper text wrapping.
 	/// </summary>
