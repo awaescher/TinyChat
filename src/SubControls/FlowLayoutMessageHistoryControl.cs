@@ -61,7 +61,7 @@ public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHist
 			SetMaxWidthToPreventHorizontalScrollbar(control);
 
 		ResumeLayout();
-		PerformLayout();
+		PerformLayout(); // to hide the H-scrollbar that pops up from time to time
 	}
 
 	/// <summary>

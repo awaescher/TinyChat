@@ -89,7 +89,7 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 	/// <param name="control">The control to apply size constraints to.</param>
 	private void SetSizeContraints(Control control)
 	{
-		control.MinimumSize = new Size(ClientRectangle.Width, 0);
-		control.MaximumSize = new Size(ClientRectangle.Width, 0);
+		control.MinimumSize = new Size(_stackPanel.ClientRectangle.Width, 0);
+		control.MaximumSize = new Size(_stackPanel.ClientRectangle.Width, 0);
 	}
 }

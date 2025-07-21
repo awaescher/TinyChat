@@ -20,12 +20,12 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl
 	/// <summary>
 	/// Label control that displays the sender's name.
 	/// </summary>
-	private readonly Label _senderLabel;
+	private readonly LabelControl _senderLabel;
 
 	/// <summary>
 	/// Label control that displays the message content.
 	/// </summary>
-	private readonly Label _messageLabel;
+	private readonly LabelControl _messageLabel;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="DXChatMessageControl"/> class.
@@ -34,13 +34,11 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl
 	public DXChatMessageControl()
 	{
 		BorderStyle = DevExpress.XtraEditors.Controls.BorderStyles.NoBorder;
+		AutoSize = true;
 
-		// TODO use DevExpress LabelControl
-		//_senderLabel = new LabelControl() { Dock = DockStyle.Top, AutoSizeMode = LabelAutoSizeMode.Vertical, Font = new Font(Font, FontStyle.Bold) };
-		//_messageLabel = new LabelControl() { Dock = DockStyle.Fill, AutoSizeMode = LabelAutoSizeMode.Default};
+		_senderLabel = new LabelControl() { Dock = DockStyle.Top, AutoSizeMode = LabelAutoSizeMode.Vertical, Font = new Font(Font, FontStyle.Bold) };
+		_messageLabel = new LabelControl() { Dock = DockStyle.Top, AutoSizeMode = LabelAutoSizeMode.Vertical };
 
-		_senderLabel = new Label() { Dock = DockStyle.Top, AutoSize = true, Font = new Font(Font, FontStyle.Bold) };
-		_messageLabel = new Label() { Dock = DockStyle.Fill, AutoSize = true };
 		Controls.Add(_senderLabel);
 		Controls.Add(_messageLabel);
 
