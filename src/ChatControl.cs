@@ -155,7 +155,7 @@ public partial class ChatControl : UserControl
 	/// Creates the container control that will hold all chat messages.
 	/// </summary>
 	/// <returns>A <see cref="Control"/> that serves as the messages container.</returns>
-	protected virtual IChatMessageHistoryControl CreateMessageHistoryControl() => new TableLayoutMessageHistoryControl();
+	protected virtual IChatMessageHistoryControl CreateMessageHistoryControl() => new FlowLayoutMessageHistoryControl();
 
 	/// <summary>
 	/// Applies layout settings to the messages container control.
