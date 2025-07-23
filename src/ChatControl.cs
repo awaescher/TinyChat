@@ -8,7 +8,9 @@ namespace TinyChat;
 public partial class ChatControl : UserControl
 {
 	private Control? _messageHistoryControl;
+	private Control? _welcomeControl;
 	private Control? _textBox;
+	private ISplitContainerControl _splitContainer;
 	private List<IChatMessage> _messages = [];
 
 	/// <summary>
@@ -20,6 +22,31 @@ public partial class ChatControl : UserControl
 	/// Occurs when a message has been sent from the user interface.
 	/// </summary>
 	public event EventHandler<MessageSentEventArgs>? MessageSent;
+
+	/// <summary>
+	/// Gets or sets the welcome message displayed when no messages are present in the chat history.
+	/// </summary>
+	[Category("Chat")]
+	[Description("Gets or sets the welcome message displayed when no messages are present in the chat history.")]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+	public string WelcomeMessage { get; set; } = "[◉_◉]\n\nGreetings human.\nHow can I help you today?";
+
+	/// <summary>
+	/// Gets or sets the splitter position dividing the chat message history from the chat input box below.
+	/// </summary>
+	[Category("Chat")]
+	[DefaultValue(100)]
+	[Description("Gets or sets the splitter position dividing the chat message history from the chat input box below.")]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+	public int SplitterPosition
+	{
+		get => _splitContainer?.SplitterPosition ?? 0;
+		set
+		{
+			if (_splitContainer is not null)
+				_splitContainer.SplitterPosition = value;
+		}
+	}
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="ChatControl"/> class.
@@ -45,8 +72,24 @@ public partial class ChatControl : UserControl
 
 			foreach (var message in _messages)
 				AppendMessageControl(message);
+
+			UpdateWelcomeControlVisibility();
 		}
 	}
+
+	/// <summary>
+	/// Updates the visibility of the welcome control based on the current message history.
+	/// </summary>
+	protected virtual void UpdateWelcomeControlVisibility()
+	{
+		if (_welcomeControl is not null)
+			_welcomeControl.Visible = ShouldShowWelcomeControl();
+	}
+
+	/// <summary>
+	/// Determines whether the welcome control should be displayed based on the current message history.
+	/// </summary>
+	protected virtual bool ShouldShowWelcomeControl() => !_messages.Any();
 
 	/// <summary>
 	/// Gets or sets the sender for messages sent from this chat control.
@@ -63,6 +106,7 @@ public partial class ChatControl : UserControl
 	public virtual IChatMessageControl AddMessage(ISender sender, IChatMessageContent content)
 	{
 		var message = AddChatMessage(sender, content);
+		UpdateWelcomeControlVisibility();
 		return AppendMessageControl(message);
 	}
 
@@ -89,6 +133,8 @@ public partial class ChatControl : UserControl
 				stringBuilder.Append(chunk);
 		}, state: null);
 
+		UpdateWelcomeControlVisibility();
+
 		return AppendMessageControl(message);
 	}
 
@@ -102,6 +148,8 @@ public partial class ChatControl : UserControl
 
 		if (_messageHistoryControl is IChatMessageHistoryControl casted)
 			casted.RemoveMessageControl(message);
+
+		UpdateWelcomeControlVisibility();
 	}
 
 	/// <summary>
@@ -111,24 +159,26 @@ public partial class ChatControl : UserControl
 	{
 		base.OnCreateControl();
 
-		var splitter = CreateSplitContainerControl();
-		var splitterControl = splitter as Control;
-
-		if (splitterControl is not null)
+		_splitContainer = CreateSplitContainerControl();
+		if (_splitContainer is Control splitContainerControl)
 		{
-			Controls.Add(splitterControl);
-			LayoutSplitContainerControl(splitterControl);
+			Controls.Add(splitContainerControl);
+			LayoutSplitContainerControl(splitContainerControl);
 		}
 
 		_messageHistoryControl = (Control)CreateMessageHistoryControl();
-		splitter?.HistoryPanel?.Controls.Add(_messageHistoryControl);
+		_splitContainer?.HistoryPanel?.Controls.Add(_messageHistoryControl);
 		LayoutMessageHistoryControl(_messageHistoryControl);
+
+		_welcomeControl = CreateWelcomeControl();
+		_splitContainer?.HistoryPanel?.Controls.Add(_welcomeControl);
+		LayoutWelcomeControl(_welcomeControl);
 
 		var textBox = CreateChatInputControl();
 		textBox.MessageSending += (_, e) => InvokeSendMessage(e);
 		_textBox = (Control)textBox;
 
-		splitter?.ChatInputPanel?.Controls.Add(_textBox);
+		_splitContainer?.ChatInputPanel?.Controls.Add(_textBox);
 		LayoutChatInputControl(_textBox);
 	}
 
@@ -160,10 +210,32 @@ public partial class ChatControl : UserControl
 	/// <summary>
 	/// Applies layout settings to the messages container control.
 	/// </summary>
-	/// <param name="container">The container control to layout.</param>
-	protected virtual void LayoutMessageHistoryControl(Control container)
+	/// <param name="control">The control to layout.</param>
+	protected virtual void LayoutMessageHistoryControl(Control control)
 	{
-		container.Dock = DockStyle.Fill;
+		control.Dock = DockStyle.Fill;
+	}
+
+	/// <summary>
+	/// Creates the container control that will hold all chat messages.
+	/// </summary>
+	/// <returns>A <see cref="Control"/> that serves as the messages container.</returns>
+	protected virtual Control CreateWelcomeControl()
+	{
+		var label = new Label { Text = WelcomeMessage, TextAlign = ContentAlignment.MiddleCenter, Dock = DockStyle.Fill, Font = new Font(Font.FontFamily, 14f) };
+		var panel = new Panel();
+		panel.Controls.Add(label);
+		return panel;
+	}
+
+	/// <summary>
+	/// Applies layout settings to the messages container control.
+	/// </summary>
+	/// <param name="control">The control to layout.</param>
+	protected virtual void LayoutWelcomeControl(Control control)
+	{
+		control.Dock = DockStyle.Fill;
+		control.BringToFront();
 	}
 
 	/// <summary>
