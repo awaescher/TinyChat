@@ -24,31 +24,6 @@ public partial class ChatControl : UserControl
 	public event EventHandler<MessageSentEventArgs>? MessageSent;
 
 	/// <summary>
-	/// Gets or sets the welcome message displayed when no messages are present in the chat history.
-	/// </summary>
-	[Category("Chat")]
-	[Description("Gets or sets the welcome message displayed when no messages are present in the chat history.")]
-	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
-	public string WelcomeMessage { get; set; } = "[◉_◉]\n\nGreetings human.\nHow can I help you today?";
-
-	/// <summary>
-	/// Gets or sets the splitter position dividing the chat message history from the chat input box below.
-	/// </summary>
-	[Category("Chat")]
-	[DefaultValue(100)]
-	[Description("Gets or sets the splitter position dividing the chat message history from the chat input box below.")]
-	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
-	public int SplitterPosition
-	{
-		get => _splitContainer?.SplitterPosition ?? 0;
-		set
-		{
-			if (_splitContainer is not null)
-				_splitContainer.SplitterPosition = value;
-		}
-	}
-
-	/// <summary>
 	/// Initializes a new instance of the <see cref="ChatControl"/> class.
 	/// </summary>
 	public ChatControl()
@@ -74,6 +49,31 @@ public partial class ChatControl : UserControl
 				AppendMessageControl(message);
 
 			UpdateWelcomeControlVisibility();
+		}
+	}
+
+	/// <summary>
+	/// Gets or sets the welcome message displayed when no messages are present in the chat history.
+	/// </summary>
+	[Category("Chat")]
+	[Description("Gets or sets the welcome message displayed when no messages are present in the chat history.")]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+	public string WelcomeMessage { get; set; } = "●\n┌─┴─┐\n◉‿◉\n└───┘\n\nGreetings human.\nHow can I help you today?";
+
+	/// <summary>
+	/// Gets or sets the splitter position dividing the chat message history from the chat input box below.
+	/// </summary>
+	[Category("Chat")]
+	[DefaultValue(60)]
+	[Description("Gets or sets the splitter position dividing the chat message history from the chat input box below.")]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+	public int SplitterPosition
+	{
+		get => _splitContainer?.SplitterPosition ?? 0;
+		set
+		{
+			if (_splitContainer is not null)
+				_splitContainer.SplitterPosition = value;
 		}
 	}
 
@@ -222,7 +222,7 @@ public partial class ChatControl : UserControl
 	/// <returns>A <see cref="Control"/> that serves as the messages container.</returns>
 	protected virtual Control CreateWelcomeControl()
 	{
-		var label = new Label { Text = WelcomeMessage, TextAlign = ContentAlignment.MiddleCenter, Dock = DockStyle.Fill, Font = new Font(Font.FontFamily, 14f) };
+		var label = new Label { Text = WelcomeMessage, TextAlign = ContentAlignment.MiddleCenter, Dock = DockStyle.Fill, Font = new Font("Tahoma", 14f) };
 		var panel = new Panel();
 		panel.Controls.Add(label);
 		return panel;
@@ -268,7 +268,7 @@ public partial class ChatControl : UserControl
 	protected virtual void LayoutSplitContainerControl(Control splitter)
 	{
 		splitter.Dock = DockStyle.Fill;
-		((ISplitContainerControl)splitter).SplitterPosition = 100;
+		((ISplitContainerControl)splitter).SplitterPosition = 60;
 	}
 
 	/// <summary>

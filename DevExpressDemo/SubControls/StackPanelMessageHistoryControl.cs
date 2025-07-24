@@ -43,8 +43,15 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 	{
 		var control = (Control)messageControl;
 		_stackPanel.Controls.Add(control);
-		SetSizeContraints(control);
-		ScrollControlIntoView(control);
+
+		// queue this to the UI thread to ensure it runs after the control is added
+		// otherwise the sizing of the labels will be incorrect if the scrollbar
+		// is not visible
+		this.BeginInvoke(() =>
+		{
+			SetSizeConstraints(control);
+			ScrollControlIntoView(control);
+		});
 	}
 
 	/// <summary>
@@ -74,12 +81,20 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 	{
 		base.OnClientSizeChanged(e);
 
-		SuspendLayout();
+		if (_stackPanel?.Controls.Count > 0)
+		{
+			// needs to be done after the control decided whether or not
+			// a V scrollbar should be shown
+			this.BeginInvoke(() =>
+			{
+				SuspendLayout();
 
-		foreach (Control control in _stackPanel.Controls)
-			SetSizeContraints(control);
+				foreach (Control control in _stackPanel.Controls)
+					SetSizeConstraints(control);
 
-		ResumeLayout();
+				ResumeLayout();
+			});
+		}
 	}
 
 	/// <summary>
@@ -87,7 +102,7 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 	/// This ensures message controls span the full width of the container.
 	/// </summary>
 	/// <param name="control">The control to apply size constraints to.</param>
-	private void SetSizeContraints(Control control)
+	private void SetSizeConstraints(Control control)
 	{
 		control.MinimumSize = new Size(_stackPanel.ClientRectangle.Width, 0);
 		control.MaximumSize = new Size(_stackPanel.ClientRectangle.Width, 0);
