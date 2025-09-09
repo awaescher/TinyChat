@@ -69,14 +69,7 @@ public partial class ChatControl : UserControl
 		set
 		{
 			_messages = value is null ? [] : [.. value];
-
-			if (MessageHistoryControl is IChatMessageHistoryControl casted)
-				casted.ClearMessageControls();
-
-			foreach (var message in _messages)
-				AppendMessageControl(message);
-
-			UpdateWelcomeControlVisibility();
+			PopulateMessages();
 		}
 	}
 
@@ -209,6 +202,22 @@ public partial class ChatControl : UserControl
 
 		splitContainer?.ChatInputPanel?.Controls.Add(InputControl);
 		LayoutChatInputControl(InputControl);
+
+		PopulateMessages();
+	}
+
+	/// <summary>
+	/// Adds the messages to the controls
+	/// </summary>
+	private void PopulateMessages()
+	{
+		if (MessageHistoryControl is IChatMessageHistoryControl casted)
+			casted.ClearMessageControls();
+
+		foreach (var message in _messages)
+			AppendMessageControl(message);
+
+		UpdateWelcomeControlVisibility();
 	}
 
 	/// <summary>
