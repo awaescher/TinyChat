@@ -16,8 +16,8 @@ public class ChatMessageControl : Panel, IChatMessageControl
 	/// </summary>
 	public ChatMessageControl()
 	{
-		_senderLabel = new Label() { Dock = DockStyle.Top, AutoSize = true, Font = new Font(Font, FontStyle.Bold) };
-		_messageLabel = new Label() { Dock = DockStyle.Fill, AutoSize = true };
+		_senderLabel = new Label() { Dock = DockStyle.Top, AutoSize = true, Font = new Font(Font, FontStyle.Bold), UseMnemonic = false };
+		_messageLabel = new Label() { Dock = DockStyle.Fill, AutoSize = true, UseMnemonic = false };
 		Controls.Add(_senderLabel);
 		Controls.Add(_messageLabel);
 

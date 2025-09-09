@@ -260,7 +260,7 @@ public partial class ChatControl : UserControl
 	/// <returns>A <see cref="Control"/> that serves as the messages container.</returns>
 	protected virtual Control CreateWelcomeControl()
 	{
-		var label = new Label { Text = WelcomeMessage, TextAlign = ContentAlignment.MiddleCenter, Dock = DockStyle.Fill, Font = new Font("Tahoma", 14f) };
+		var label = new Label { Text = WelcomeMessage, TextAlign = ContentAlignment.MiddleCenter, Dock = DockStyle.Fill, Font = new Font("Tahoma", 14f), UseMnemonic = false };
 		var panel = new Panel();
 		panel.Controls.Add(label);
 		return panel;

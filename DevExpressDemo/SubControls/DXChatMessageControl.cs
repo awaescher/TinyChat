@@ -36,8 +36,8 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl
 		BorderStyle = DevExpress.XtraEditors.Controls.BorderStyles.NoBorder;
 		AutoSize = true;
 
-		_senderLabel = new LabelControl() { Dock = DockStyle.Top, AutoSizeMode = LabelAutoSizeMode.Vertical, Font = new Font(Font, FontStyle.Bold) };
-		_messageLabel = new LabelControl() { Dock = DockStyle.Top, AutoSizeMode = LabelAutoSizeMode.Vertical };
+		_senderLabel = new LabelControl() { Dock = DockStyle.Top, AutoSizeMode = LabelAutoSizeMode.Vertical, Font = new Font(Font, FontStyle.Bold), UseMnemonic = false };
+		_messageLabel = new LabelControl() { Dock = DockStyle.Top, AutoSizeMode = LabelAutoSizeMode.Vertical, UseMnemonic = false };
 
 		Controls.Add(_senderLabel);
 		Controls.Add(_messageLabel);
