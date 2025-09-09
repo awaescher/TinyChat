@@ -143,10 +143,11 @@ public partial class ChatControl : UserControl
 	/// </summary>
 	/// <param name="sender">The sender of the streaming message.</param>
 	/// <param name="stream">The stream of the tokens.</param>
+	/// <param name="completionCallback">An optional callback that can be used to process the streamed messages after it was received completely.</param>
 	/// <param name="synchronizationContext">An optional synchronization context. Only required if the applications does not provide a default synchronization context.</param>
 	/// <param name="cancellationToken">The token to cancel the operation with.</param>
 	/// <returns></returns>
-	public virtual IChatMessageControl AddStreamingMessage(ISender sender, IAsyncEnumerable<string> stream, SynchronizationContext? synchronizationContext = default, CancellationToken cancellationToken = default)
+	public virtual IChatMessageControl AddStreamingMessage(ISender sender, IAsyncEnumerable<string> stream, Action<string>? completionCallback = default, SynchronizationContext? synchronizationContext = default, CancellationToken cancellationToken = default)
 	{
 		var stringBuilder = new NotifyingStringBuilder();
 		var content = new ChangingMessageContent(stringBuilder);
@@ -159,6 +160,8 @@ public partial class ChatControl : UserControl
 		{
 			await foreach (var chunk in stream.ConfigureAwait(true).WithCancellation(cancellationToken))
 				stringBuilder.Append(chunk);
+
+			completionCallback?.Invoke(stringBuilder.ToString());
 		}, state: null);
 
 		UpdateWelcomeControlVisibility();
