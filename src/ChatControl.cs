@@ -197,7 +197,7 @@ public partial class ChatControl : UserControl
 		LayoutWelcomeControl(WelcomeControl);
 
 		var inputControl = CreateChatInputControl();
-		inputControl.MessageSending += (_, e) => InvokeSendMessage(e);
+		inputControl.MessageSending += (_, e) => SendMessage(e);
 		InputControl = (Control)inputControl;
 
 		splitContainer?.ChatInputPanel?.Controls.Add(InputControl);
@@ -322,10 +322,63 @@ public partial class ChatControl : UserControl
 	protected virtual void LayoutChatInputControl(Control textBox) => textBox.Dock = DockStyle.Fill;
 
 	/// <summary>
-	/// Invokes the events before and after a message is sent
+	/// Sends a message from the current sender with the specified text content.
 	/// </summary>
-	/// <param name="e">The event arguments to send.</param>
-	protected virtual void InvokeSendMessage(MessageSendingEventArgs e)
+	/// <param name="message">The text content of the message to send.</param>
+	/// <returns>
+	/// <see langword="true"/> if the message was sent successfully; 
+	/// <see langword="false"/> if the message sending was cancelled.
+	/// </returns>
+	/// <remarks>
+	/// This method creates a <see cref="StringMessageContent"/> wrapper around the provided text
+	/// and uses the control's default <see cref="Sender"/> property for the message sender.
+	/// The message sending can be cancelled by handling the <see cref="MessageSending"/> event
+	/// and setting the MessageSendingEventArgs.Cancel property to <see langword="true"/>.
+	/// </remarks>
+	public bool SendMessage(string message)
+	{
+		var args = new MessageSendingEventArgs(Sender, new StringMessageContent(message));
+		SendMessage(args);
+		return !args.Cancel;
+	}
+
+	/// <summary>
+	/// Sends a message from the specified sender with the given content.
+	/// </summary>
+	/// <param name="sender">The sender of the message.</param>
+	/// <param name="content">The content of the message to send.</param>
+	/// <returns>
+	/// <see langword="true"/> if the message was sent successfully; 
+	/// <see langword="false"/> if the message sending was cancelled.
+	/// </returns>
+	/// <remarks>
+	/// This method allows specifying both the sender and content of the message explicitly.
+	/// The message sending can be cancelled by handling the <see cref="MessageSending"/> event
+	/// and setting the MessageSendingEventArgs.Cancel property to <see langword="true"/>.
+	/// </remarks>
+	public bool SendMessage(ISender sender, IChatMessageContent content)
+	{
+		var args = new MessageSendingEventArgs(sender, content);
+		SendMessage(args);
+		return !args.Cancel;
+	}
+
+	/// <summary>
+	/// Sends a message using the provided event arguments, handling the complete message sending workflow.
+	/// </summary>
+	/// <param name="e">The event arguments containing the sender, content, and cancellation state.</param>
+	/// <remarks>
+	/// This method orchestrates the complete message sending process:
+	/// <list type="number">
+	/// <item><description>Determines the effective sender (uses <paramref name="e"/>.Sender if provided, otherwise falls back to the control's <see cref="Sender"/>)</description></item>
+	/// <item><description>Raises the <see cref="MessageSending"/> event to allow subscribers to inspect or cancel the operation</description></item>
+	/// <item><description>If not cancelled, adds the message to the chat history and displays it</description></item>
+	/// <item><description>Raises the <see cref="MessageSent"/> event to notify subscribers that the message was successfully sent</description></item>
+	/// </list>
+	/// The message sending can be cancelled by setting the MessageSendingEventArgs.Cancel property to <see langword="true"/> 
+	/// in the <see cref="MessageSending"/> event handler.
+	/// </remarks>
+	public virtual void SendMessage(MessageSendingEventArgs e)
 	{
 		var sender = e.Sender ?? Sender;
 
