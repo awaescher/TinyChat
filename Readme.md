@@ -35,7 +35,6 @@ These features are not implemented and I don't plan to implement them. However, 
 - [Basic HTML support with DevExpress labels](https://docs.devexpress.com/WindowsForms/4874/common-features/html-text-formatting)
 - Designer support for properties like UI settings like Fonts, Splitter position, ...
 - Select and copy texts
-- Send button
 - Shortcuts
 - Requesting cancellation
 - Starting new chats

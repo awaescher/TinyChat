@@ -56,4 +56,11 @@ public class ChatInputControl : Control, IChatInputControl
 		if (!sendArgs.Cancel)
 			_textBox.Clear();
 	}
+
+	/// <inheritdoc />
+	protected override void OnGotFocus(EventArgs e)
+	{
+		base.OnGotFocus(e);
+		_textBox.Focus();
+	}
 }

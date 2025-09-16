@@ -64,4 +64,10 @@ public class DXChatInputControl : Control, IChatInputControl
 		if (!sendArgs.Cancel)
 			_textBox.Clear();
 	}
+
+	protected override void OnGotFocus(EventArgs e)
+	{
+		base.OnGotFocus(e);
+		_textBox.Focus();
+	}
 }
