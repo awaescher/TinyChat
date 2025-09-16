@@ -5,6 +5,13 @@ namespace TinyChat;
 /// </summary>
 public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHistoryControl
 {
+	private bool _shouldFollowStreamScroll = true;
+
+	/// <summary>
+	/// Gets the maximum vertical scroll value that indicates the bottom of the scrollable area.
+	/// </summary>
+	private int MaxVerticalScroll => VerticalScroll.Maximum - VerticalScroll.LargeChange;
+
 	/// <summary>
 	/// Initializes a new instance of the <see cref="FlowLayoutMessageHistoryControl"/> class
 	/// with top-down flow direction, auto-scroll enabled, and content wrapping disabled.
@@ -26,6 +33,8 @@ public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHist
 		Controls.Add(control);
 		SetMaxWidthToPreventHorizontalScrollbar(control);
 		ScrollControlIntoView(control);
+
+		messageControl.SizeUpdatedWhileStreaming += MessageControlStreamingSizeUpdate;
 	}
 
 	/// <summary>
@@ -33,6 +42,9 @@ public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHist
 	/// </summary>
 	public void ClearMessageControls()
 	{
+		foreach (var messageControl in Controls.OfType<IChatMessageControl>())
+			messageControl.SizeUpdatedWhileStreaming -= MessageControlStreamingSizeUpdate;
+
 		Controls.Clear();
 	}
 
@@ -42,8 +54,11 @@ public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHist
 	/// <param name="message">The chat message whose control should be removed.</param>
 	public void RemoveMessageControl(IChatMessage message)
 	{
-		if (Controls.OfType<IChatMessageControl>().FirstOrDefault(mc => mc.Message?.Equals(message) ?? false) is Control control)
-			Controls.Remove(control);
+		if (Controls.OfType<IChatMessageControl>().FirstOrDefault(mc => mc.Message?.Equals(message) ?? false) is { } messageControl)
+		{
+			messageControl.SizeUpdatedWhileStreaming -= MessageControlStreamingSizeUpdate;
+			Controls.Remove((Control)messageControl);
+		}
 	}
 
 	/// <summary>
@@ -72,5 +87,36 @@ public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHist
 	private void SetMaxWidthToPreventHorizontalScrollbar(Control control)
 	{
 		control.MaximumSize = new Size(ClientRectangle.Width - SystemInformation.VerticalScrollBarWidth, 0);
+	}
+
+
+	/// <inheritdoc />
+	protected override void OnScroll(ScrollEventArgs se)
+	{
+		base.OnScroll(se);
+
+		var didScrollUp = se.ScrollOrientation == ScrollOrientation.VerticalScroll && se.NewValue < se.OldValue;
+		var didScrollToBottom = se.NewValue >= MaxVerticalScroll;
+
+		_shouldFollowStreamScroll = !didScrollUp && didScrollToBottom;
+	}
+
+	/// <inheritdoc />
+	protected override void OnMouseWheel(MouseEventArgs e)
+	{
+		base.OnMouseWheel(e);
+
+		var didScrollUp = e.Delta > 0;
+		var didScrollToBottom = VerticalScroll.Value >= MaxVerticalScroll;
+
+		_shouldFollowStreamScroll = !didScrollUp && didScrollToBottom;
+	}
+
+	private void MessageControlStreamingSizeUpdate(object? sender, EventArgs args)
+	{
+		// can't use ScrollControlIntoView() because this will stop scrolling
+		// once the message controls gets larger than the flow layout panel
+		if (_shouldFollowStreamScroll)
+			VerticalScroll.Value = MaxVerticalScroll;
 	}
 }

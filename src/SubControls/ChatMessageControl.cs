@@ -8,8 +8,14 @@ namespace TinyChat;
 public class ChatMessageControl : Panel, IChatMessageControl
 {
 	private IChatMessage? _message;
+	private bool _isReceivingStream;
 	private readonly Label _senderLabel;
 	private readonly Label _messageLabel;
+
+	/// <summary>
+	/// The event that is raised when the size of the control is updated while streaming a message.
+	/// </summary>
+	public event EventHandler? SizeUpdatedWhileStreaming;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="ChatMessageControl"/> class.
@@ -61,5 +67,20 @@ public class ChatMessageControl : Panel, IChatMessageControl
 			_senderLabel.MaximumSize = new Size(value.Width - Padding.Horizontal, 0);
 			_messageLabel.MaximumSize = new Size(value.Width - Padding.Horizontal, 0);
 		}
+	}
+
+	/// <inheritdoc />
+	protected override void OnSizeChanged(EventArgs e)
+	{
+		base.OnSizeChanged(e);
+
+		if (_isReceivingStream)
+			SizeUpdatedWhileStreaming?.Invoke(this, EventArgs.Empty);
+	}
+
+	/// <inheritdoc />
+	void IChatMessageControl.SetIsReceivingStream(bool isReceiving)
+	{
+		_isReceivingStream = isReceiving;
 	}
 }

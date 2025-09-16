@@ -14,10 +14,13 @@ namespace DevExpressDemo;
 /// </summary>
 public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessageHistoryControl
 {
-	/// <summary>
-	/// The internal stack panel that contains and arranges the message controls vertically.
-	/// </summary>
 	private readonly StackPanel _stackPanel = new();
+	private bool _shouldFollowStreamScroll = true;
+
+	/// <summary>
+	/// Gets the maximum vertical scroll value that indicates the bottom of the scrollable area.
+	/// </summary>
+	private int MaxVerticalScroll => VerticalScroll.Maximum - VerticalScroll.LargeChange;
 
 	/// <summary>
 	/// Initializes a new instance of the StackPanelMessageHistoryControl class.
@@ -51,6 +54,7 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 		{
 			SetSizeConstraints(control);
 			ScrollControlIntoView(control);
+			messageControl.SizeUpdatedWhileStreaming += MessageControlStreamingSizeUpdate;
 		});
 	}
 
@@ -59,6 +63,9 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 	/// </summary>
 	public void ClearMessageControls()
 	{
+		foreach (var messageControl in _stackPanel.Controls.OfType<IChatMessageControl>())
+			messageControl.SizeUpdatedWhileStreaming -= MessageControlStreamingSizeUpdate;
+
 		_stackPanel.Controls.Clear();
 	}
 
@@ -68,8 +75,11 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 	/// <param name="message">The message to remove the control for</param>
 	public void RemoveMessageControl(IChatMessage message)
 	{
-		if (_stackPanel.Controls.OfType<IChatMessageControl>().FirstOrDefault(mc => mc.Message?.Equals(message) ?? false) is Control control)
-			_stackPanel.Controls.Remove(control);
+		if (_stackPanel.Controls.OfType<IChatMessageControl>().FirstOrDefault(mc => mc.Message?.Equals(message) ?? false) is { } messageControl)
+		{
+			messageControl.SizeUpdatedWhileStreaming -= MessageControlStreamingSizeUpdate;
+			_stackPanel.Controls.Remove((Control)messageControl);
+		}
 	}
 
 	/// <summary>
@@ -106,5 +116,36 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 	{
 		control.MinimumSize = new Size(_stackPanel.ClientRectangle.Width, 0);
 		control.MaximumSize = new Size(_stackPanel.ClientRectangle.Width, 0);
+	}
+
+
+	/// <inheritdoc />
+	protected override void OnScroll(object sender, XtraScrollEventArgs e)
+	{
+		base.OnScroll(sender, e);
+
+		var didScrollUp = e.ScrollOrientation == DevExpress.XtraEditors.ScrollOrientation.VerticalScroll && e.NewValue < e.OldValue;
+		var didScrollToBottom = e.NewValue >= MaxVerticalScroll;
+
+		_shouldFollowStreamScroll = !didScrollUp && didScrollToBottom;
+	}
+
+	/// <inheritdoc />
+	protected override void OnMouseWheelCore(MouseEventArgs ev)
+	{
+		base.OnMouseWheelCore(ev);
+
+		var didScrollUp = ev.Delta > 0;
+		var didScrollToBottom = VerticalScroll.Value >= MaxVerticalScroll;
+
+		_shouldFollowStreamScroll = !didScrollUp && didScrollToBottom;
+	}
+
+	private void MessageControlStreamingSizeUpdate(object? sender, EventArgs args)
+	{
+		// can't use ScrollControlIntoView() because this will stop scrolling
+		// once the message controls gets larger than the flow layout panel
+		if (_shouldFollowStreamScroll)
+			VerticalScroll.Value = MaxVerticalScroll;
 	}
 }

@@ -151,18 +151,28 @@ public partial class ChatControl : UserControl
 
 		var context = (synchronizationContext ?? SynchronizationContext.Current) ?? throw new InvalidOperationException("No synchronization context available. Please make sure a the default SynchronizationContext is available or pass in an SynchronizationContext as argument!");
 
+		UpdateWelcomeControlVisibility();
+		var messageControl = AppendMessageControl(message);
+
 		// loop through the stream in a background thread and append the chunks to the string builder
 		context.Post(async (_) =>
 		{
-			await foreach (var chunk in stream.ConfigureAwait(true).WithCancellation(cancellationToken))
-				stringBuilder.Append(chunk);
+			try
+			{
+				messageControl.SetIsReceivingStream(true);
+
+				await foreach (var chunk in stream.ConfigureAwait(true).WithCancellation(cancellationToken))
+					stringBuilder.Append(chunk);
+			}
+			finally
+			{
+				messageControl.SetIsReceivingStream(false);
+			}
 
 			completionCallback?.Invoke(stringBuilder.ToString());
 		}, state: null);
 
-		UpdateWelcomeControlVisibility();
-
-		return AppendMessageControl(message);
+		return messageControl;
 	}
 
 	/// <summary>

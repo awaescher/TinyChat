@@ -1,3 +1,4 @@
+using System;
 using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
@@ -12,20 +13,15 @@ namespace DevExpressDemo;
 /// </summary>
 public class DXChatMessageControl : PanelControl, IChatMessageControl
 {
-	/// <summary>
-	/// The chat message displayed by this control.
-	/// </summary>
 	private IChatMessage? _message;
-
-	/// <summary>
-	/// Label control that displays the sender's name.
-	/// </summary>
+	private bool _isReceivingStream;
 	private readonly LabelControl _senderLabel;
+	private readonly LabelControl _messageLabel;
 
 	/// <summary>
-	/// Label control that displays the message content.
+	/// The event that is raised when the size of the control is updated while streaming a message.
 	/// </summary>
-	private readonly LabelControl _messageLabel;
+	public event EventHandler? SizeUpdatedWhileStreaming;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="DXChatMessageControl"/> class.
@@ -87,5 +83,21 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl
 			_senderLabel.MaximumSize = new Size(value.Width - Padding.Horizontal, 0);
 			_messageLabel.MaximumSize = new Size(value.Width - Padding.Horizontal, 0);
 		}
+	}
+
+	/// <inheritdoc />
+	protected override void OnSizeChanged(EventArgs e)
+	{
+		base.OnSizeChanged(e);
+
+		if (_isReceivingStream)
+			SizeUpdatedWhileStreaming?.Invoke(this, EventArgs.Empty);
+	}
+
+	/// <inheritdoc />
+
+	void IChatMessageControl.SetIsReceivingStream(bool isReceiving)
+	{
+		_isReceivingStream = isReceiving;
 	}
 }
