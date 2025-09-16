@@ -7,6 +7,8 @@ namespace TinyChat;
 /// </summary>
 public partial class ChatControl : UserControl
 {
+	private const string ROBOT_WELCOME = "●\n┌─┴─┐\n◉‿◉\n└───┘\n\nGreetings human.\nHow can I help you today?";
+
 	private List<IChatMessage> _messages = [];
 
 	/// <summary>
@@ -78,8 +80,9 @@ public partial class ChatControl : UserControl
 	/// </summary>
 	[Category("Chat")]
 	[Description("Gets or sets the welcome message displayed when no messages are present in the chat history.")]
+	[DefaultValue(ROBOT_WELCOME)]
 	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
-	public string WelcomeMessage { get; set; } = "●\n┌─┴─┐\n◉‿◉\n└───┘\n\nGreetings human.\nHow can I help you today?";
+	public string WelcomeMessage { get; set; } = ROBOT_WELCOME;
 
 	/// <summary>
 	/// Gets or sets the splitter position dividing the chat message history from the chat input box below.
