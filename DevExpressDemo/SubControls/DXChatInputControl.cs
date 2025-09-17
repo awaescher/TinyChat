@@ -12,9 +12,6 @@ namespace DevExpressDemo;
 /// </summary>
 public class DXChatInputControl : Control, IChatInputControl
 {
-	const string SEND_CHAR = "\u27A4";
-	const string STOP_CHAR = "\u25A0";
-
 	/// <summary>
 	/// Occurs before a message is sent from the text box.
 	/// </summary>
@@ -41,7 +38,9 @@ public class DXChatInputControl : Control, IChatInputControl
 		panel.Controls.Add(_textBox);
 
 		var size = new Size(24, 24);
-		_sendButton = new SimpleButton { Text = SEND_CHAR, MaximumSize = size, MinimumSize = size, Anchor = AnchorStyles.Bottom | AnchorStyles.Right };
+		_sendButton = new SimpleButton { MaximumSize = size, MinimumSize = size, Anchor = AnchorStyles.Bottom | AnchorStyles.Right };
+		_sendButton.ImageOptions.SvgImage = Properties.Resources.Send;
+		_sendButton.ImageOptions.SvgImageSize = new Size(16, 16);
 		_sendButton.Left = ClientRectangle.Width - _sendButton.Width - panel.Padding.Right / 2 * 3;
 		_sendButton.Top = ClientRectangle.Height - _sendButton.Height - panel.Padding.Bottom / 2 * 3;
 		Controls.Add(_sendButton);
@@ -98,6 +97,6 @@ public class DXChatInputControl : Control, IChatInputControl
 	void IChatInputControl.SetIsReceivingStream(bool isReceiving)
 	{
 		_isReceivingStream = isReceiving;
-		BeginInvoke(() => { _sendButton.Text = isReceiving ? STOP_CHAR : SEND_CHAR; });
+		BeginInvoke(() => { _sendButton.ImageOptions.SvgImage = isReceiving ? Properties.Resources.Stop : Properties.Resources.Send; });
 	}
 }
