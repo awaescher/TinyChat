@@ -40,7 +40,7 @@ public class DXChatInputControl : Control, IChatInputControl
 		var size = new Size(24, 24);
 		_sendButton = new SimpleButton { MaximumSize = size, MinimumSize = size, Anchor = AnchorStyles.Bottom | AnchorStyles.Right };
 		_sendButton.ImageOptions.SvgImage = Properties.Resources.Send;
-		_sendButton.ImageOptions.SvgImageSize = new Size(16, 16);
+		_sendButton.ImageOptions.SvgImageSize = new Size(18, 18);
 		_sendButton.Left = ClientRectangle.Width - _sendButton.Width - panel.Padding.Right / 2 * 3;
 		_sendButton.Top = ClientRectangle.Height - _sendButton.Height - panel.Padding.Bottom / 2 * 3;
 		Controls.Add(_sendButton);
