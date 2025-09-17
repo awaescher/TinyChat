@@ -12,12 +12,22 @@ namespace DevExpressDemo;
 /// </summary>
 public class DXChatInputControl : Control, IChatInputControl
 {
+	const string SEND_CHAR = "\u27A4";
+	const string STOP_CHAR = "\u25A0";
+
 	/// <summary>
 	/// Occurs before a message is sent from the text box.
 	/// </summary>
 	public event EventHandler<MessageSendingEventArgs>? MessageSending;
 
+	/// <summary>
+	/// The event that is raised when cancellation of a streaming message is requested.
+	/// </summary>
+	public event EventHandler? CancellationRequested;
+
 	private readonly MemoEdit _textBox;
+	private readonly SimpleButton _sendButton;
+	private bool _isReceivingStream;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="ChatInputControl"/> class.
@@ -31,15 +41,21 @@ public class DXChatInputControl : Control, IChatInputControl
 		panel.Controls.Add(_textBox);
 
 		var size = new Size(24, 24);
-		var sendChar = "\u27A4";
-		var sendButton = new SimpleButton { Text = sendChar, MaximumSize = size, MinimumSize = size, Anchor = AnchorStyles.Bottom | AnchorStyles.Right };
-		sendButton.Left = ClientRectangle.Width - sendButton.Width - panel.Padding.Right / 2 * 3;
-		sendButton.Top = ClientRectangle.Height - sendButton.Height - panel.Padding.Bottom / 2 * 3;
-		Controls.Add(sendButton);
-		sendButton.BringToFront();
-		sendButton.Click += (s, e) => Send();
+		_sendButton = new SimpleButton { Text = SEND_CHAR, MaximumSize = size, MinimumSize = size, Anchor = AnchorStyles.Bottom | AnchorStyles.Right };
+		_sendButton.Left = ClientRectangle.Width - _sendButton.Width - panel.Padding.Right / 2 * 3;
+		_sendButton.Top = ClientRectangle.Height - _sendButton.Height - panel.Padding.Bottom / 2 * 3;
+		Controls.Add(_sendButton);
+		_sendButton.BringToFront();
+		_sendButton.Click += (s, e) => SendOrStop();
 
 		_textBox.KeyPress += TextBox_KeyPress;
+	}
+
+	/// <inheritdoc />
+	protected override void OnGotFocus(EventArgs e)
+	{
+		base.OnGotFocus(e);
+		_textBox.Focus();
 	}
 
 	/// <summary>
@@ -52,8 +68,16 @@ public class DXChatInputControl : Control, IChatInputControl
 		if (e.KeyChar == (char)Keys.Enter)
 		{
 			e.Handled = true;
-			Send();
+			SendOrStop();
 		}
+	}
+
+	private void SendOrStop()
+	{
+		if (_isReceivingStream)
+			Stop();
+		else
+			Send();
 	}
 
 	private void Send()
@@ -65,9 +89,15 @@ public class DXChatInputControl : Control, IChatInputControl
 			_textBox.Clear();
 	}
 
-	protected override void OnGotFocus(EventArgs e)
+	private void Stop()
 	{
-		base.OnGotFocus(e);
-		_textBox.Focus();
+		CancellationRequested?.Invoke(this, EventArgs.Empty);
+	}
+
+	/// <inheritdoc />
+	void IChatInputControl.SetIsReceivingStream(bool isReceiving)
+	{
+		_isReceivingStream = isReceiving;
+		BeginInvoke(() => { _sendButton.Text = isReceiving ? STOP_CHAR : SEND_CHAR; });
 	}
 }

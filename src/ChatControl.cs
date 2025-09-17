@@ -145,6 +145,9 @@ public partial class ChatControl : UserControl
 	/// <returns></returns>
 	public virtual IChatMessageControl AddStreamingMessage(ISender sender, IAsyncEnumerable<string> stream, Action<string>? completionCallback = default, SynchronizationContext? synchronizationContext = default, CancellationToken cancellationToken = default)
 	{
+		var cancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+		void InputControl_CancellationRequested(object? sender, EventArgs e) => cancellationSource.Cancel();
+
 		var stringBuilder = new NotifyingStringBuilder();
 		var content = new ChangingMessageContent(stringBuilder);
 		var message = AddChatMessage(sender, content);
@@ -154,19 +157,29 @@ public partial class ChatControl : UserControl
 		UpdateWelcomeControlVisibility();
 		var messageControl = AppendMessageControl(message);
 
+		var inputControl = InputControl as IChatInputControl;
+
 		// loop through the stream in a background thread and append the chunks to the string builder
 		context.Post(async (_) =>
 		{
 			try
 			{
-				messageControl.SetIsReceivingStream(true);
+				if (inputControl != null)
+					inputControl.CancellationRequested += InputControl_CancellationRequested;
 
-				await foreach (var chunk in stream.ConfigureAwait(true).WithCancellation(cancellationToken))
+				messageControl.SetIsReceivingStream(true);
+				inputControl?.SetIsReceivingStream(true);
+
+				await foreach (var chunk in stream.ConfigureAwait(true).WithCancellation(cancellationSource.Token))
 					stringBuilder.Append(chunk);
 			}
 			finally
 			{
+				inputControl?.SetIsReceivingStream(false);
 				messageControl.SetIsReceivingStream(false);
+
+				if (inputControl != null)
+					inputControl.CancellationRequested -= InputControl_CancellationRequested;
 			}
 
 			completionCallback?.Invoke(stringBuilder.ToString());

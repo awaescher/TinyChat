@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using TinyChat;
 
 namespace WinFormsDemo;
@@ -23,7 +24,7 @@ public class DemoData
 			];
 	}
 
-	public static async IAsyncEnumerable<string> StreamAiAnswer()
+	public static async IAsyncEnumerable<string> StreamAiAnswer([EnumeratorCancellation] CancellationToken cancellationToken)
 	{
 		var answers = new[]
 		{
@@ -39,6 +40,9 @@ public class DemoData
 
 		for (var i = 0; i < selectedAnswer.Length; i += 4)
 		{
+			if (cancellationToken.IsCancellationRequested)
+				yield break;
+
 			var chunk = selectedAnswer.Substring(i, Math.Min(4, selectedAnswer.Length - i));
 			yield return chunk;
 			await Task.Delay(75).ConfigureAwait(false);

@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Windows.Forms;
 using DevExpress.LookAndFeel;
 using DevExpress.XtraBars.ToolbarForm;
@@ -110,6 +111,7 @@ public partial class DemoForm : ToolbarForm, IMessageFilter
 
 	private void DxChatControl_MessageSent(object sender, MessageSentEventArgs e)
 	{
-		dxChatControl.AddStreamingMessage(new NamedSender(DemoData.AssistantName), DemoData.StreamAiAnswer());
+		var cts = new CancellationTokenSource();
+		dxChatControl.AddStreamingMessage(new NamedSender(DemoData.AssistantName), DemoData.StreamAiAnswer(cts.Token), cancellationToken: cts.Token);
 	}
 }
