@@ -1,6 +1,8 @@
 using System;
 using System.Drawing;
+using System.IO;
 using System.Windows.Forms;
+using DevExpress.Utils.Svg;
 using DevExpress.XtraEditors;
 using TinyChat;
 
@@ -12,6 +14,26 @@ namespace DevExpressDemo;
 /// </summary>
 public class DXChatInputControl : Control, IChatInputControl
 {
+	/// <summary>
+	/// Gets the SVG code for the send icon (taken and minimized from the DevExpress SVG library)
+	/// </summary>
+	private const string SEND_SVG = """
+		<svg viewBox="0 0 32 32">
+			<style type="text/css">.Black{fill:#727272;}</style>
+			<path d="M16,2C8.3,2,2,8.3,2,16s6.3,14,14,14s14-6.3,14-14S23.7,2,16,2z M18,24h-4v-8H8l8-8l8,8h-6V24z" class="Black" />
+		</svg>
+		""";
+
+	/// <summary>
+	/// Gets the SVG code for the stop icon (taken and minimized from the DevExpress SVG library)
+	/// </summary>s
+	private const string STOP_SVG = """
+		<svg viewBox="0 0 32 32">
+			<style type="text/css">.Black{fill:#727272;}</style>
+			<path d="M25,26H7c-0.6,0-1-0.5-1-1V7c0-0.6,0.4-1,1-1h18c0.5,0,1,0.4,1,1v18C26,25.5,25.5,26,25,26z" class="Black" />
+		</svg>
+		""";
+
 	/// <summary>
 	/// Occurs before a message is sent from the text box.
 	/// </summary>
@@ -26,6 +48,10 @@ public class DXChatInputControl : Control, IChatInputControl
 	private readonly SimpleButton _sendButton;
 	private bool _isReceivingStream;
 
+	private SvgImage SendImage { get; } = SvgImage.FromStream(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(SEND_SVG)));
+
+	private SvgImage StopImage { get; } = SvgImage.FromStream(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(STOP_SVG)));
+
 	/// <summary>
 	/// Initializes a new instance of the <see cref="ChatInputControl"/> class.
 	/// </summary>
@@ -39,8 +65,9 @@ public class DXChatInputControl : Control, IChatInputControl
 
 		var size = new Size(24, 24);
 		_sendButton = new SimpleButton { MaximumSize = size, MinimumSize = size, Anchor = AnchorStyles.Bottom | AnchorStyles.Right };
-		_sendButton.ImageOptions.SvgImage = Properties.Resources.Send;
+		_sendButton.ImageOptions.SvgImage = SendImage;
 		_sendButton.ImageOptions.SvgImageSize = new Size(18, 18);
+		_sendButton.ImageOptions.ImageToTextAlignment = ImageAlignToText.TopCenter;
 		_sendButton.Left = ClientRectangle.Width - _sendButton.Width - panel.Padding.Right / 2 * 3;
 		_sendButton.Top = ClientRectangle.Height - _sendButton.Height - panel.Padding.Bottom / 2 * 3;
 		Controls.Add(_sendButton);
@@ -97,6 +124,6 @@ public class DXChatInputControl : Control, IChatInputControl
 	void IChatInputControl.SetIsReceivingStream(bool isReceiving)
 	{
 		_isReceivingStream = isReceiving;
-		BeginInvoke(() => { _sendButton.ImageOptions.SvgImage = isReceiving ? Properties.Resources.Stop : Properties.Resources.Send; });
+		BeginInvoke(() => { _sendButton.ImageOptions.SvgImage = isReceiving ? StopImage : SendImage; });
 	}
 }
