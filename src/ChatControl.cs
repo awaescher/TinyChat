@@ -168,14 +168,19 @@ public partial class ChatControl : UserControl
 					inputControl.CancellationRequested += InputControl_CancellationRequested;
 
 				messageControl.SetIsReceivingStream(true);
-				inputControl?.SetIsReceivingStream(true);
+				inputControl?.SetIsReceivingStream(true, allowCancellation: cancellationToken.CanBeCanceled);
 
 				await foreach (var chunk in stream.ConfigureAwait(true).WithCancellation(cancellationSource.Token))
 					stringBuilder.Append(chunk);
 			}
+			catch (System.Net.Sockets.SocketException)
+			{
+				if (!cancellationSource.Token.IsCancellationRequested)
+					throw;
+			}
 			finally
 			{
-				inputControl?.SetIsReceivingStream(false);
+				inputControl?.SetIsReceivingStream(false, allowCancellation: false);
 				messageControl.SetIsReceivingStream(false);
 
 				if (inputControl != null)

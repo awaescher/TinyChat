@@ -19,5 +19,6 @@ public interface IChatInputControl
 	/// Sets whether the control is receiving a stream or not
 	/// </summary>
 	/// <param name="isReceiving">The flag specifying whether a stream is being received or not</param>
-	void SetIsReceivingStream(bool isReceiving);
+	/// <param name="allowCancellation">The flag specifying whether the stream can be cancelled or not</param>
+	void SetIsReceivingStream(bool isReceiving, bool allowCancellation);
 }

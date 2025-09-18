@@ -87,9 +87,13 @@ public class ChatInputControl : Control, IChatInputControl
 	}
 
 	/// <inheritdoc />
-	void IChatInputControl.SetIsReceivingStream(bool isReceiving)
+	void IChatInputControl.SetIsReceivingStream(bool isReceiving, bool allowCancellation)
 	{
 		_isReceivingStream = isReceiving;
-		BeginInvoke(() => { _sendButton.Text = isReceiving ? STOP_CHAR : SEND_CHAR; });
+		BeginInvoke(() =>
+		{
+			_sendButton.Text = isReceiving && allowCancellation ? STOP_CHAR : SEND_CHAR;
+			_sendButton.Enabled = !isReceiving || allowCancellation;
+		});
 	}
 }
