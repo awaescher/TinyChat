@@ -140,10 +140,17 @@ public partial class ChatControl : UserControl
 	/// <param name="sender">The sender of the streaming message.</param>
 	/// <param name="stream">The stream of the tokens.</param>
 	/// <param name="completionCallback">An optional callback that can be used to process the streamed messages after it was received completely.</param>
+	/// <param name="exceptionCallback">An optional callback that can be used to process exceptions that occured during the processing of the stream.</param>
 	/// <param name="synchronizationContext">An optional synchronization context. Only required if the applications does not provide a default synchronization context.</param>
 	/// <param name="cancellationToken">The token to cancel the operation with.</param>
 	/// <returns></returns>
-	public virtual IChatMessageControl AddStreamingMessage(ISender sender, IAsyncEnumerable<string> stream, Action<string>? completionCallback = default, SynchronizationContext? synchronizationContext = default, CancellationToken cancellationToken = default)
+	public virtual IChatMessageControl AddStreamingMessage(
+		ISender sender,
+		IAsyncEnumerable<string> stream,
+		SynchronizationContext? synchronizationContext = default,
+		Action<string>? completionCallback = default,
+		Action<Exception>? exceptionCallback = default,
+		CancellationToken cancellationToken = default)
 	{
 		var cancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 		void InputControl_CancellationRequested(object? sender, EventArgs e) => cancellationSource.Cancel();
@@ -173,8 +180,9 @@ public partial class ChatControl : UserControl
 				await foreach (var chunk in stream.ConfigureAwait(true).WithCancellation(cancellationSource.Token))
 					stringBuilder.Append(chunk);
 			}
-			catch (System.Net.Sockets.SocketException)
+			catch (Exception ex)
 			{
+				exceptionCallback?.Invoke(ex);
 				if (!cancellationSource.Token.IsCancellationRequested)
 					throw;
 			}
