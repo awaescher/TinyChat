@@ -38,8 +38,8 @@ public class ChatInputControl : Control, IChatInputControl
 		_sendButton.Top = ClientRectangle.Height - _sendButton.Height - panel.Padding.Bottom / 2 * 3;
 		Controls.Add(_sendButton);
 		_sendButton.BringToFront();
-		_sendButton.Click += (s, e) => SendOrStop();
 
+		_sendButton.Click += (s, e) => SendOrStop();
 		_textBox.KeyPress += TextBox_KeyPress;
 	}
 
@@ -60,7 +60,7 @@ public class ChatInputControl : Control, IChatInputControl
 		if (e.KeyChar == (char)Keys.Enter)
 		{
 			e.Handled = true;
-			SendOrStop();
+			_sendButton.PerformClick();
 		}
 	}
 
@@ -83,7 +83,8 @@ public class ChatInputControl : Control, IChatInputControl
 
 	private void Stop()
 	{
-		CancellationRequested?.Invoke(this, EventArgs.Empty);
+		if (_sendButton.Enabled)
+			CancellationRequested?.Invoke(this, EventArgs.Empty);
 	}
 
 	/// <inheritdoc />
