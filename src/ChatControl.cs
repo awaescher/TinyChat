@@ -178,7 +178,13 @@ public partial class ChatControl : UserControl
 				inputControl?.SetIsReceivingStream(true, allowCancellation: cancellationToken.CanBeCanceled);
 
 				await foreach (var chunk in stream.ConfigureAwait(true).WithCancellation(cancellationSource.Token))
+				{
 					stringBuilder.Append(chunk);
+
+					// leave the chat if cancellation was requested, the stream might or might not support cancellation.
+					if (cancellationToken.IsCancellationRequested)
+						break;
+				}
 			}
 			catch (Exception ex)
 			{
