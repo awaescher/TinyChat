@@ -57,10 +57,10 @@ public class ChatInputControl : Control, IChatInputControl
 	/// <param name="e">A <see cref="KeyPressEventArgs"/> that contains the event data.</param>
 	private void TextBox_KeyPress(object? sender, KeyPressEventArgs e)
 	{
-		if (e.KeyChar == (char)Keys.Enter)
+		if (e.KeyChar == (char)Keys.Enter && !_isReceivingStream) // only send with Enter to prevent unwanted cancellation
 		{
 			e.Handled = true;
-			_sendButton.PerformClick();
+			Send();
 		}
 	}
 
