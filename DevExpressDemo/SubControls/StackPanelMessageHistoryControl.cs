@@ -146,6 +146,6 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 		// can't use ScrollControlIntoView() because this will stop scrolling
 		// once the message controls gets larger than the flow layout panel
 		if (_shouldFollowStreamScroll)
-			VerticalScroll.Value = MaxVerticalScroll;
+			BeginInvoke(() => VerticalScroll.Value = MaxVerticalScroll);
 	}
 }
