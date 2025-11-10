@@ -4,7 +4,7 @@ using System.Drawing;
 using System.Windows.Forms;
 using DevExpress.XtraEditors;
 using TinyChat;
-using TinyChat.Messages.Rendering;
+using TinyChat.Messages.Formatting;
 
 namespace DevExpressDemo;
 
@@ -25,10 +25,10 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl
 	public event EventHandler? SizeUpdatedWhileStreaming;
 
 	/// <summary>
-	/// Gets or sets the renderer that converts message content into displayable strings.
+	/// Gets or sets the formatter that converts message content into displayable strings.
 	/// </summary>
 	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-	public required IMessageRenderer MessageRenderer { get; set; }
+	public required IMessageFormatter MessageFormatter { get; set; }
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="DXChatMessageControl"/> class.
@@ -71,7 +71,7 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl
 			if (Message is not null)
 			{
 				var binding = _messageLabel.DataBindings.Add(nameof(_messageLabel.Text), Message.Content, nameof(Message.Content.Content));
-				binding.Format += (_, e) => e.Value = MessageRenderer.Render(e.Value?.ToString() ?? string.Empty);
+				binding.Format += (_, e) => e.Value = MessageFormatter.Format(e.Value?.ToString() ?? string.Empty);
 			}
 		}
 	}

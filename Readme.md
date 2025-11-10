@@ -17,7 +17,7 @@ While there are countless web-based chat controls, there's nearly to none for th
 
 DevExpress, the component vendor of my choice, [has a very nice chat control](http://docs.devexpress.com/WindowsForms/405218). However, it's built upon web technologies and with that [it introduces a significant number of dependencies to ship](https://supportcenter.devexpress.com/ticket/details/t1294891/aichatcontrol-without-webview). I didn't want to pack additional 50MB of assemblies for a single control and theirs is so feature-rich that I would have to to disable 90% of it's functionality nevertheless.
 
-That's why I quickly hacked down TinyChat. I hope this might help anyone out there. But please keep in mind that I never inteded to build a full-featured chat client with advanced text rendering support and so on. If you need more features, please consider sending pull-requests or using the DevExpress chat control.
+That's why I quickly hacked down TinyChat. I hope this might help anyone out there. But please keep in mind that I never inteded to build a full-featured chat client with advanced text formatting support and so on. If you need more features, please consider sending pull-requests or using the DevExpress chat control.
 
 ## 🤷‍♂️ Not implemented
 
@@ -82,7 +82,7 @@ The DevExpress Demo goes even further and makes use of the [basic HTML support w
 
 ![Formatting within the WinForms ChatControl and the DevExpress Demo ChatControl](./docs/Formatting.png)
 
-You can use your own formatter by implementing `IMessageRenderer` and instantiating it in `ChatControl.CreateDefaultMessageRenderer`.
+You can use your own formatter by implementing `IMessageFormatter` and instantiating it in `ChatControl.CreateDefaultMessageFormatter`.
 
 ## 🎬 Demos
 

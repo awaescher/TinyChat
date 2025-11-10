@@ -1,5 +1,5 @@
 using System.ComponentModel;
-using TinyChat.Messages.Rendering;
+using TinyChat.Messages.Formatting;
 
 namespace TinyChat;
 
@@ -106,10 +106,10 @@ public partial class ChatControl : UserControl
 	public ISender Sender { get; set; } = new NamedSender(Environment.UserName);
 
 	/// <summary>
-	/// Gets or sets the renderer that converts message content into displayable strings.
+	/// Gets or sets the formatter that converts message content into displayable strings.
 	/// </summary>
 	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-	public IMessageRenderer MessageRenderer { get; set; } = new PlainTextMessageRenderer();
+	public IMessageFormatter MessageFormatter { get; set; } = new PlainTextMessageFormatter();
 
 	/// <summary>
 	/// Updates the visibility of the welcome control based on the current message history.
@@ -131,14 +131,14 @@ public partial class ChatControl : UserControl
 	{
 		base.OnHandleCreated(e);
 
-		MessageRenderer = CreateDefaultMessageRenderer() ?? MessageRenderer;
+		MessageFormatter = CreateDefaultMessageFormatter() ?? MessageFormatter;
 	}
 
 	/// <summary>
-	/// Creates the message renderer that is used to display chat messages contents in the chat user interface
+	/// Creates the message formatter that is used to display chat messages contents in the chat user interface
 	/// </summary>
 	/// <returns></returns>
-	protected virtual IMessageRenderer? CreateDefaultMessageRenderer() => null;
+	protected virtual IMessageFormatter? CreateDefaultMessageFormatter() => null;
 
 	/// <summary>
 	/// Adds a chat message to the message history control.
@@ -345,7 +345,7 @@ public partial class ChatControl : UserControl
 	/// </summary>
 	/// <param name="message">The chat message to create a control for.</param>
 	/// <returns>An <see cref="IChatMessageControl"/> instance for the message.</returns>
-	protected virtual IChatMessageControl CreateMessageControl(IChatMessage message) => new ChatMessageControl() { Message = message, MessageRenderer = MessageRenderer };
+	protected virtual IChatMessageControl CreateMessageControl(IChatMessage message) => new ChatMessageControl() { Message = message, MessageFormatter = MessageFormatter };
 
 	/// <summary>
 	/// Applies layout settings to a chat message control and adds it to the container.

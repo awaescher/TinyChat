@@ -2,17 +2,17 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Web;
 
-namespace TinyChat.Messages.Rendering;
+namespace TinyChat.Messages.Formatting;
 
 /// <summary>
 /// Renders message content as simplified HTML, supporting only specified HTML tags.
 /// Markdown is converted to HTML where supported, otherwise stripped to plain text.
 /// </summary>
 /// <remarks>
-/// Initializes a new instance of the <see cref="SimplifiedHtmlMessageRenderer"/> class.
+/// Initializes a new instance of the <see cref="SimplifiedHtmlMessageFormatter"/> class.
 /// </remarks>
 /// <param name="supportedTags">Array of supported HTML tag names (e.g., "b", "i", "a", "ul"). Case-insensitive.</param>
-public partial class SimplifiedHtmlMessageRenderer(params string[] supportedTags) : IMessageRenderer
+public partial class SimplifiedHtmlMessageFormatter(params string[] supportedTags) : IMessageFormatter
 {
 	[GeneratedRegex(@"<([a-z][a-z0-9]*)\b[^>]*>(.*?)</\1>", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline)]
 	private static partial Regex HtmlTagsRegex();
@@ -121,22 +121,22 @@ public partial class SimplifiedHtmlMessageRenderer(params string[] supportedTags
 	/// <summary>
 	/// Renders the message content as simplified HTML.
 	/// </summary>
-	/// <param name="content">The message content to render.</param>
+	/// <param name="content">The message content to format.</param>
 	/// <returns>HTML representation of the content with only supported tags.</returns>
-	public string Render(IChatMessageContent content)
+	public string Format(IChatMessageContent content)
 	{
 		if (content is StringMessageContent stringContent)
-			return Render(stringContent.ToString());
+			return Format(stringContent.ToString());
 
-		throw new NotSupportedException($"Only {nameof(StringMessageContent)} is supported by {nameof(SimplifiedHtmlMessageRenderer)}.");
+		throw new NotSupportedException($"Only {nameof(StringMessageContent)} is supported by {nameof(SimplifiedHtmlMessageFormatter)}.");
 	}
 
 	/// <summary>
 	/// Renders the message content as simplified HTML.
 	/// </summary>
-	/// <param name="content">The message content to render.</param>
+	/// <param name="content">The message content to format.</param>
 	/// <returns>HTML representation of the content with only supported tags.</returns>
-	public string Render(string content)
+	public string Format(string content)
 	{
 		var text = content ?? string.Empty;
 
@@ -158,7 +158,7 @@ public partial class SimplifiedHtmlMessageRenderer(params string[] supportedTags
 	private string ConvertMarkdownToHtml(string text)
 	{
 		// Process code blocks first (before other conversions)
-		// Code blocks are rendered with font tags and line breaks if font is supported
+		// Code blocks are formatted with font tags and line breaks if font is supported
 		text = MarkdownCodeBlockRegex().Replace(text, match =>
 		{
 			var codeContent = match.Groups[1].Value;
@@ -185,7 +185,7 @@ public partial class SimplifiedHtmlMessageRenderer(params string[] supportedTags
 		});
 
 		// Process inline code
-		// Inline code is rendered with font tags if font is supported
+		// Inline code is formatted with font tags if font is supported
 		text = MarkdownInlineCodeRegex().Replace(text, match =>
 		{
 			var codeContent = match.Groups[1].Value;

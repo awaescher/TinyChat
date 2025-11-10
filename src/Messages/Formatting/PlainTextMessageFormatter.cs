@@ -1,11 +1,11 @@
 using System.Text.RegularExpressions;
 
-namespace TinyChat.Messages.Rendering;
+namespace TinyChat.Messages.Formatting;
 
 /// <summary>
 /// Renders message content as plain text by stripping common formatting like Markdown and HTML.
 /// </summary>
-public partial class PlainTextMessageRenderer : IMessageRenderer
+public partial class PlainTextMessageFormatter : IMessageFormatter
 {
 	[GeneratedRegex(@"<[^>]*>", RegexOptions.Compiled)]
 	private static partial Regex HtmlTagsRegex();
@@ -46,22 +46,22 @@ public partial class PlainTextMessageRenderer : IMessageRenderer
 	/// <summary>
 	/// Renders the message content as plain text by removing formatting.
 	/// </summary>
-	/// <param name="content">The message content to render.</param>
+	/// <param name="content">The message content to format.</param>
 	/// <returns>Plain text representation of the content.</returns>
-	public string Render(IChatMessageContent content)
+	public string Format(IChatMessageContent content)
 	{
 		if (content is StringMessageContent stringContent)
-			return Render(stringContent.ToString());
+			return Format(stringContent.ToString());
 
-		throw new NotSupportedException($"Only {nameof(StringMessageContent)} is supported by {nameof(PlainTextMessageRenderer)}.");
+		throw new NotSupportedException($"Only {nameof(StringMessageContent)} is supported by {nameof(PlainTextMessageFormatter)}.");
 	}
 
 	/// <summary>
 	/// Renders the message content as plain text by removing formatting.
 	/// </summary>
-	/// <param name="content">The message content to render.</param>
+	/// <param name="content">The message content to format.</param>
 	/// <returns>Plain text representation of the content.</returns>
-	public string Render(string content)
+	public string Format(string content)
 	{
 		var text = content ?? string.Empty;
 
