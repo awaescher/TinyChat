@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using TinyChat.Messages.Rendering;
 
 namespace TinyChat;
 
@@ -16,6 +17,12 @@ public class ChatMessageControl : Panel, IChatMessageControl
 	/// The event that is raised when the size of the control is updated while streaming a message.
 	/// </summary>
 	public event EventHandler? SizeUpdatedWhileStreaming;
+
+	/// <summary>
+	/// Gets or sets the renderer that converts message content into displayable strings.
+	/// </summary>
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	public required IMessageRenderer MessageRenderer { get; set; }
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="ChatMessageControl"/> class.
@@ -52,7 +59,10 @@ public class ChatMessageControl : Panel, IChatMessageControl
 
 			_messageLabel.DataBindings.Clear();
 			if (Message is not null)
-				_messageLabel.DataBindings.Add(nameof(_messageLabel.Text), Message.Content, nameof(Message.Content.Content));
+			{
+				var binding = _messageLabel.DataBindings.Add(nameof(_messageLabel.Text), Message.Content, nameof(Message.Content.Content));
+				binding.Format += (_, e) => e.Value = MessageRenderer.Render(new StringMessageContent(e.Value?.ToString() ?? string.Empty));
+			}
 		}
 	}
 

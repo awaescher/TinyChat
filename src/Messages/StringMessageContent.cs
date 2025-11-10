@@ -27,15 +27,9 @@ public class StringMessageContent : IChatMessageContent
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(_value)));
 	}
 
-	/// <summary>
-	/// Renders the content as a string for display.
-	/// </summary>
-	/// <returns>The string value of the content.</returns>
-	public string Render() => _value ?? string.Empty;
-
 	/// <inheritdoc />
 	public object? Content => _value;
 
 	/// <inheritdoc />
-	public override string ToString() => Render();
+	public override string ToString() => _value?.ToString() ?? string.Empty;
 }

@@ -11,7 +11,7 @@ public class DXChatControl : ChatControl
 	protected override IChatMessageHistoryControl CreateMessageHistoryControl() => new StackPanelMessageHistoryControl();
 
 	/// <inheritdoc />
-	protected override IChatMessageControl CreateMessageControl(IChatMessage message) => new DXChatMessageControl { Message = message };
+	protected override IChatMessageControl CreateMessageControl(IChatMessage message) => new DXChatMessageControl { Message = message, MessageRenderer = MessageRenderer };
 
 	/// <inheritdoc />
 	protected override IChatInputControl CreateChatInputControl() => new DXChatInputControl();

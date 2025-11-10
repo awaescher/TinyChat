@@ -33,14 +33,11 @@ public class ChangingMessageContent : IChatMessageContent
 			value.PropertyChanged += NotifyChangedValue;
 	}
 
-	/// <summary>
-	/// Renders the content as a string for display.
-	/// </summary>
-	/// <returns>The string value of the content.</returns>
-	public string Render() => _value?.ToString() ?? string.Empty;
-
 	/// <inheritdoc />
 	public object? Content => _value;
+
+	/// <inheritdoc />
+	public override string ToString() => _value?.ToString() ?? string.Empty;
 
 	private void NotifyChangedValue(object? _, PropertyChangedEventArgs? __)
 	{

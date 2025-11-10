@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using TinyChat.Messages.Rendering;
 
 namespace TinyChat;
 
@@ -120,6 +121,12 @@ public partial class ChatControl : UserControl
 	/// </summary>
 	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
 	public ISender Sender { get; set; } = new NamedSender(Environment.UserName);
+
+	/// <summary>
+	/// Gets or sets the renderer that converts message content into displayable strings.
+	/// </summary>
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	public IMessageRenderer MessageRenderer { get; set; } = new PlainTextMessageRenderer();
 
 	/// <summary>
 	/// Adds a chat message to the message history control.
@@ -326,7 +333,7 @@ public partial class ChatControl : UserControl
 	/// </summary>
 	/// <param name="message">The chat message to create a control for.</param>
 	/// <returns>An <see cref="IChatMessageControl"/> instance for the message.</returns>
-	protected virtual IChatMessageControl CreateMessageControl(IChatMessage message) => new ChatMessageControl();
+	protected virtual IChatMessageControl CreateMessageControl(IChatMessage message) => new ChatMessageControl() { Message = message, MessageRenderer = MessageRenderer };
 
 	/// <summary>
 	/// Applies layout settings to a chat message control and adds it to the container.
