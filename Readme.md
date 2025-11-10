@@ -32,7 +32,6 @@ These features are not implemented and I don't plan to implement them. However, 
 - everything else you know from chatbots
 
 ### Might come
-- [Basic HTML support with DevExpress labels](https://docs.devexpress.com/WindowsForms/4874/common-features/html-text-formatting)
 - Designer support for properties like UI settings like Fonts, Splitter position, ...
 - Select and copy texts
 - Starting new chats
@@ -74,6 +73,16 @@ Use `AddStreamingMessage()` to pass in a stream of tokens asynchronously. The ch
 IAsyncEnumerable<string> stream = ...;
 chatControl.AddStreamingMessage(new NamedSender("AI Assistant"), stream);
 ```
+
+### Formatting
+
+WinForms controls don't support partial text formatting. To make the WinForms ChatControl usable with AI chatbots, TinyChat will try to remove basic HTML and Markdown formatting. 
+
+The DevExpress Demo goes even further and makes use of the [basic HTML support with DevExpress controls](https://docs.devexpress.com/WindowsForms/4874/common-features/html-text-formatting) and tries to turn HTML or even Markdown input into these basic HTML tags. Tags that are not supported are stripped out to keep the text readable.
+
+![Formatting within the WinForms ChatControl and the DevExpress Demo ChatControl](./docs/Formatting.png)
+
+You can use your own formatter by implementing `IMessageRenderer` and instantiating it in `ChatControl.CreateDefaultMessageRenderer`.
 
 ## 🎬 Demos
 
