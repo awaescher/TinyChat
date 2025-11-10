@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Windows.Forms;
 using DevExpress.XtraEditors;
 using TinyChat;
+using TinyChat.Messages.Formatting;
 
 namespace DevExpressDemo;
 
@@ -24,6 +25,12 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl
 	public event EventHandler? SizeUpdatedWhileStreaming;
 
 	/// <summary>
+	/// Gets or sets the formatter that converts message content into displayable strings.
+	/// </summary>
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	public required IMessageFormatter MessageFormatter { get; set; }
+
+	/// <summary>
 	/// Initializes a new instance of the <see cref="DXChatMessageControl"/> class.
 	/// Sets up the layout with sender and message labels, configures styling and sizing behavior.
 	/// </summary>
@@ -32,8 +39,8 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl
 		BorderStyle = DevExpress.XtraEditors.Controls.BorderStyles.NoBorder;
 		AutoSize = true;
 
-		_senderLabel = new LabelControl() { Dock = DockStyle.Top, AutoSizeMode = LabelAutoSizeMode.Vertical, Font = new Font(Font, FontStyle.Bold), UseMnemonic = false };
-		_messageLabel = new LabelControl() { Dock = DockStyle.Top, AutoSizeMode = LabelAutoSizeMode.Vertical, UseMnemonic = false };
+		_senderLabel = new LabelControl() { AllowHtmlString = true, Dock = DockStyle.Top, AutoSizeMode = LabelAutoSizeMode.Vertical, Font = new Font(Font, FontStyle.Bold), UseMnemonic = false };
+		_messageLabel = new LabelControl() { AllowHtmlString = true, Dock = DockStyle.Top, AutoSizeMode = LabelAutoSizeMode.Vertical, UseMnemonic = false };
 
 		Controls.Add(_senderLabel);
 		Controls.Add(_messageLabel);
@@ -62,7 +69,10 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl
 
 			_messageLabel.DataBindings.Clear();
 			if (Message is not null)
-				_messageLabel.DataBindings.Add(nameof(_messageLabel.Text), Message.Content, nameof(Message.Content.Content));
+			{
+				var binding = _messageLabel.DataBindings.Add(nameof(_messageLabel.Text), Message.Content, nameof(Message.Content.Content));
+				binding.Format += (_, e) => e.Value = MessageFormatter.Format(e.Value?.ToString() ?? string.Empty);
+			}
 		}
 	}
 

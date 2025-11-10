@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using TinyChat.Messages.Formatting;
 
 namespace TinyChat;
 
@@ -18,6 +19,12 @@ public class ChatMessageControl : Panel, IChatMessageControl
 	public event EventHandler? SizeUpdatedWhileStreaming;
 
 	/// <summary>
+	/// Gets or sets the formatter that converts message content into displayable strings.
+	/// </summary>
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	public required IMessageFormatter MessageFormatter { get; set; }
+
+	/// <summary>
 	/// Initializes a new instance of the <see cref="ChatMessageControl"/> class.
 	/// </summary>
 	public ChatMessageControl()
@@ -35,7 +42,7 @@ public class ChatMessageControl : Panel, IChatMessageControl
 
 	/// <summary>
 	/// Gets or sets the chat message displayed by this control.
-	/// When set, the control updates to display the sender's name and rendered message content.
+	/// When set, the control updates to display the sender's name and message content.
 	/// If the message is null, both the sender and content labels will display empty strings.
 	/// </summary>
 	/// <value>
@@ -52,7 +59,10 @@ public class ChatMessageControl : Panel, IChatMessageControl
 
 			_messageLabel.DataBindings.Clear();
 			if (Message is not null)
-				_messageLabel.DataBindings.Add(nameof(_messageLabel.Text), Message.Content, nameof(Message.Content.Content));
+			{
+				var binding = _messageLabel.DataBindings.Add(nameof(_messageLabel.Text), Message.Content, nameof(Message.Content.Content));
+				binding.Format += (_, e) => e.Value = MessageFormatter.Format(new StringMessageContent(e.Value?.ToString() ?? string.Empty));
+			}
 		}
 	}
 

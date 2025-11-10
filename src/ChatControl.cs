@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using TinyChat.Messages.Formatting;
 
 namespace TinyChat;
 
@@ -56,10 +57,7 @@ public partial class ChatControl : UserControl
 	/// <summary>
 	/// Initializes a new instance of the <see cref="ChatControl"/> class.
 	/// </summary>
-	public ChatControl()
-	{
-		InitializeComponent();
-	}
+	public ChatControl() => InitializeComponent();
 
 	/// <summary>
 	/// Gets or sets the message history displayed in the chat control.
@@ -102,6 +100,18 @@ public partial class ChatControl : UserControl
 	}
 
 	/// <summary>
+	/// Gets or sets the sender for messages sent from this chat control.
+	/// </summary>
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	public ISender Sender { get; set; } = new NamedSender(Environment.UserName);
+
+	/// <summary>
+	/// Gets or sets the formatter that converts message content into displayable strings.
+	/// </summary>
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	public IMessageFormatter MessageFormatter { get; set; } = new PlainTextMessageFormatter();
+
+	/// <summary>
 	/// Updates the visibility of the welcome control based on the current message history.
 	/// </summary>
 	protected virtual void UpdateWelcomeControlVisibility()
@@ -113,13 +123,22 @@ public partial class ChatControl : UserControl
 	/// <summary>
 	/// Determines whether the welcome control should be displayed based on the current message history.
 	/// </summary>
-	protected virtual bool ShouldShowWelcomeControl() => !_messages.Any();
+	protected virtual bool ShouldShowWelcomeControl() => _messages.Count == 0;
+
+
+	/// <inheritdoc/>
+	protected override void OnHandleCreated(EventArgs e)
+	{
+		base.OnHandleCreated(e);
+
+		MessageFormatter = CreateDefaultMessageFormatter() ?? MessageFormatter;
+	}
 
 	/// <summary>
-	/// Gets or sets the sender for messages sent from this chat control.
+	/// Creates the message formatter that is used to display chat messages contents in the chat user interface
 	/// </summary>
-	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-	public ISender Sender { get; set; } = new NamedSender(Environment.UserName);
+	/// <returns></returns>
+	protected virtual IMessageFormatter? CreateDefaultMessageFormatter() => null;
 
 	/// <summary>
 	/// Adds a chat message to the message history control.
@@ -326,7 +345,7 @@ public partial class ChatControl : UserControl
 	/// </summary>
 	/// <param name="message">The chat message to create a control for.</param>
 	/// <returns>An <see cref="IChatMessageControl"/> instance for the message.</returns>
-	protected virtual IChatMessageControl CreateMessageControl(IChatMessage message) => new ChatMessageControl();
+	protected virtual IChatMessageControl CreateMessageControl(IChatMessage message) => new ChatMessageControl() { Message = message, MessageFormatter = MessageFormatter };
 
 	/// <summary>
 	/// Applies layout settings to a chat message control and adds it to the container.

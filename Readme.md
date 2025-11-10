@@ -17,7 +17,7 @@ While there are countless web-based chat controls, there's nearly to none for th
 
 DevExpress, the component vendor of my choice, [has a very nice chat control](http://docs.devexpress.com/WindowsForms/405218). However, it's built upon web technologies and with that [it introduces a significant number of dependencies to ship](https://supportcenter.devexpress.com/ticket/details/t1294891/aichatcontrol-without-webview). I didn't want to pack additional 50MB of assemblies for a single control and theirs is so feature-rich that I would have to to disable 90% of it's functionality nevertheless.
 
-That's why I quickly hacked down TinyChat. I hope this might help anyone out there. But please keep in mind that I never inteded to build a full-featured chat client with advanced text rendering support and so on. If you need more features, please consider sending pull-requests or using the DevExpress chat control.
+That's why I quickly hacked down TinyChat. I hope this might help anyone out there. But please keep in mind that I never inteded to build a full-featured chat client with advanced text formatting support and so on. If you need more features, please consider sending pull-requests or using the DevExpress chat control.
 
 ## 🤷‍♂️ Not implemented
 
@@ -32,7 +32,6 @@ These features are not implemented and I don't plan to implement them. However, 
 - everything else you know from chatbots
 
 ### Might come
-- [Basic HTML support with DevExpress labels](https://docs.devexpress.com/WindowsForms/4874/common-features/html-text-formatting)
 - Designer support for properties like UI settings like Fonts, Splitter position, ...
 - Select and copy texts
 - Starting new chats
@@ -74,6 +73,16 @@ Use `AddStreamingMessage()` to pass in a stream of tokens asynchronously. The ch
 IAsyncEnumerable<string> stream = ...;
 chatControl.AddStreamingMessage(new NamedSender("AI Assistant"), stream);
 ```
+
+### Formatting
+
+WinForms controls don't support partial text formatting. To make the WinForms ChatControl usable with AI chatbots, TinyChat will try to remove basic HTML and Markdown formatting. 
+
+The DevExpress Demo goes even further and makes use of the [basic HTML support with DevExpress controls](https://docs.devexpress.com/WindowsForms/4874/common-features/html-text-formatting) and tries to turn HTML or even Markdown input into these basic HTML tags. Tags that are not supported are stripped out to keep the text readable.
+
+![Formatting within the WinForms ChatControl and the DevExpress Demo ChatControl](./docs/Formatting.png)
+
+You can use your own formatter by implementing `IMessageFormatter` and instantiating it in `ChatControl.CreateDefaultMessageFormatter`.
 
 ## 🎬 Demos
 
