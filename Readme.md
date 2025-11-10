@@ -83,7 +83,7 @@ The DevExpress Demo goes even further and makes use of the [basic HTML support w
 
 ![Formatting within the WinForms ChatControl and the DevExpress Demo ChatControl](./docs/Formatting.png)
 
-You can use your own formatter by implementing `IMessageFormatter` and instantiating it in `ChatControl.CreateDefaultMessageFormatter`.
+It's possible to create a custom formatter by implementing `IMessageFormatter` and instantiating it by overriding `ChatControl.CreateDefaultMessageFormatter()`.
 
 ## 🎬 Demos
 
