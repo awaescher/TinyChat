@@ -57,10 +57,7 @@ public partial class ChatControl : UserControl
 	/// <summary>
 	/// Initializes a new instance of the <see cref="ChatControl"/> class.
 	/// </summary>
-	public ChatControl()
-	{
-		InitializeComponent();
-	}
+	public ChatControl() => InitializeComponent();
 
 	/// <summary>
 	/// Gets or sets the message history displayed in the chat control.
@@ -112,7 +109,7 @@ public partial class ChatControl : UserControl
 	/// Gets or sets the renderer that converts message content into displayable strings.
 	/// </summary>
 	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-	public IMessageRenderer MessageRenderer { get; set; }
+	public IMessageRenderer MessageRenderer { get; set; } = new PlainTextMessageRenderer();
 
 	/// <summary>
 	/// Updates the visibility of the welcome control based on the current message history.
@@ -126,7 +123,7 @@ public partial class ChatControl : UserControl
 	/// <summary>
 	/// Determines whether the welcome control should be displayed based on the current message history.
 	/// </summary>
-	protected virtual bool ShouldShowWelcomeControl() => !_messages.Any();
+	protected virtual bool ShouldShowWelcomeControl() => _messages.Count == 0;
 
 
 	/// <inheritdoc/>
@@ -134,14 +131,14 @@ public partial class ChatControl : UserControl
 	{
 		base.OnHandleCreated(e);
 
-		MessageRenderer = CreateDefaultMessageRenderer();
+		MessageRenderer = CreateDefaultMessageRenderer() ?? MessageRenderer;
 	}
 
 	/// <summary>
 	/// Creates the message renderer that is used to display chat messages contents in the chat user interface
 	/// </summary>
 	/// <returns></returns>
-	protected virtual IMessageRenderer CreateDefaultMessageRenderer() => new PlainTextMessageRenderer();
+	protected virtual IMessageRenderer? CreateDefaultMessageRenderer() => null;
 
 	/// <summary>
 	/// Adds a chat message to the message history control.

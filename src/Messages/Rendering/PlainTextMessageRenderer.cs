@@ -73,8 +73,8 @@ public partial class PlainTextMessageRenderer : IMessageRenderer
 		{
 			var codeContent = match.Groups[1].Value;
 			// Trim trailing newline from code content to avoid double newlines
-			if (codeContent.EndsWith("\n"))
-				codeContent = codeContent.Substring(0, codeContent.Length - 1);
+			if (codeContent.EndsWith('\n'))
+				codeContent = codeContent[..^1];
 			return $"\n{codeContent}\n";
 		});
 
@@ -105,7 +105,7 @@ public partial class PlainTextMessageRenderer : IMessageRenderer
 		return text.Trim();
 	}
 
-	private string ConvertHtmlListsToPlainText(string text)
+	private static string ConvertHtmlListsToPlainText(string text)
 	{
 		// We need to process nested lists from innermost to outermost
 		// So we keep replacing until no more <ul> or <ol> tags are found

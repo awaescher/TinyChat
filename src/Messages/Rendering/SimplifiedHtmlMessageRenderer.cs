@@ -8,24 +8,12 @@ namespace TinyChat.Messages.Rendering;
 /// Renders message content as simplified HTML, supporting only specified HTML tags.
 /// Markdown is converted to HTML where supported, otherwise stripped to plain text.
 /// </summary>
-public partial class SimplifiedHtmlMessageRenderer : IMessageRenderer
+/// <remarks>
+/// Initializes a new instance of the <see cref="SimplifiedHtmlMessageRenderer"/> class.
+/// </remarks>
+/// <param name="supportedTags">Array of supported HTML tag names (e.g., "b", "i", "a", "ul"). Case-insensitive.</param>
+public partial class SimplifiedHtmlMessageRenderer(params string[] supportedTags) : IMessageRenderer
 {
-	private readonly HashSet<string> _supportedTags;
-
-	// Tag mappings from markdown/HTML to canonical HTML tags
-	private static readonly Dictionary<string, string> TagAliases = new(StringComparer.OrdinalIgnoreCase)
-	{
-		{ "strong", "b" },
-		{ "em", "i" },
-		{ "del", "s" },
-		{ "strike", "s" }
-	};
-
-	/// <summary>
-	/// Default monospace font family for code blocks and inline code.
-	/// </summary>
-	public string DefaultCodeFontName { get; set; } = "Consolas";
-
 	[GeneratedRegex(@"<([a-z][a-z0-9]*)\b[^>]*>(.*?)</\1>", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline)]
 	private static partial Regex HtmlTagsRegex();
 
@@ -80,20 +68,55 @@ public partial class SimplifiedHtmlMessageRenderer : IMessageRenderer
 	[GeneratedRegex(@"<li[^>]*>(.*?)</li>", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline)]
 	private static partial Regex HtmlListItemRegex();
 
-	private static readonly Regex _htmlColorSpanRegex = new(@"<span\s+style=['""]color:\s*([^'""]+)['""]>([^<]+)</span>", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-	private static Regex HtmlColorSpanRegex() => _htmlColorSpanRegex;
+	[GeneratedRegex(@"<span\s+style=['""]color:\s*([^'""]+)['""]>([^<]+)</span>", RegexOptions.Compiled | RegexOptions.IgnoreCase)]
+	private static partial Regex HtmlColorSpanRegex();
 
-	private static readonly Regex _htmlBackColorSpanRegex = new(@"<span\s+style=['""]background-color:\s*([^'""]+)['""]>([^<]+)</span>", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-	private static Regex HtmlBackColorSpanRegex() => _htmlBackColorSpanRegex;
+	[GeneratedRegex(@"<span\s+style=['""]background-color:\s*([^'""]+)['""]>([^<]+)</span>", RegexOptions.Compiled | RegexOptions.IgnoreCase)]
+	private static partial Regex HtmlBackColorSpanRegex();
+
+	[GeneratedRegex(@"href=['""]([^'""]+)['""]", RegexOptions.Compiled | RegexOptions.IgnoreCase)]
+	private static partial Regex HrefAttributeRegex();
+
+	[GeneratedRegex(@"src=['""]([^'""]+)['""]", RegexOptions.Compiled | RegexOptions.IgnoreCase)]
+	private static partial Regex SrcAttributeRegex();
+
+	[GeneratedRegex(@"alt=['""]([^'""]*)['""]", RegexOptions.Compiled | RegexOptions.IgnoreCase)]
+	private static partial Regex AltAttributeRegex();
+
+	[GeneratedRegex(@"<font=""([^""]+)"">", RegexOptions.Compiled | RegexOptions.IgnoreCase)]
+	private static partial Regex FontDevExpressFormatRegex();
+
+	[GeneratedRegex(@"face=['""]([^'""]+)['""]", RegexOptions.Compiled | RegexOptions.IgnoreCase)]
+	private static partial Regex FontFaceAttributeRegex();
+
+	[GeneratedRegex(@"<size=([+-]?\d+)>", RegexOptions.Compiled | RegexOptions.IgnoreCase)]
+	private static partial Regex SizeAttributeRegex();
+
+	[GeneratedRegex(@"<color=([^>]+)>", RegexOptions.Compiled | RegexOptions.IgnoreCase)]
+	private static partial Regex ColorAttributeRegex();
+
+	[GeneratedRegex(@"<backcolor=([^>]+)>", RegexOptions.Compiled | RegexOptions.IgnoreCase)]
+	private static partial Regex BackColorAttributeRegex();
+
+	[GeneratedRegex(@"rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*(\d+(?:\.\d+)?))?\s*\)", RegexOptions.Compiled | RegexOptions.IgnoreCase)]
+	private static partial Regex RgbColorRegex();
+
+	private readonly HashSet<string> _supportedTags = new(supportedTags.Select(NormalizeTag), StringComparer.OrdinalIgnoreCase);
+
+	// Tag mappings from markdown/HTML to canonical HTML tags
+	private static readonly Dictionary<string, string> _tagAliases = new(StringComparer.OrdinalIgnoreCase)
+	{
+		{ "strong", "b" },
+		{ "em", "i" },
+		{ "del", "s" },
+		{ "strike", "s" }
+	};
 
 	/// <summary>
-	/// Initializes a new instance of the <see cref="SimplifiedHtmlMessageRenderer"/> class.
+	/// Default monospace font family for code blocks and inline code.
 	/// </summary>
-	/// <param name="supportedTags">Array of supported HTML tag names (e.g., "b", "i", "a", "ul"). Case-insensitive.</param>
-	public SimplifiedHtmlMessageRenderer(params string[] supportedTags)
-	{
-		_supportedTags = new HashSet<string>(supportedTags.Select(NormalizeTag), StringComparer.OrdinalIgnoreCase);
-	}
+	public string DefaultCodeFontName { get; set; } = "Consolas";
+
 
 	/// <summary>
 	/// Renders the message content as simplified HTML.
@@ -139,8 +162,8 @@ public partial class SimplifiedHtmlMessageRenderer : IMessageRenderer
 		text = MarkdownCodeBlockRegex().Replace(text, match =>
 		{
 			var codeContent = match.Groups[1].Value;
-			if (codeContent.EndsWith("\n"))
-				codeContent = codeContent.Substring(0, codeContent.Length - 1);
+			if (codeContent.EndsWith('\n'))
+				codeContent = codeContent[..^1];
 
 			var escapedCode = HttpUtility.HtmlEncode(codeContent);
 			// DevExpress doesn't decode &quot; in AllowHtmlString mode, so we need to convert it back
@@ -378,7 +401,7 @@ public partial class SimplifiedHtmlMessageRenderer : IMessageRenderer
 		var result = new StringBuilder();
 		var inList = false;
 
-		for (int i = 0; i < lines.Length; i++)
+		for (var i = 0; i < lines.Length; i++)
 		{
 			var line = lines[i];
 			var match = MarkdownUnorderedListRegex().Match(line);
@@ -422,7 +445,7 @@ public partial class SimplifiedHtmlMessageRenderer : IMessageRenderer
 		var result = new StringBuilder();
 		var inList = false;
 
-		for (int i = 0; i < lines.Length; i++)
+		for (var i = 0; i < lines.Length; i++)
 		{
 			var line = lines[i];
 			var match = MarkdownOrderedListRegex().Match(line);
@@ -524,20 +547,20 @@ public partial class SimplifiedHtmlMessageRenderer : IMessageRenderer
 				if (IsSupported(normalizedTag))
 				{
 					// For specific tags, keep only essential attributes
-					string attributes = "";
+					var attributes = "";
 
 					if (normalizedTag == "a")
 					{
 						// Extract href attribute only
-						var hrefMatch = Regex.Match(match.Value, @"href=['""]([^'""]+)['""]", RegexOptions.IgnoreCase);
+						var hrefMatch = HrefAttributeRegex().Match(match.Value);
 						if (hrefMatch.Success)
 							attributes = $" href=\"{hrefMatch.Groups[1].Value}\"";
 					}
 					else if (normalizedTag == "img")
 					{
 						// Extract src and alt attributes only
-						var srcMatch = Regex.Match(match.Value, @"src=['""]([^'""]+)['""]", RegexOptions.IgnoreCase);
-						var altMatch = Regex.Match(match.Value, @"alt=['""]([^'""]*)['""]", RegexOptions.IgnoreCase);
+						var srcMatch = SrcAttributeRegex().Match(match.Value);
+						var altMatch = AltAttributeRegex().Match(match.Value);
 
 						if (srcMatch.Success)
 							attributes += $" src=\"{srcMatch.Groups[1].Value}\"";
@@ -552,8 +575,8 @@ public partial class SimplifiedHtmlMessageRenderer : IMessageRenderer
 					{
 						// DevExpress uses <font="FontName"> syntax instead of <font face="FontName">
 						// Extract both face attribute and the simplified DevExpress format
-						var devExpressMatch = Regex.Match(match.Value, @"<font=""([^""]+)"">", RegexOptions.IgnoreCase);
-						var faceMatch = Regex.Match(match.Value, @"face=['""]([^'""]+)['""]", RegexOptions.IgnoreCase);
+						var devExpressMatch = FontDevExpressFormatRegex().Match(match.Value);
+						var faceMatch = FontFaceAttributeRegex().Match(match.Value);
 
 						if (devExpressMatch.Success)
 							attributes = $"=\"{devExpressMatch.Groups[1].Value}\"";
@@ -563,21 +586,21 @@ public partial class SimplifiedHtmlMessageRenderer : IMessageRenderer
 					else if (normalizedTag == "size")
 					{
 						// Extract size value (e.g., <size=+3>)
-						var sizeMatch = Regex.Match(match.Value, @"<size=([+-]?\d+)>", RegexOptions.IgnoreCase);
+						var sizeMatch = SizeAttributeRegex().Match(match.Value);
 						if (sizeMatch.Success)
 							attributes = $"={sizeMatch.Groups[1].Value}";
 					}
 					else if (normalizedTag == "color")
 					{
 						// Extract color value (e.g., <color=red> or <color=#FF0000>)
-						var colorMatch = Regex.Match(match.Value, @"<color=([^>]+)>", RegexOptions.IgnoreCase);
+						var colorMatch = ColorAttributeRegex().Match(match.Value);
 						if (colorMatch.Success)
 							attributes = $"={colorMatch.Groups[1].Value}";
 					}
 					else if (normalizedTag == "backcolor")
 					{
 						// Extract backcolor value
-						var backcolorMatch = Regex.Match(match.Value, @"<backcolor=([^>]+)>", RegexOptions.IgnoreCase);
+						var backcolorMatch = BackColorAttributeRegex().Match(match.Value);
 						if (backcolorMatch.Success)
 							attributes = $"={backcolorMatch.Groups[1].Value}";
 					}
@@ -661,7 +684,7 @@ public partial class SimplifiedHtmlMessageRenderer : IMessageRenderer
 		return text;
 	}
 
-	private string StripHtmlTags(string text)
+	private static string StripHtmlTags(string text)
 	{
 		// Recursively strip all HTML tags but keep content
 		var changed = true;
@@ -708,14 +731,14 @@ public partial class SimplifiedHtmlMessageRenderer : IMessageRenderer
 		return text;
 	}
 
-	private string ParseColorValue(string colorValue)
+	private static string ParseColorValue(string colorValue)
 	{
 		// Normalize color value - keep as is (named colors, hex, rgb)
 		// DevExpress supports: red, #FF0000, 255,0,0, 255,255,0,0 (ARGB)
 		colorValue = colorValue.Trim();
 
 		// If it's rgb() or rgba() format, extract values
-		var rgbMatch = Regex.Match(colorValue, @"rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*(\d+(?:\.\d+)?))?\s*\)", RegexOptions.IgnoreCase);
+		var rgbMatch = RgbColorRegex().Match(colorValue);
 		if (rgbMatch.Success)
 		{
 			var r = rgbMatch.Groups[1].Value;
@@ -728,7 +751,7 @@ public partial class SimplifiedHtmlMessageRenderer : IMessageRenderer
 				// Convert alpha from 0-1 or 0-255 to 0-255
 				var alphaValue = double.Parse(a);
 				if (alphaValue <= 1.0)
-					alphaValue = alphaValue * 255;
+					alphaValue *= 255;
 				return $"{(int)alphaValue},{r},{g},{b}";
 			}
 
@@ -792,18 +815,18 @@ public partial class SimplifiedHtmlMessageRenderer : IMessageRenderer
 			if (IsSupported(normalizedTag))
 			{
 				// For nested tags, extract and keep essential attributes
-				string attributes = "";
+				var attributes = "";
 
 				if (normalizedTag == "a")
 				{
-					var hrefMatch = Regex.Match(match.Value, @"href=['""]([^'""]+)['""]", RegexOptions.IgnoreCase);
+					var hrefMatch = HrefAttributeRegex().Match(match.Value);
 					if (hrefMatch.Success)
 						attributes = $" href=\"{hrefMatch.Groups[1].Value}\"";
 				}
 				else if (normalizedTag == "img")
 				{
-					var srcMatch = Regex.Match(match.Value, @"src=['""]([^'""]+)['""]", RegexOptions.IgnoreCase);
-					var altMatch = Regex.Match(match.Value, @"alt=['""]([^'""]*)['""]", RegexOptions.IgnoreCase);
+					var srcMatch = SrcAttributeRegex().Match(match.Value);
+					var altMatch = AltAttributeRegex().Match(match.Value);
 
 					if (srcMatch.Success)
 						attributes += $" src=\"{srcMatch.Groups[1].Value}\"";
@@ -816,8 +839,8 @@ public partial class SimplifiedHtmlMessageRenderer : IMessageRenderer
 				}
 				else if (normalizedTag == "font")
 				{
-					var devExpressMatch = Regex.Match(match.Value, @"<font=""([^""]+)"">", RegexOptions.IgnoreCase);
-					var faceMatch = Regex.Match(match.Value, @"face=['""]([^'""]+)['""]", RegexOptions.IgnoreCase);
+					var devExpressMatch = FontDevExpressFormatRegex().Match(match.Value);
+					var faceMatch = FontFaceAttributeRegex().Match(match.Value);
 
 					if (devExpressMatch.Success)
 						attributes = $"=\"{devExpressMatch.Groups[1].Value}\"";
@@ -826,19 +849,19 @@ public partial class SimplifiedHtmlMessageRenderer : IMessageRenderer
 				}
 				else if (normalizedTag == "size")
 				{
-					var sizeMatch = Regex.Match(match.Value, @"<size=([+-]?\d+)>", RegexOptions.IgnoreCase);
+					var sizeMatch = SizeAttributeRegex().Match(match.Value);
 					if (sizeMatch.Success)
 						attributes = $"={sizeMatch.Groups[1].Value}";
 				}
 				else if (normalizedTag == "color")
 				{
-					var colorMatch = Regex.Match(match.Value, @"<color=([^>]+)>", RegexOptions.IgnoreCase);
+					var colorMatch = ColorAttributeRegex().Match(match.Value);
 					if (colorMatch.Success)
 						attributes = $"={colorMatch.Groups[1].Value}";
 				}
 				else if (normalizedTag == "backcolor")
 				{
-					var backcolorMatch = Regex.Match(match.Value, @"<backcolor=([^>]+)>", RegexOptions.IgnoreCase);
+					var backcolorMatch = BackColorAttributeRegex().Match(match.Value);
 					if (backcolorMatch.Success)
 						attributes = $"={backcolorMatch.Groups[1].Value}";
 				}
@@ -867,7 +890,7 @@ public partial class SimplifiedHtmlMessageRenderer : IMessageRenderer
 
 	private static string NormalizeTag(string tag)
 	{
-		if (TagAliases.TryGetValue(tag, out var normalized))
+		if (_tagAliases.TryGetValue(tag, out var normalized))
 			return normalized;
 		return tag.ToLowerInvariant();
 	}

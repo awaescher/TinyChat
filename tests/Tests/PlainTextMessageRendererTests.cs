@@ -1,6 +1,6 @@
 using Shouldly;
-using TinyChat.Messages.Rendering;
 using TinyChat;
+using TinyChat.Messages.Rendering;
 
 namespace Tests;
 
@@ -560,7 +560,7 @@ public class PlainTextMessageRendererTests
 			  "<ul><li>Item 1</li><li>Item 2</li></ul></p>";
 
 			var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-			for (int i = 0; i < 10000; i++)
+			for (var i = 0; i < 10000; i++)
 			{
 				_ = _renderer.Render(input);
 			}
@@ -579,7 +579,7 @@ public class PlainTextMessageRendererTests
 					 "1. First\n2. Second\n3. Third";
 
 			var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-			for (int i = 0; i < 10000; i++)
+			for (var i = 0; i < 10000; i++)
 			{
 				_ = _renderer.Render(input);
 			}
