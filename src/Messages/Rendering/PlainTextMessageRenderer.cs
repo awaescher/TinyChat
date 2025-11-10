@@ -7,7 +7,7 @@ namespace TinyChat.Messages.Rendering;
 /// </summary>
 public partial class PlainTextMessageRenderer : IMessageRenderer
 {
-	[GeneratedRegex(@"<[^>]+>", RegexOptions.Compiled)]
+	[GeneratedRegex(@"<[^>]*>", RegexOptions.Compiled)]
 	private static partial Regex HtmlTagsRegex();
 
 	[GeneratedRegex(@"!\[([^\]]*)\]\([^\)]+\)", RegexOptions.Compiled)]
@@ -28,11 +28,20 @@ public partial class PlainTextMessageRenderer : IMessageRenderer
 	[GeneratedRegex(@"~~(.*?)~~", RegexOptions.Compiled)]
 	private static partial Regex MarkdownStrikethroughRegex();
 
-	[GeneratedRegex(@"`([^`]+)`", RegexOptions.Compiled)]
+	[GeneratedRegex(@"`([^`]*)`", RegexOptions.Compiled)]
 	private static partial Regex MarkdownInlineCodeRegex();
 
-	[GeneratedRegex(@"```[\s\S]*?```", RegexOptions.Compiled)]
+	[GeneratedRegex(@"```(?:\w+)?(?:\s*\n)?([\s\S]*?)```", RegexOptions.Compiled)]
 	private static partial Regex MarkdownCodeBlockRegex();
+
+	[GeneratedRegex(@"<ul[^>]*>(.*?)</ul>", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline)]
+	private static partial Regex HtmlUnorderedListRegex();
+
+	[GeneratedRegex(@"<ol[^>]*>(.*?)</ol>", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline)]
+	private static partial Regex HtmlOrderedListRegex();
+
+	[GeneratedRegex(@"<li[^>]*>(.*?)</li>", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline)]
+	private static partial Regex HtmlListItemRegex();
 
 	/// <summary>
 	/// Renders the message content as plain text by removing formatting.
@@ -56,10 +65,20 @@ public partial class PlainTextMessageRenderer : IMessageRenderer
 	{
 		var text = content ?? string.Empty;
 
-		// Remove Markdown code blocks
-		text = MarkdownCodeBlockRegex().Replace(text, string.Empty);
+		// Convert HTML lists to plain text BEFORE removing other HTML tags
+		text = ConvertHtmlListsToPlainText(text);
 
-		// Remove Markdown inline code
+		// Replace Markdown code blocks with blank-line-separated content (process first to avoid interference with other patterns)
+		text = MarkdownCodeBlockRegex().Replace(text, match =>
+		{
+			var codeContent = match.Groups[1].Value;
+			// Trim trailing newline from code content to avoid double newlines
+			if (codeContent.EndsWith("\n"))
+				codeContent = codeContent.Substring(0, codeContent.Length - 1);
+			return $"\n{codeContent}\n";
+		});
+
+		// Remove Markdown inline code (keep content)
 		text = MarkdownInlineCodeRegex().Replace(text, "$1");
 
 		// Remove Markdown images (keep alt text)
@@ -68,10 +87,10 @@ public partial class PlainTextMessageRenderer : IMessageRenderer
 		// Remove Markdown links (keep link text)
 		text = MarkdownLinksRegex().Replace(text, "$1");
 
-		// Remove Markdown headers
+		// Remove Markdown headers (process before bold/italic to avoid conflicts)
 		text = MarkdownHeadersRegex().Replace(text, string.Empty);
 
-		// Remove Markdown bold
+		// Remove Markdown bold (process before italic to handle *** correctly)
 		text = MarkdownBoldRegex().Replace(text, "$2");
 
 		// Remove Markdown italic
@@ -80,9 +99,42 @@ public partial class PlainTextMessageRenderer : IMessageRenderer
 		// Remove Markdown strikethrough
 		text = MarkdownStrikethroughRegex().Replace(text, "$1");
 
-		// Remove HTML tags
+		// Remove HTML tags (process last to catch any HTML in the original content)
 		text = HtmlTagsRegex().Replace(text, string.Empty);
 
 		return text.Trim();
+	}
+
+	private string ConvertHtmlListsToPlainText(string text)
+	{
+		// We need to process nested lists from innermost to outermost
+		// So we keep replacing until no more <ul> or <ol> tags are found
+		var changed = true;
+		while (changed)
+		{
+			var originalText = text;
+
+			// Convert unordered lists <ul> to "- " prefixed items
+			text = HtmlUnorderedListRegex().Replace(text, match =>
+			{
+				var listContent = match.Groups[1].Value;
+				var items = HtmlListItemRegex().Matches(listContent);
+				var result = string.Join("\n", items.Cast<Match>().Select(m => $"- {m.Groups[1].Value.Trim()}"));
+				return result;
+			});
+
+			// Convert ordered lists <ol> to numbered items
+			text = HtmlOrderedListRegex().Replace(text, match =>
+			{
+				var listContent = match.Groups[1].Value;
+				var items = HtmlListItemRegex().Matches(listContent);
+				var result = string.Join("\n", items.Cast<Match>().Select((m, i) => $"{i + 1}. {m.Groups[1].Value.Trim()}"));
+				return result;
+			});
+
+			changed = text != originalText;
+		}
+
+		return text;
 	}
 }

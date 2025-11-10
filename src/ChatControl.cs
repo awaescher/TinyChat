@@ -103,6 +103,18 @@ public partial class ChatControl : UserControl
 	}
 
 	/// <summary>
+	/// Gets or sets the sender for messages sent from this chat control.
+	/// </summary>
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	public ISender Sender { get; set; } = new NamedSender(Environment.UserName);
+
+	/// <summary>
+	/// Gets or sets the renderer that converts message content into displayable strings.
+	/// </summary>
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	public IMessageRenderer MessageRenderer { get; set; }
+
+	/// <summary>
 	/// Updates the visibility of the welcome control based on the current message history.
 	/// </summary>
 	protected virtual void UpdateWelcomeControlVisibility()
@@ -116,17 +128,20 @@ public partial class ChatControl : UserControl
 	/// </summary>
 	protected virtual bool ShouldShowWelcomeControl() => !_messages.Any();
 
-	/// <summary>
-	/// Gets or sets the sender for messages sent from this chat control.
-	/// </summary>
-	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-	public ISender Sender { get; set; } = new NamedSender(Environment.UserName);
+
+	/// <inheritdoc/>
+	protected override void OnHandleCreated(EventArgs e)
+	{
+		base.OnHandleCreated(e);
+
+		MessageRenderer = CreateDefaultMessageRenderer();
+	}
 
 	/// <summary>
-	/// Gets or sets the renderer that converts message content into displayable strings.
+	/// Creates the message renderer that is used to display chat messages contents in the chat user interface
 	/// </summary>
-	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-	public IMessageRenderer MessageRenderer { get; set; } = new PlainTextMessageRenderer();
+	/// <returns></returns>
+	protected virtual IMessageRenderer CreateDefaultMessageRenderer() => new PlainTextMessageRenderer();
 
 	/// <summary>
 	/// Adds a chat message to the message history control.
