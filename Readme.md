@@ -27,7 +27,7 @@ That's why I quickly hacked down TinyChat. I hope this might help anyone out the
 These features are not implemented and I don't plan to implement them. However, I'd be happy to review pull-requests.
 
 - Full formatting support
-  > [Basic formatting is supported](https://github.com/awaescher/TinyChat/pull/1) but full formatting spec support will be very hard to do in Winforms. Especially because AI assistants can come up with pretty much every flavor of formatting like HTML, Markdown, RTF, etc.
+  > [Basic formatting is supported since v2.0](https://github.com/awaescher/TinyChat/pull/1) but full formatting spec support will be very hard to do in Winforms. Especially because AI assistants can come up with pretty much every flavor of formatting like HTML, Markdown, RTF, etc.
 - File attachment support
 - Image support
 - everything else you know from chatbots
