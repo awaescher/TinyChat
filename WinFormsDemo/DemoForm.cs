@@ -97,7 +97,7 @@ public partial class DemoForm : Form, IMessageFilter
 	private void ChatControl_MessageSent(object sender, MessageSentEventArgs e)
 	{
 		var cts = new CancellationTokenSource();
-		chatControl.AddStreamingMessage(new NamedSender(DemoData.AssistantName), DemoData.StreamAiAnswer(cts.Token), cancellationToken: cts.Token);
+		chatControl.AddStreamingMessage(new NamedSender(DemoData.AssistantName), DemoData.StreamAiAnswer(e.Content, isDevExpress: false, cts.Token), cancellationToken: cts.Token);
 	}
 }
 

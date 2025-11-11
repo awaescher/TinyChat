@@ -112,6 +112,6 @@ public partial class DemoForm : ToolbarForm, IMessageFilter
 	private void DxChatControl_MessageSent(object sender, MessageSentEventArgs e)
 	{
 		var cts = new CancellationTokenSource();
-		dxChatControl.AddStreamingMessage(new NamedSender(DemoData.AssistantName), DemoData.StreamAiAnswer(cts.Token), cancellationToken: cts.Token);
+		dxChatControl.AddStreamingMessage(new NamedSender(DemoData.AssistantName), DemoData.StreamAiAnswer(e.Content, isDevExpress: true, cts.Token), cancellationToken: cts.Token);
 	}
 }
