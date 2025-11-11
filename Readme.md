@@ -1,3 +1,5 @@
+[![NuGet Status](https://img.shields.io/nuget/v/TinyChat.svg)](https://www.nuget.org/packages/TinyChat/)
+
 # TinyChat 💬
 
 A minimalistic but extensible chat control library for Windows Forms.
