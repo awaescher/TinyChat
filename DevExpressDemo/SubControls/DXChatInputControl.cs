@@ -125,10 +125,19 @@ public class DXChatInputControl : Control, IChatInputControl
 	void IChatInputControl.SetIsReceivingStream(bool isReceiving, bool allowCancellation)
 	{
 		_isReceivingStream = isReceiving;
-		BeginInvoke(() =>
+
+		if (IsAvailable())
 		{
-			_sendButton.ImageOptions.SvgImage = isReceiving && allowCancellation ? StopImage : SendImage;
-			_sendButton.Enabled = !isReceiving || allowCancellation;
-		});
+			BeginInvoke(() =>
+			{
+				if (IsAvailable())
+				{
+					_sendButton.ImageOptions.SvgImage = isReceiving && allowCancellation ? StopImage : SendImage;
+					_sendButton.Enabled = !isReceiving || allowCancellation;
+				}
+			});
+		}
 	}
+
+	private bool IsAvailable() => !((this?.Disposing ?? false) || (this?.IsDisposed ?? false));
 }
