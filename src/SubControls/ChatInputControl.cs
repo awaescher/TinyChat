@@ -105,5 +105,5 @@ public class ChatInputControl : Control, IChatInputControl
 		}
 	}
 
-	private bool IsAvailable() => !((this?.Disposing ?? false) || (this?.IsDisposed ?? false));
+	private bool IsAvailable() => !(Disposing || IsDisposed);
 }
