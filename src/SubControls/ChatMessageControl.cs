@@ -12,6 +12,7 @@ public class ChatMessageControl : Panel, IChatMessageControl
 	private bool _isReceivingStream;
 	private readonly Label _senderLabel;
 	private readonly Label _messageLabel;
+	private readonly FlowLayoutPanel _thinkingPanel;
 
 	/// <summary>
 	/// The event that is raised when the size of the control is updated while streaming a message.
@@ -30,11 +31,15 @@ public class ChatMessageControl : Panel, IChatMessageControl
 	public ChatMessageControl()
 	{
 		_senderLabel = new Label() { Dock = DockStyle.Top, AutoSize = true, Font = new Font(Font, FontStyle.Bold), UseMnemonic = false };
+		_thinkingPanel = new FlowLayoutPanel() { Dock = DockStyle.Top, AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
 		_messageLabel = new Label() { Dock = DockStyle.Fill, AutoSize = true, UseMnemonic = false };
+
 		Controls.Add(_senderLabel);
+		Controls.Add(_thinkingPanel);
 		Controls.Add(_messageLabel);
 
 		_messageLabel.BringToFront();
+		_thinkingPanel.BringToFront();
 
 		AutoSize = true;
 		Padding = new Padding(8);
@@ -61,7 +66,32 @@ public class ChatMessageControl : Panel, IChatMessageControl
 			if (Message is not null)
 			{
 				var binding = _messageLabel.DataBindings.Add(nameof(_messageLabel.Text), Message.Content, nameof(Message.Content.Content));
-				binding.Format += (_, e) => e.Value = MessageFormatter.Format(new StringMessageContent(e.Value?.ToString() ?? string.Empty));
+				binding.Format += (_, e) =>
+				{
+					var formattedText = MessageFormatter.Format(new StringMessageContent(e.Value?.ToString() ?? string.Empty));
+
+					// Check for thinking placeholders and extract them
+					if (ThinkingControl.HasThinkPlaceholders(formattedText))
+					{
+						// Clear existing thinking controls
+						_thinkingPanel.Controls.Clear();
+
+						// Create thinking controls
+						foreach (var thinkingControl in ThinkingControl.CreateThinkingControls(formattedText))
+						{
+							_thinkingPanel.Controls.Add(thinkingControl);
+						}
+
+						// Remove thinking placeholders from the main text
+						e.Value = ThinkingControl.ExtractTextWithoutThinkPlaceholders(formattedText);
+					}
+					else
+					{
+						// Clear thinking panel if no thinking placeholders
+						_thinkingPanel.Controls.Clear();
+						e.Value = formattedText;
+					}
+				};
 			}
 		}
 	}
@@ -75,6 +105,7 @@ public class ChatMessageControl : Panel, IChatMessageControl
 		{
 			base.MaximumSize = value;
 			_senderLabel.MaximumSize = new Size(value.Width - Padding.Horizontal, 0);
+			_thinkingPanel.MaximumSize = new Size(value.Width - Padding.Horizontal, 0);
 			_messageLabel.MaximumSize = new Size(value.Width - Padding.Horizontal, 0);
 		}
 	}

@@ -105,6 +105,12 @@ public class DemoData
 		var random = new Random();
 		var selectedAnswer = answers[random.Next(answers.Length)];
 
+		var shouldThink = content?.Content?.ToString()?.Contains("think", StringComparison.OrdinalIgnoreCase) ?? false;
+		if (shouldThink)
+		{
+			selectedAnswer = "<Think>Hmm, let me think about that for a moment ...</Think>" + selectedAnswer;
+		}
+
 		for (var i = 0; i < selectedAnswer.Length; i += 4)
 		{
 			if (cancellationToken.IsCancellationRequested)

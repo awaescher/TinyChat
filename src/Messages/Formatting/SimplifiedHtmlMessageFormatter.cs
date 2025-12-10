@@ -101,6 +101,8 @@ public partial class SimplifiedHtmlMessageFormatter(params string[] supportedTag
 	[GeneratedRegex(@"rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*(\d+(?:\.\d+)?))?\s*\)", RegexOptions.Compiled | RegexOptions.IgnoreCase)]
 	private static partial Regex RgbColorRegex();
 
+	private static readonly Regex _thinkTagRegex = new(@"<Think>(.*?)</Think>", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
 	private readonly HashSet<string> _supportedTags = new(supportedTags.Select(NormalizeTag), StringComparer.OrdinalIgnoreCase);
 
 	// Tag mappings from markdown/HTML to canonical HTML tags
@@ -140,19 +142,49 @@ public partial class SimplifiedHtmlMessageFormatter(params string[] supportedTag
 	{
 		var text = content ?? string.Empty;
 
-		// Step 1: Remove HTML comments
+		// Step 1: Extract and process Think tags first
+		var thinkSections = new List<(string placeholder, string content)>();
+		text = ProcessThinkTags(text, thinkSections);
+
+		// Step 2: Remove HTML comments
 		text = HtmlCommentsRegex().Replace(text, string.Empty);
 
-		// Step 2: Convert color/backcolor span tags to DevExpress format (BEFORE processing HTML tags)
+		// Step 3: Convert color/backcolor span tags to DevExpress format (BEFORE processing HTML tags)
 		text = ConvertColorSpansToDevExpressFormat(text);
 
-		// Step 3: Convert supported Markdown to HTML
+		// Step 4: Convert supported Markdown to HTML
 		text = ConvertMarkdownToHtml(text);
 
-		// Step 4: Process HTML tags (keep supported, strip unsupported)
+		// Step 5: Process HTML tags (keep supported, strip unsupported)
 		text = ProcessHtmlTags(text);
 
+		// Step 6: Restore Think sections as placeholders
+		text = RestoreThinkSections(text, thinkSections);
+
 		return text.Trim();
+	}
+
+	private string ProcessThinkTags(string text, List<(string placeholder, string content)> thinkSections)
+	{
+		var index = 0;
+		return _thinkTagRegex.Replace(text, match =>
+		{
+			var thinkContent = match.Groups[1].Value.Trim();
+			var placeholder = $"{{THINK_{index}}}";
+			thinkSections.Add((placeholder, thinkContent));
+			index++;
+			return placeholder;
+		});
+	}
+
+	private static string RestoreThinkSections(string text, List<(string placeholder, string content)> thinkSections)
+	{
+		foreach (var (placeholder, content) in thinkSections)
+		{
+			// Format: {THINK|collapsed_text|expanded_content}
+			text = text.Replace(placeholder, $"{{THINK|Thinking ...|{content}}}");
+		}
+		return text;
 	}
 
 	private string ConvertMarkdownToHtml(string text)

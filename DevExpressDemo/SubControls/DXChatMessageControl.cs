@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
+using System.Linq;
 using System.Windows.Forms;
 using DevExpress.XtraEditors;
 using TinyChat;
@@ -18,6 +20,7 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl
 	private bool _isReceivingStream;
 	private readonly LabelControl _senderLabel;
 	private readonly LabelControl _messageLabel;
+	private readonly DevExpress.XtraEditors.PanelControl _thinkingPanel;
 
 	/// <summary>
 	/// The event that is raised when the size of the control is updated while streaming a message.
@@ -40,12 +43,15 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl
 		AutoSize = true;
 
 		_senderLabel = new LabelControl() { AllowHtmlString = true, Dock = DockStyle.Top, AutoSizeMode = LabelAutoSizeMode.Vertical, Font = new Font(Font, FontStyle.Bold), UseMnemonic = false };
+		_thinkingPanel = new DevExpress.XtraEditors.PanelControl() { Dock = DockStyle.Top, AutoSize = true, BorderStyle = DevExpress.XtraEditors.Controls.BorderStyles.NoBorder };
 		_messageLabel = new LabelControl() { AllowHtmlString = true, Dock = DockStyle.Top, AutoSizeMode = LabelAutoSizeMode.Vertical, UseMnemonic = false };
 
 		Controls.Add(_senderLabel);
+		Controls.Add(_thinkingPanel);
 		Controls.Add(_messageLabel);
 
 		_messageLabel.BringToFront();
+		_thinkingPanel.BringToFront();
 
 		AutoSize = true;
 		Padding = new Padding(8);
@@ -71,7 +77,39 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl
 			if (Message is not null)
 			{
 				var binding = _messageLabel.DataBindings.Add(nameof(_messageLabel.Text), Message.Content, nameof(Message.Content.Content));
-				binding.Format += (_, e) => e.Value = MessageFormatter.Format(e.Value?.ToString() ?? string.Empty);
+				binding.Format += (_, e) =>
+				{
+					var formattedText = MessageFormatter.Format(e.Value?.ToString() ?? string.Empty);
+
+					// Check for thinking placeholders and extract them
+					if (DXThinkingControl.HasThinkPlaceholders(formattedText))
+					{
+						// Clear existing thinking controls
+						_thinkingPanel.Controls.Clear();
+
+						// Create thinking controls
+						var thinkingControls = DXThinkingControl.CreateThinkingControls(formattedText).ToList();
+						for (int i = 0; i < thinkingControls.Count; i++)
+						{
+							var control = thinkingControls[i];
+							control.Dock = DockStyle.Top;
+							_thinkingPanel.Controls.Add(control);
+
+							// Bring to front in reverse order so they appear in correct order
+							if (i == 0)
+								control.BringToFront();
+						}
+
+						// Remove thinking placeholders from the main text
+						e.Value = DXThinkingControl.ExtractTextWithoutThinkPlaceholders(formattedText);
+					}
+					else
+					{
+						// Clear thinking panel if no thinking placeholders
+						_thinkingPanel.Controls.Clear();
+						e.Value = formattedText;
+					}
+				};
 			}
 		}
 	}
@@ -91,6 +129,7 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl
 		{
 			base.MaximumSize = value;
 			_senderLabel.MaximumSize = new Size(value.Width - Padding.Horizontal, 0);
+			_thinkingPanel.MaximumSize = new Size(value.Width - Padding.Horizontal, 0);
 			_messageLabel.MaximumSize = new Size(value.Width - Padding.Horizontal, 0);
 		}
 	}
