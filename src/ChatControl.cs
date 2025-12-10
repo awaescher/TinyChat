@@ -345,7 +345,7 @@ public partial class ChatControl : UserControl
 	/// </summary>
 	/// <param name="message">The chat message to create a control for.</param>
 	/// <returns>An <see cref="IChatMessageControl"/> instance for the message.</returns>
-	protected virtual IChatMessageControl CreateMessageControl(IChatMessage message) => new ChatMessageControl() { Message = message, MessageFormatter = MessageFormatter };
+	protected virtual IChatMessageControl CreateMessageControl(IChatMessage message) => new ChatMessageControl() { MessageFormatter = MessageFormatter, Message = message };
 
 	/// <summary>
 	/// Applies layout settings to a chat message control and adds it to the container.

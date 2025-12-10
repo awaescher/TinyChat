@@ -12,6 +12,8 @@ public class ChatMessageControl : Panel, IChatMessageControl
 	private bool _isReceivingStream;
 	private readonly Label _senderLabel;
 	private readonly Label _messageLabel;
+	private readonly List<CollapsibleThinkPanel> _thinkPanels = [];
+	private readonly Panel _contentContainer;
 
 	/// <summary>
 	/// The event that is raised when the size of the control is updated while streaming a message.
@@ -30,11 +32,15 @@ public class ChatMessageControl : Panel, IChatMessageControl
 	public ChatMessageControl()
 	{
 		_senderLabel = new Label() { Dock = DockStyle.Top, AutoSize = true, Font = new Font(Font, FontStyle.Bold), UseMnemonic = false };
-		_messageLabel = new Label() { Dock = DockStyle.Fill, AutoSize = true, UseMnemonic = false };
-		Controls.Add(_senderLabel);
-		Controls.Add(_messageLabel);
+		_messageLabel = new Label() { Dock = DockStyle.Top, AutoSize = true, UseMnemonic = false };
 
-		_messageLabel.BringToFront();
+		_contentContainer = new Panel() { Dock = DockStyle.Fill, AutoSize = true };
+		_contentContainer.Controls.Add(_messageLabel);
+
+		Controls.Add(_senderLabel);
+		Controls.Add(_contentContainer);
+
+		_contentContainer.BringToFront();
 
 		AutoSize = true;
 		Padding = new Padding(8);
@@ -58,12 +64,81 @@ public class ChatMessageControl : Panel, IChatMessageControl
 			_senderLabel.Text = Message?.Sender?.Name ?? string.Empty;
 
 			_messageLabel.DataBindings.Clear();
+			ClearThinkPanels();
+
 			if (Message is not null)
 			{
-				var binding = _messageLabel.DataBindings.Add(nameof(_messageLabel.Text), Message.Content, nameof(Message.Content.Content));
-				binding.Format += (_, e) => e.Value = MessageFormatter.Format(new StringMessageContent(e.Value?.ToString() ?? string.Empty));
+				// Subscribe to content changes to detect think tags
+				if (Message.Content is INotifyPropertyChanged notifyPropertyChanged)
+				{
+					notifyPropertyChanged.PropertyChanged += OnContentPropertyChanged;
+				}
+
+				// Initial update
+				UpdateContentWithThinkTags(Message.Content?.Content?.ToString() ?? string.Empty);
 			}
 		}
+	}
+
+	private void OnContentPropertyChanged(object? sender, PropertyChangedEventArgs e)
+	{
+		if (Message?.Content?.Content is string content)
+		{
+			UpdateContentWithThinkTags(content);
+		}
+	}
+
+	private void UpdateContentWithThinkTags(string rawContent)
+	{
+		var extraction = ThinkTagHelper.ExtractThinkSections(rawContent);
+
+		// Clear existing think panels
+		ClearThinkPanels();
+
+		// Update the message label with content without think tags
+		var formattedContent = MessageFormatter.Format(new StringMessageContent(extraction.ContentWithoutThink));
+		_messageLabel.Text = formattedContent;
+
+		// Add think panels for each think section
+		if (extraction.ThinkSections.Count > 0)
+		{
+			_contentContainer.SuspendLayout();
+
+			// Insert think panels at the top (before the message)
+			foreach (var section in extraction.ThinkSections.Reverse())
+			{
+				var thinkPanel = new CollapsibleThinkPanel
+				{
+					ThinkContent = section.Content,
+					Dock = DockStyle.Top,
+					MaximumSize = new Size(Math.Max(0, MaximumSize.Width - Padding.Horizontal), 0)
+				};
+				thinkPanel.ExpandedChanged += (_, _) =>
+				{
+					if (_isReceivingStream)
+						SizeUpdatedWhileStreaming?.Invoke(this, EventArgs.Empty);
+				};
+
+				_thinkPanels.Add(thinkPanel);
+				_contentContainer.Controls.Add(thinkPanel);
+				thinkPanel.BringToFront();
+			}
+
+			// Make sure message label is at the bottom
+			_messageLabel.SendToBack();
+
+			_contentContainer.ResumeLayout();
+		}
+	}
+
+	private void ClearThinkPanels()
+	{
+		foreach (var panel in _thinkPanels)
+		{
+			_contentContainer.Controls.Remove(panel);
+			panel.Dispose();
+		}
+		_thinkPanels.Clear();
 	}
 
 	/// <inheritdoc />
@@ -76,6 +151,11 @@ public class ChatMessageControl : Panel, IChatMessageControl
 			base.MaximumSize = value;
 			_senderLabel.MaximumSize = new Size(value.Width - Padding.Horizontal, 0);
 			_messageLabel.MaximumSize = new Size(value.Width - Padding.Horizontal, 0);
+
+			foreach (var thinkPanel in _thinkPanels)
+			{
+				thinkPanel.MaximumSize = new Size(value.Width - Padding.Horizontal, 0);
+			}
 		}
 	}
 

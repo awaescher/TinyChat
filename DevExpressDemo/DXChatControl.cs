@@ -12,7 +12,7 @@ public class DXChatControl : ChatControl
 	protected override IChatMessageHistoryControl CreateMessageHistoryControl() => new StackPanelMessageHistoryControl();
 
 	/// <inheritdoc />
-	protected override IChatMessageControl CreateMessageControl(IChatMessage message) => new DXChatMessageControl { Message = message, MessageFormatter = MessageFormatter };
+	protected override IChatMessageControl CreateMessageControl(IChatMessage message) => new DXChatMessageControl { MessageFormatter = MessageFormatter, Message = message };
 
 	/// <inheritdoc />
 	protected override IChatInputControl CreateChatInputControl() => new DXChatInputControl();
