@@ -143,6 +143,16 @@ public partial class ChatControl : UserControl
 	public bool UseStreaming { get; set; } = true;
 
 	/// <summary>
+	/// Gets or sets whether function call and function result content should be included in the streaming visualization.
+	/// When true, function calls and their results will be displayed alongside text content during streaming.
+	/// </summary>
+	[Category("Chat")]
+	[Description("Gets or sets whether function call and function result content should be included in the streaming visualization.")]
+	[DefaultValue(false)]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+	public bool IncludeFunctionCalls { get; set; } = false;
+
+	/// <summary>
 	/// Gets or sets the sender name used for assistant responses when using <see cref="IChatClient"/>.
 	/// </summary>
 	[Category("Chat")]
@@ -272,6 +282,38 @@ public partial class ChatControl : UserControl
 		}, state: null);
 
 		return messageControl;
+	}
+
+	/// <summary>
+	/// Adds a chat message with support of streaming input, handling different kinds of content
+	/// such as text and function calls.
+	/// </summary>
+	/// <param name="sender">The sender of the streaming message.</param>
+	/// <param name="stream">The stream of content items.</param>
+	/// <param name="synchronizationContext">An optional synchronization context. Only required if the applications does not provide a default synchronization context.</param>
+	/// <param name="completionCallback">An optional callback that can be used to process the streamed messages after it was received completely.</param>
+	/// <param name="exceptionCallback">An optional callback that can be used to process exceptions that occurred during the processing of the stream.</param>
+	/// <param name="cancellationToken">The token to cancel the operation with.</param>
+	/// <returns>An <see cref="IChatMessageControl"/> instance representing the added streaming message.</returns>
+	public virtual IChatMessageControl AddStreamingMessage(
+		ISender sender,
+		IAsyncEnumerable<IChatMessageContent> stream,
+		SynchronizationContext? synchronizationContext = default,
+		Action<string>? completionCallback = default,
+		Action<Exception>? exceptionCallback = default,
+		CancellationToken cancellationToken = default)
+	{
+		async IAsyncEnumerable<string> ToStringStream()
+		{
+			await foreach (var content in stream.ConfigureAwait(false))
+			{
+				var text = content.ToString();
+				if (!string.IsNullOrEmpty(text))
+					yield return text;
+			}
+		}
+
+		return AddStreamingMessage(sender, ToStringStream(), synchronizationContext, completionCallback, exceptionCallback, cancellationToken);
 	}
 
 	/// <summary>
@@ -685,18 +727,37 @@ public partial class ChatControl : UserControl
 	/// </summary>
 	private async Task HandleStreamingResponseAsync(ISender sender, IAsyncEnumerable<ChatResponseUpdate> stream)
 	{
-		// Create an async enumerable that yields text chunks
-		async IAsyncEnumerable<string> TextStream()
+		// Create an async enumerable that yields typed content items
+		async IAsyncEnumerable<IChatMessageContent> ContentStream()
 		{
 			await foreach (var update in stream.ConfigureAwait(false))
 			{
-				if (!string.IsNullOrEmpty(update.Text))
-					yield return update.Text;
+				foreach (var content in update.Contents)
+				{
+					if (content is Microsoft.Extensions.AI.TextContent textContent)
+					{
+						if (!string.IsNullOrEmpty(textContent.Text))
+							yield return new StringMessageContent(textContent.Text);
+					}
+					else if (IncludeFunctionCalls && content is Microsoft.Extensions.AI.FunctionCallContent functionCall)
+					{
+						yield return new FunctionCallMessageContent(
+							functionCall.CallId ?? string.Empty,
+							functionCall.Name ?? string.Empty,
+							functionCall.Arguments);
+					}
+					else if (IncludeFunctionCalls && content is Microsoft.Extensions.AI.FunctionResultContent functionResult)
+					{
+						yield return new FunctionResultMessageContent(
+							functionResult.CallId ?? string.Empty,
+							functionResult.Result);
+					}
+				}
 			}
 		}
 
-		// Use the existing AddStreamingMessage method
-		AddStreamingMessage(sender, TextStream());
+		// Use the AddStreamingMessage overload that handles different content types
+		AddStreamingMessage(sender, ContentStream());
 	}
 
 	/// <summary>

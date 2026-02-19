@@ -482,6 +482,42 @@ public class SimplifiedHtmlMessageFormatterTests
 		}
 
 		[Test]
+		public void Formats_FunctionCallMessageContent()
+		{
+			var formatter = new SimplifiedHtmlMessageFormatter("b");
+			var content = new FunctionCallMessageContent("call1", "get_weather", new Dictionary<string, object?> { ["location"] = "Paris" });
+			var result = formatter.Format(content);
+			result.ShouldBe(content.ToString());
+		}
+
+		[Test]
+		public void Formats_FunctionCallMessageContent_Without_Arguments()
+		{
+			var formatter = new SimplifiedHtmlMessageFormatter("b");
+			var content = new FunctionCallMessageContent("call1", "get_time", null);
+			var result = formatter.Format(content);
+			result.ShouldBe("[Calling: get_time()]");
+		}
+
+		[Test]
+		public void Formats_FunctionResultMessageContent()
+		{
+			var formatter = new SimplifiedHtmlMessageFormatter("b");
+			var content = new FunctionResultMessageContent("call1", "15°C, cloudy");
+			var result = formatter.Format(content);
+			result.ShouldBe("[Result: 15°C, cloudy]");
+		}
+
+		[Test]
+		public void Formats_FunctionResultMessageContent_With_Null_Result()
+		{
+			var formatter = new SimplifiedHtmlMessageFormatter("b");
+			var content = new FunctionResultMessageContent("call1", null);
+			var result = formatter.Format(content);
+			result.ShouldBe("[Result: ]");
+		}
+
+		[Test]
 		public void Preserves_Empty_Markdown_Link_As_Is()
 		{
 			var formatter = new SimplifiedHtmlMessageFormatter("a");
