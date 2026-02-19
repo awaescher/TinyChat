@@ -34,6 +34,9 @@ public partial class DemoForm : Form, IMessageFilter
 
 		chatControl.Messages = DemoData.Create(Environment.UserName);
 		SelectControl(chatControl);
+
+		// start a second demo showcasing the IChatClient implementation
+		new IChatClientDemoForm().Show();
 	}
 
 	/// <summary>
