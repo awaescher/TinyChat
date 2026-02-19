@@ -23,6 +23,11 @@ public partial class ChatControl : UserControl
 	/// Occurs when a message has been sent from the user interface.
 	/// </summary>
 	public event EventHandler<MessageSentEventArgs>? MessageSent;
+
+	/// <summary>
+	/// Occurs before a request is sent to the <see cref="IChatClient"/>, allowing the developer to define or modify <see cref="Microsoft.Extensions.AI.ChatOptions"/>.
+	/// </summary>
+	public event EventHandler<ChatOptionsRequestedEventArgs>? ChatOptionsRequested;
 	/// <summary>
 	/// Gets the control that manages and displays the chat message history.
 	/// </summary>
@@ -141,6 +146,13 @@ public partial class ChatControl : UserControl
 	[DefaultValue(true)]
 	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
 	public bool UseStreaming { get; set; } = true;
+
+	/// <summary>
+	/// Gets or sets the <see cref="Microsoft.Extensions.AI.ChatOptions"/> passed to every <see cref="IChatClient"/> request.
+	/// When set, these options are used as the default for each request. They can also be overridden per-request by handling the <see cref="ChatOptionsRequested"/> event.
+	/// </summary>
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	public ChatOptions? ChatOptions { get; set; }
 
 	/// <summary>
 	/// Gets or sets the sender name used for assistant responses when using <see cref="IChatClient"/>.
@@ -549,6 +561,11 @@ public partial class ChatControl : UserControl
 			// Convert message history to Microsoft.Extensions.AI format
 			var chatMessages = ConvertToChatMessages();
 
+			// Resolve chat options, allowing subscribers to override them via event
+			var chatOptionsArgs = new ChatOptionsRequestedEventArgs(ChatOptions);
+			ChatOptionsRequested?.Invoke(this, chatOptionsArgs);
+			var chatOptions = chatOptionsArgs.ChatOptions;
+
 			try
 			{
 				var assistantSender = new NamedSender(AssistantSenderName);
@@ -556,13 +573,13 @@ public partial class ChatControl : UserControl
 				if (UseStreaming)
 				{
 					// Use streaming response
-					var streamingResponse = chatClient.GetStreamingResponseAsync(chatMessages, cancellationToken: _chatClientCancellationTokenSource.Token);
+					var streamingResponse = chatClient.GetStreamingResponseAsync(chatMessages, chatOptions, cancellationToken: _chatClientCancellationTokenSource.Token);
 					await HandleStreamingResponseAsync(assistantSender, streamingResponse).ConfigureAwait(true);
 				}
 				else
 				{
 					// Use non-streaming response
-					var response = await chatClient.GetResponseAsync(chatMessages, cancellationToken: _chatClientCancellationTokenSource.Token).ConfigureAwait(true);
+					var response = await chatClient.GetResponseAsync(chatMessages, chatOptions, cancellationToken: _chatClientCancellationTokenSource.Token).ConfigureAwait(true);
 					HandleNonStreamingResponse(assistantSender, response);
 				}
 			}
