@@ -153,6 +153,14 @@ public partial class ChatControl : UserControl
 	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
 	public string AssistantSenderName { get; set; } = "Assistant";
 
+	private CancellationTokenSource? _chatClientCancellationTokenSource;
+
+	/// <summary>
+	/// Gets the cancellation token source for the current IChatClient operation, if any.
+	/// </summary>
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	public CancellationTokenSource? ChatClientCancellationTokenSource => _chatClientCancellationTokenSource;
+
 	/// <summary>
 	/// Updates the visibility of the welcome control based on the current message history.
 	/// </summary>
@@ -523,39 +531,69 @@ public partial class ChatControl : UserControl
 	/// </summary>
 	private async void OnMessageSentAsync(object? sender, MessageSentEventArgs e)
 	{
-		// Only proceed if we have a service provider
-		if (ServiceProvider is null)
-			return;
-
-		// Try to resolve the IChatClient
-		var chatClient = ResolveChatClient();
-		if (chatClient is null)
-			return;
-
-		// Convert message history to Microsoft.Extensions.AI format
-		var chatMessages = ConvertToChatMessages();
-
 		try
 		{
-			var assistantSender = new NamedSender(AssistantSenderName);
+			// Only proceed if we have a service provider
+			if (ServiceProvider is null)
+				return;
 
-			if (UseStreaming)
+			// Try to resolve the IChatClient
+			var chatClient = ResolveChatClient();
+			if (chatClient is null)
+				return;
+
+			// Cancel any existing IChatClient operation
+			_chatClientCancellationTokenSource?.Cancel();
+			_chatClientCancellationTokenSource?.Dispose();
+			_chatClientCancellationTokenSource = new CancellationTokenSource();
+
+			// Convert message history to Microsoft.Extensions.AI format
+			var chatMessages = ConvertToChatMessages();
+
+			try
 			{
-				// Use streaming response
-				var streamingResponse = chatClient.GetStreamingResponseAsync(chatMessages, cancellationToken: default);
-				await HandleStreamingResponseAsync(assistantSender, streamingResponse).ConfigureAwait(true);
+				var assistantSender = new NamedSender(AssistantSenderName);
+
+				if (UseStreaming)
+				{
+					// Use streaming response
+					var streamingResponse = chatClient.GetStreamingResponseAsync(chatMessages, cancellationToken: _chatClientCancellationTokenSource.Token);
+					await HandleStreamingResponseAsync(assistantSender, streamingResponse).ConfigureAwait(true);
+				}
+				else
+				{
+					// Use non-streaming response
+					var response = await chatClient.GetResponseAsync(chatMessages, cancellationToken: _chatClientCancellationTokenSource.Token).ConfigureAwait(true);
+					HandleNonStreamingResponse(assistantSender, response);
+				}
 			}
-			else
+			catch (OperationCanceledException)
 			{
-				// Use non-streaming response
-				var response = await chatClient.GetResponseAsync(chatMessages, cancellationToken: default).ConfigureAwait(true);
-				HandleNonStreamingResponse(assistantSender, response);
+				// Operation was cancelled, this is expected behavior
+			}
+			catch (Exception ex)
+			{
+				// Display error message in chat
+				AddMessage(new NamedSender("System"), new StringMessageContent($"Error: {ex.Message}"));
+			}
+			finally
+			{
+				_chatClientCancellationTokenSource?.Dispose();
+				_chatClientCancellationTokenSource = null;
 			}
 		}
 		catch (Exception ex)
 		{
-			// Display error message in chat
-			AddMessage(new NamedSender("System"), new StringMessageContent($"Error: {ex.Message}"));
+			// Catch any unexpected exceptions to prevent application crash
+			// Since this is an async void method, unhandled exceptions would terminate the application
+			try
+			{
+				AddMessage(new NamedSender("System"), new StringMessageContent($"Unexpected error: {ex.Message}"));
+			}
+			catch
+			{
+				// If we can't even add an error message, just ignore it to prevent further issues
+			}
 		}
 	}
 
@@ -589,7 +627,14 @@ public partial class ChatControl : UserControl
 	/// <summary>
 	/// Converts the current message history to Microsoft.Extensions.AI.ChatMessage format.
 	/// </summary>
-	private List<Microsoft.Extensions.AI.ChatMessage> ConvertToChatMessages()
+	/// <remarks>
+	/// This method determines the chat role based on the sender name:
+	/// - Messages from the current <see cref="Sender"/> or the environment username are treated as User messages
+	/// - Messages from the <see cref="AssistantSenderName"/> or containing "Assistant" are treated as Assistant messages
+	/// - All other messages are treated as Assistant messages by default
+	/// Override this method to customize role determination logic.
+	/// </remarks>
+	protected virtual List<Microsoft.Extensions.AI.ChatMessage> ConvertToChatMessages()
 	{
 		var result = new List<Microsoft.Extensions.AI.ChatMessage>();
 
@@ -598,17 +643,42 @@ public partial class ChatControl : UserControl
 			var content = message.Content?.Content?.ToString() ?? string.Empty;
 			var senderName = message.Sender?.Name ?? "User";
 
-			// Determine the role based on sender
-			// Users and the current sender are treated as User role
-			// Others (like Assistant) are treated as Assistant role
-			var role = senderName == Sender.Name || senderName == Environment.UserName
-				? ChatRole.User
-				: ChatRole.Assistant;
+			// Determine the role based on sender name
+			var role = DetermineChatRole(senderName);
 
 			result.Add(new Microsoft.Extensions.AI.ChatMessage(role, content));
 		}
 
 		return result;
+	}
+
+	/// <summary>
+	/// Determines the ChatRole for a given sender name.
+	/// </summary>
+	/// <param name="senderName">The name of the sender.</param>
+	/// <returns>The appropriate ChatRole for the sender.</returns>
+	/// <remarks>
+	/// Override this method to customize how sender names are mapped to chat roles.
+	/// </remarks>
+	protected virtual ChatRole DetermineChatRole(string senderName)
+	{
+		// Check if this is the current user
+		if (senderName == Sender.Name || senderName == Environment.UserName)
+			return ChatRole.User;
+
+		// Check if this is an assistant
+		if (senderName == AssistantSenderName || 
+		    senderName.Contains("Assistant", StringComparison.OrdinalIgnoreCase) ||
+		    senderName.Contains("AI", StringComparison.OrdinalIgnoreCase) ||
+		    senderName.Contains("Bot", StringComparison.OrdinalIgnoreCase))
+			return ChatRole.Assistant;
+
+		// Check for system messages
+		if (senderName.Equals("System", StringComparison.OrdinalIgnoreCase))
+			return ChatRole.System;
+
+		// Default to Assistant for all other senders
+		return ChatRole.Assistant;
 	}
 
 	/// <summary>
