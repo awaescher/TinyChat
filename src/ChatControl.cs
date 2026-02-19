@@ -1,4 +1,6 @@
 using System.ComponentModel;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using TinyChat.Messages.Formatting;
 
 namespace TinyChat;
@@ -57,7 +59,10 @@ public partial class ChatControl : UserControl
 	/// <summary>
 	/// Initializes a new instance of the <see cref="ChatControl"/> class.
 	/// </summary>
-	public ChatControl() => InitializeComponent();
+	public ChatControl()
+	{
+		InitializeComponent();
+	}
 
 	/// <summary>
 	/// Gets or sets the message history displayed in the chat control.
@@ -110,6 +115,49 @@ public partial class ChatControl : UserControl
 	/// </summary>
 	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
 	public IMessageFormatter MessageFormatter { get; set; } = new PlainTextMessageFormatter();
+
+	/// <summary>
+	/// Gets or sets the service provider used to resolve the <see cref="IChatClient"/> instance.
+	/// </summary>
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	public IServiceProvider? ServiceProvider { get; set; }
+
+	/// <summary>
+	/// Gets or sets the service key used to resolve a keyed <see cref="IChatClient"/> registration.
+	/// When null, the default <see cref="IChatClient"/> registration is used.
+	/// </summary>
+	[Category("Chat")]
+	[Description("Gets or sets the service key used to resolve a keyed IChatClient registration.")]
+	[DefaultValue(null)]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+	public string? ChatClientServiceKey { get; set; }
+
+	/// <summary>
+	/// Gets or sets whether streaming should be used when communicating with the <see cref="IChatClient"/>.
+	/// When true (default), responses will be streamed in real-time. When false, the complete response is awaited before displaying.
+	/// </summary>
+	[Category("Chat")]
+	[Description("Gets or sets whether streaming should be used when communicating with the IChatClient.")]
+	[DefaultValue(true)]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+	public bool UseStreaming { get; set; } = true;
+
+	/// <summary>
+	/// Gets or sets the sender name used for assistant responses when using <see cref="IChatClient"/>.
+	/// </summary>
+	[Category("Chat")]
+	[Description("Gets or sets the sender name used for assistant responses when using IChatClient.")]
+	[DefaultValue("Assistant")]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+	public string AssistantSenderName { get; set; } = "Assistant";
+
+	private CancellationTokenSource? _chatClientCancellationTokenSource;
+
+	/// <summary>
+	/// Gets the cancellation token source for the current IChatClient operation, if any.
+	/// </summary>
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	public CancellationTokenSource? ChatClientCancellationTokenSource => _chatClientCancellationTokenSource;
 
 	/// <summary>
 	/// Updates the visibility of the welcome control based on the current message history.
@@ -451,6 +499,7 @@ public partial class ChatControl : UserControl
 		if (!e.Cancel)
 		{
 			AppendMessageControl(AddChatMessage(sender, e.Content));
+			SendMessageByChatClient();
 			MessageSent?.Invoke(this, new MessageSentEventArgs(sender, e.Content));
 		}
 	}
@@ -474,5 +523,188 @@ public partial class ChatControl : UserControl
 		var message = CreateChatMessage(sender, content);
 		_messages.Add(message);
 		return message;
+	}
+
+	/// <summary>
+	/// Handles the MessageSent event to automatically call IChatClient if configured.
+	/// </summary>
+	private async void SendMessageByChatClient()
+	{
+		try
+		{
+			// Only proceed if we have a service provider
+			if (ServiceProvider is null)
+				return;
+
+			// Try to resolve the IChatClient
+			var chatClient = ResolveChatClient();
+			if (chatClient is null)
+				return;
+
+			// Cancel any existing IChatClient operation
+			_chatClientCancellationTokenSource?.Cancel();
+			_chatClientCancellationTokenSource?.Dispose();
+			_chatClientCancellationTokenSource = new CancellationTokenSource();
+
+			// Convert message history to Microsoft.Extensions.AI format
+			var chatMessages = ConvertToChatMessages();
+
+			try
+			{
+				var assistantSender = new NamedSender(AssistantSenderName);
+
+				if (UseStreaming)
+				{
+					// Use streaming response
+					var streamingResponse = chatClient.GetStreamingResponseAsync(chatMessages, cancellationToken: _chatClientCancellationTokenSource.Token);
+					await HandleStreamingResponseAsync(assistantSender, streamingResponse).ConfigureAwait(true);
+				}
+				else
+				{
+					// Use non-streaming response
+					var response = await chatClient.GetResponseAsync(chatMessages, cancellationToken: _chatClientCancellationTokenSource.Token).ConfigureAwait(true);
+					HandleNonStreamingResponse(assistantSender, response);
+				}
+			}
+			catch (OperationCanceledException)
+			{
+				// Operation was cancelled, this is expected behavior
+			}
+			catch (Exception ex)
+			{
+				// Display error message in chat
+				AddMessage(new NamedSender("System"), new StringMessageContent($"Error: {ex.Message}"));
+			}
+			finally
+			{
+				_chatClientCancellationTokenSource?.Dispose();
+				_chatClientCancellationTokenSource = null;
+			}
+		}
+		catch (Exception ex)
+		{
+			// Catch any unexpected exceptions to prevent application crash
+			// Since this is an async void method, unhandled exceptions would terminate the application
+			try
+			{
+				AddMessage(new NamedSender("System"), new StringMessageContent($"Unexpected error: {ex.Message}"));
+			}
+			catch
+			{
+				// If we can't even add an error message, just ignore it to prevent further issues
+			}
+		}
+	}
+
+	/// <summary>
+	/// Resolves the IChatClient from the service provider, using the ChatClientServiceKey if configured.
+	/// </summary>
+	private IChatClient? ResolveChatClient()
+	{
+		if (ServiceProvider is null)
+			return null;
+
+		try
+		{
+			if (string.IsNullOrEmpty(ChatClientServiceKey))
+			{
+				// Resolve default IChatClient
+				return ServiceProvider.GetService<IChatClient>();
+			}
+			else
+			{
+				// Resolve keyed IChatClient
+				return ServiceProvider.GetKeyedService<IChatClient>(ChatClientServiceKey);
+			}
+		}
+		catch
+		{
+			return null;
+		}
+	}
+
+	/// <summary>
+	/// Converts the current message history to Microsoft.Extensions.AI.ChatMessage format.
+	/// </summary>
+	/// <remarks>
+	/// This method determines the chat role based on the sender name:
+	/// - Messages from the current <see cref="Sender"/> or the environment username are treated as User messages
+	/// - Messages from the <see cref="AssistantSenderName"/> or containing "Assistant" are treated as Assistant messages
+	/// - All other messages are treated as Assistant messages by default
+	/// Override this method to customize role determination logic.
+	/// </remarks>
+	protected virtual List<Microsoft.Extensions.AI.ChatMessage> ConvertToChatMessages()
+	{
+		var result = new List<Microsoft.Extensions.AI.ChatMessage>();
+
+		foreach (var message in _messages)
+		{
+			var content = message.Content?.Content?.ToString() ?? string.Empty;
+			var senderName = message.Sender?.Name ?? "User";
+
+			// Determine the role based on sender name
+			var role = DetermineChatRole(senderName);
+
+			result.Add(new Microsoft.Extensions.AI.ChatMessage(role, content));
+		}
+
+		return result;
+	}
+
+	/// <summary>
+	/// Determines the ChatRole for a given sender name.
+	/// </summary>
+	/// <param name="senderName">The name of the sender.</param>
+	/// <returns>The appropriate ChatRole for the sender.</returns>
+	/// <remarks>
+	/// Override this method to customize how sender names are mapped to chat roles.
+	/// </remarks>
+	protected virtual ChatRole DetermineChatRole(string senderName)
+	{
+		// Check if this is the current user
+		if (senderName == Sender.Name || senderName == Environment.UserName)
+			return ChatRole.User;
+
+		// Check if this is an assistant
+		if (senderName == AssistantSenderName ||
+			senderName.Contains("Assistant", StringComparison.OrdinalIgnoreCase) ||
+			senderName.Contains("AI", StringComparison.OrdinalIgnoreCase) ||
+			senderName.Contains("Bot", StringComparison.OrdinalIgnoreCase))
+			return ChatRole.Assistant;
+
+		// Check for system messages
+		if (senderName.Equals("System", StringComparison.OrdinalIgnoreCase))
+			return ChatRole.System;
+
+		// Default to Assistant for all other senders
+		return ChatRole.Assistant;
+	}
+
+	/// <summary>
+	/// Handles a streaming response from the IChatClient.
+	/// </summary>
+	private async Task HandleStreamingResponseAsync(ISender sender, IAsyncEnumerable<ChatResponseUpdate> stream)
+	{
+		// Create an async enumerable that yields text chunks
+		async IAsyncEnumerable<string> TextStream()
+		{
+			await foreach (var update in stream.ConfigureAwait(false))
+			{
+				if (!string.IsNullOrEmpty(update.Text))
+					yield return update.Text;
+			}
+		}
+
+		// Use the existing AddStreamingMessage method
+		AddStreamingMessage(sender, TextStream());
+	}
+
+	/// <summary>
+	/// Handles a non-streaming response from the IChatClient.
+	/// </summary>
+	private void HandleNonStreamingResponse(ISender sender, ChatResponse response)
+	{
+		var content = response.Text ?? string.Empty;
+		AddMessage(sender, new StringMessageContent(content));
 	}
 }

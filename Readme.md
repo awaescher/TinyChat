@@ -77,6 +77,53 @@ IAsyncEnumerable<string> stream = ...;
 chatControl.AddStreamingMessage(new NamedSender("AI Assistant"), stream);
 ```
 
+### Using IChatClient with Dependency Injection
+
+TinyChat now supports direct integration with `Microsoft.Extensions.AI.IChatClient`, enabling automatic AI responses with minimal boilerplate code.
+
+```csharp
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
+using TinyChat;
+
+// Set up dependency injection
+var services = new ServiceCollection();
+
+// Register your IChatClient implementation (e.g., OpenAI, Azure OpenAI, Ollama, etc.)
+services.AddSingleton<IChatClient>(/* your IChatClient implementation */);
+
+var serviceProvider = services.BuildServiceProvider();
+
+// Configure the ChatControl
+var chatControl = new ChatControl
+{
+    ServiceProvider = serviceProvider,
+    UseStreaming = true,  // Enable streaming (default)
+    AssistantSenderName = "AI Assistant"
+};
+
+// That's it! The ChatControl will automatically call IChatClient when users send messages
+// The entire conversation history is passed to the IChatClient
+```
+
+**Key Features:**
+- **Automatic Integration**: No need to manually handle `MessageSent` events
+- **Conversation History**: Full message history is automatically passed to the IChatClient
+- **Streaming Support**: Toggle between streaming and non-streaming responses
+- **Keyed Services**: Support for keyed service resolution via `ChatClientServiceKey` property
+- **Cancellation Support**: Long-running operations can be cancelled
+- **Extensible**: Override `ConvertToChatMessages()` or `DetermineChatRole()` for custom behavior
+
+**Using Keyed Services:**
+```csharp
+// Register multiple IChatClient instances with different keys
+services.AddKeyedSingleton<IChatClient>("basic", /* basic model */);
+services.AddKeyedSingleton<IChatClient>("premium", /* premium model */);
+
+// Use a specific keyed service
+chatControl.ChatClientServiceKey = "premium";
+```
+
 ### Formatting
 
 WinForms controls don't support partial text formatting. To make the WinForms ChatControl usable with AI chatbots, TinyChat will try to remove basic HTML and Markdown formatting. 
@@ -89,12 +136,14 @@ It's possible to create a custom formatter by implementing `IMessageFormatter` a
 
 ## 🎬 Demos
 
-The repository includes two pretty similar demo applications:
-- A basic Windows Forms application with dependency-free standard controls
-- A DevExpress powered application showcasing the customizability with skinned DevExpress components *(requires a DevExpress license)*
+The repository includes multiple demo applications:
+- **WinFormsDemo**: A basic Windows Forms application with dependency-free standard controls
+- **WinFormsDemo with IChatClient**: Shows automatic IChatClient integration (run with `--ichatclient` flag)
+- **DevExpressDemo**: Showcases the customizability with skinned DevExpress components *(requires a DevExpress license)*
 
 ```bash
-dotnet run --project WinFormsDemo
+dotnet run --project WinFormsDemo                  # Basic demo
+dotnet run --project WinFormsDemo -- --ichatclient # IChatClient integration demo
 dotnet run --project DevExpressDemo
 ```
 
