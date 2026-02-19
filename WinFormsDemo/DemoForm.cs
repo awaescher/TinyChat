@@ -32,6 +32,7 @@ public partial class DemoForm : Form, IMessageFilter
 
 		Application.AddMessageFilter(this);
 
+		chatControl.IncludeFunctionCalls = true;
 		chatControl.Messages = DemoData.Create(Environment.UserName);
 		SelectControl(chatControl);
 
@@ -100,7 +101,7 @@ public partial class DemoForm : Form, IMessageFilter
 	private void ChatControl_MessageSent(object sender, MessageSentEventArgs e)
 	{
 		var cts = new CancellationTokenSource();
-		chatControl.AddStreamingMessage(new NamedSender(DemoData.AssistantName), DemoData.StreamAiAnswer(e.Content, isDevExpress: false, cts.Token), cancellationToken: cts.Token);
+		chatControl.AddStreamingMessage(new NamedSender(DemoData.AssistantName), DemoData.StreamAiAnswerWithFunctionCalls(e.Content, isDevExpress: false, cts.Token), cancellationToken: cts.Token);
 	}
 }
 

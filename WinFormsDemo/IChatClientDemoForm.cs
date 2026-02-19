@@ -90,7 +90,8 @@ public partial class IChatClientDemoForm : Form
 			Dock = DockStyle.Fill,
 			ServiceProvider = TestIChatClientDemo.CreateServiceProviderWithMockChatClient(),
 			UseStreaming = true,
-			AssistantSenderName = "AI Assistant"
+			AssistantSenderName = "AI Assistant",
+			IncludeFunctionCalls = true
 		};
 
 		this.Controls.Add(chatControl);

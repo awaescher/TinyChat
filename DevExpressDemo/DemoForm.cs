@@ -43,6 +43,7 @@ public partial class DemoForm : ToolbarForm, IMessageFilter
 
 		UserLookAndFeel.Default.SetSkinStyle(SkinStyle.Office2010Blue);
 
+		dxChatControl.IncludeFunctionCalls = true;
 		dxChatControl.Messages = DemoData.Create(Environment.UserName);
 		SelectControl(dxChatControl);
 	}
@@ -112,6 +113,6 @@ public partial class DemoForm : ToolbarForm, IMessageFilter
 	private void DxChatControl_MessageSent(object sender, MessageSentEventArgs e)
 	{
 		var cts = new CancellationTokenSource();
-		dxChatControl.AddStreamingMessage(new NamedSender(DemoData.AssistantName), DemoData.StreamAiAnswer(e.Content, isDevExpress: true, cts.Token), cancellationToken: cts.Token);
+		dxChatControl.AddStreamingMessage(new NamedSender(DemoData.AssistantName), DemoData.StreamAiAnswerWithFunctionCalls(e.Content, isDevExpress: true, cts.Token), cancellationToken: cts.Token);
 	}
 }

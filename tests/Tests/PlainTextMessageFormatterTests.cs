@@ -273,6 +273,14 @@ public class PlainTextMessageFormatterTests
 		}
 
 		[Test]
+		public void Formats_FunctionCallMessageContent_With_Result()
+		{
+			var content = new FunctionCallMessageContent("call1", "get_weather", new Dictionary<string, object?> { ["city"] = "Amsterdam" }, result: "6°C");
+			var result = _formatter.Format(content);
+			result.ShouldBe("{Tool: get_weather(city: Amsterdam) = 6°C}");
+		}
+
+		[Test]
 		public void Formats_FunctionResultMessageContent()
 		{
 			var content = new FunctionResultMessageContent("call1", "15°C, cloudy");

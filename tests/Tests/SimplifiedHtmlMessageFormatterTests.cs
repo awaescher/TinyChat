@@ -500,6 +500,15 @@ public class SimplifiedHtmlMessageFormatterTests
 		}
 
 		[Test]
+		public void Formats_FunctionCallMessageContent_With_Result()
+		{
+			var formatter = new SimplifiedHtmlMessageFormatter("b");
+			var content = new FunctionCallMessageContent("call1", "get_weather", new Dictionary<string, object?> { ["city"] = "Amsterdam" }, result: "6°C");
+			var result = formatter.Format(content);
+			result.ShouldBe("{Tool: get_weather(city: Amsterdam) = 6°C}");
+		}
+
+		[Test]
 		public void Formats_FunctionResultMessageContent()
 		{
 			var formatter = new SimplifiedHtmlMessageFormatter("b");

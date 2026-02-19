@@ -1,10 +1,9 @@
 using System.ComponentModel;
-using System.Text.Json;
 
 namespace TinyChat;
 
 /// <summary>
-/// Represents a function call content item within a chat message.
+/// Represents a function call content item within a chat message, optionally including the function result.
 /// </summary>
 public class FunctionCallMessageContent : IChatMessageContent
 {
@@ -19,13 +18,15 @@ public class FunctionCallMessageContent : IChatMessageContent
 	/// <param name="callId">The identifier of the function call.</param>
 	/// <param name="name">The name of the function being called.</param>
 	/// <param name="arguments">The arguments passed to the function.</param>
-	public FunctionCallMessageContent(string callId, string name, IDictionary<string, object?>? arguments)
+	/// <param name="result">The optional result returned by the function.</param>
+	public FunctionCallMessageContent(string callId, string name, IDictionary<string, object?>? arguments, object? result = null)
 	{
 		CallId = callId;
 		Name = name;
 		Arguments = arguments is not null
 			? new System.Collections.ObjectModel.ReadOnlyDictionary<string, object?>(new Dictionary<string, object?>(arguments))
 			: null;
+		Result = result;
 	}
 
 	/// <summary>
@@ -43,15 +44,27 @@ public class FunctionCallMessageContent : IChatMessageContent
 	/// </summary>
 	public IReadOnlyDictionary<string, object?>? Arguments { get; }
 
+	/// <summary>
+	/// Gets the result returned by the function, or <see langword="null"/> if no result is available yet.
+	/// </summary>
+	public object? Result { get; }
+
 	/// <inheritdoc />
 	public object? Content => this;
 
 	/// <inheritdoc />
 	public override string ToString()
 	{
-		var args = Arguments is not null
-			? JsonSerializer.Serialize(Arguments)
-			: string.Empty;
-		return $"[Calling: {Name}({args})]";
+		var args = FormatArgs();
+		return Result is not null
+			? $"{{Tool: {Name}({args}) = {Result}}}"
+			: $"[Calling: {Name}({args})]";
+	}
+
+	private string FormatArgs()
+	{
+		if (Arguments is null || Arguments.Count == 0)
+			return string.Empty;
+		return string.Join(", ", Arguments.Select(kv => $"{kv.Key}: {kv.Value}"));
 	}
 }
