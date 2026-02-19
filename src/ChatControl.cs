@@ -62,8 +62,6 @@ public partial class ChatControl : UserControl
 	public ChatControl()
 	{
 		InitializeComponent();
-		// Wire up automatic IChatClient handling
-		MessageSent += OnMessageSentAsync;
 	}
 
 	/// <summary>
@@ -501,6 +499,7 @@ public partial class ChatControl : UserControl
 		if (!e.Cancel)
 		{
 			AppendMessageControl(AddChatMessage(sender, e.Content));
+			SendMessageByChatClient();
 			MessageSent?.Invoke(this, new MessageSentEventArgs(sender, e.Content));
 		}
 	}
@@ -529,7 +528,7 @@ public partial class ChatControl : UserControl
 	/// <summary>
 	/// Handles the MessageSent event to automatically call IChatClient if configured.
 	/// </summary>
-	private async void OnMessageSentAsync(object? sender, MessageSentEventArgs e)
+	private async void SendMessageByChatClient()
 	{
 		try
 		{
@@ -667,10 +666,10 @@ public partial class ChatControl : UserControl
 			return ChatRole.User;
 
 		// Check if this is an assistant
-		if (senderName == AssistantSenderName || 
-		    senderName.Contains("Assistant", StringComparison.OrdinalIgnoreCase) ||
-		    senderName.Contains("AI", StringComparison.OrdinalIgnoreCase) ||
-		    senderName.Contains("Bot", StringComparison.OrdinalIgnoreCase))
+		if (senderName == AssistantSenderName ||
+			senderName.Contains("Assistant", StringComparison.OrdinalIgnoreCase) ||
+			senderName.Contains("AI", StringComparison.OrdinalIgnoreCase) ||
+			senderName.Contains("Bot", StringComparison.OrdinalIgnoreCase))
 			return ChatRole.Assistant;
 
 		// Check for system messages
