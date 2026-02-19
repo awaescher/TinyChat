@@ -301,8 +301,8 @@ public partial class ChatControl : UserControl
 	/// </summary>
 	/// <param name="sender">The sender of the streaming message.</param>
 	/// <param name="stream">The stream of content items.</param>
-	/// <param name="synchronizationContext">An optional synchronization context. Only required if the applications does not provide a default synchronization context.</param>
-	/// <param name="completionCallback">An optional callback that can be used to process the streamed messages after it was received completely.</param>
+	/// <param name="synchronizationContext">An optional synchronization context. Only required if the application does not provide a default synchronization context.</param>
+	/// <param name="completionCallback">An optional callback that can be used to process the streamed messages after they have been received completely.</param>
 	/// <param name="exceptionCallback">An optional callback that can be used to process exceptions that occurred during the processing of the stream.</param>
 	/// <param name="cancellationToken">The token to cancel the operation with.</param>
 	/// <returns>An <see cref="IChatMessageControl"/> instance representing the added streaming message.</returns>
@@ -314,9 +314,9 @@ public partial class ChatControl : UserControl
 		Action<Exception>? exceptionCallback = default,
 		CancellationToken cancellationToken = default)
 	{
-		async IAsyncEnumerable<string> ToStringStream()
+		async IAsyncEnumerable<string> ToStringStream([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
 		{
-			await foreach (var content in stream.ConfigureAwait(false))
+			await foreach (var content in stream.WithCancellation(ct).ConfigureAwait(false))
 			{
 				var text = content.ToString();
 				if (!string.IsNullOrEmpty(text))
@@ -324,7 +324,7 @@ public partial class ChatControl : UserControl
 			}
 		}
 
-		return AddStreamingMessage(sender, ToStringStream(), synchronizationContext, completionCallback, exceptionCallback, cancellationToken);
+		return AddStreamingMessage(sender, ToStringStream(cancellationToken), synchronizationContext, completionCallback, exceptionCallback, cancellationToken);
 	}
 
 	/// <summary>

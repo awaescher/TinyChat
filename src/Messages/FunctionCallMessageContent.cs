@@ -23,7 +23,9 @@ public class FunctionCallMessageContent : IChatMessageContent
 	{
 		CallId = callId;
 		Name = name;
-		Arguments = arguments;
+		Arguments = arguments is not null
+			? new System.Collections.ObjectModel.ReadOnlyDictionary<string, object?>(new Dictionary<string, object?>(arguments))
+			: null;
 	}
 
 	/// <summary>
@@ -39,7 +41,7 @@ public class FunctionCallMessageContent : IChatMessageContent
 	/// <summary>
 	/// Gets the arguments passed to the function.
 	/// </summary>
-	public IDictionary<string, object?>? Arguments { get; }
+	public IReadOnlyDictionary<string, object?>? Arguments { get; }
 
 	/// <inheritdoc />
 	public object? Content => this;
