@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Threading.Channels;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using TinyChat.Messages.Formatting;
@@ -156,7 +157,7 @@ public partial class ChatControl : UserControl
 	[DefaultValue(false)]
 	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
 	public bool IncludeFunctionCalls { get; set; } = false;
-  
+
 	/// Gets or sets the <see cref="Microsoft.Extensions.AI.ChatOptions"/> passed to every <see cref="IChatClient"/> request.
 	/// When set, these options are used as the default for each request. They can also be overridden per-request by handling the <see cref="ChatOptionsRequested"/> event.
 	/// </summary>
@@ -446,7 +447,13 @@ public partial class ChatControl : UserControl
 	/// </summary>
 	/// <param name="message">The chat message to create a control for.</param>
 	/// <returns>An <see cref="IChatMessageControl"/> instance for the message.</returns>
-	protected virtual IChatMessageControl CreateMessageControl(IChatMessage message) => new ChatMessageControl() { Message = message, MessageFormatter = MessageFormatter };
+	protected virtual IChatMessageControl CreateMessageControl(IChatMessage message)
+	{
+		if (message.Content is FunctionCallMessageContent)
+			return new ToolCallMessageControl { Message = message };
+
+		return new ChatMessageControl() { Message = message, MessageFormatter = MessageFormatter };
+	}
 
 	/// <summary>
 	/// Applies layout settings to a chat message control and adds it to the container.
@@ -740,21 +747,51 @@ public partial class ChatControl : UserControl
 
 	/// <summary>
 	/// Handles a streaming response from the IChatClient.
+	/// Function calls are added as separate messages before the text response stream starts.
 	/// </summary>
 	private async Task HandleStreamingResponseAsync(ISender sender, IAsyncEnumerable<ChatResponseUpdate> stream)
 	{
-		// Create an async enumerable that yields text chunks
-		async IAsyncEnumerable<string> TextStream()
+		var pendingCalls = new Dictionary<string, (string name, IDictionary<string, object?>? args)>();
+		var textChannel = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = true });
+		var textStreamStarted = false;
+
+		try
 		{
-			await foreach (var update in stream.ConfigureAwait(false))
+			// Iterate without ConfigureAwait(false) so continuations stay on the UI thread,
+			// allowing direct AddMessage / AddStreamingMessage calls.
+			await foreach (var update in stream)
 			{
+				foreach (var item in update.Contents)
+				{
+					if (item is FunctionCallContent funcCall)
+					{
+						pendingCalls[funcCall.CallId] = (funcCall.Name ?? string.Empty, funcCall.Arguments);
+					}
+					else if (item is FunctionResultContent funcResult && IncludeFunctionCalls)
+					{
+						if (pendingCalls.TryGetValue(funcResult.CallId, out var callInfo))
+						{
+							pendingCalls.Remove(funcResult.CallId);
+							AddMessage(sender, new FunctionCallMessageContent(funcResult.CallId, callInfo.name, callInfo.args, funcResult.Result));
+						}
+					}
+				}
+
 				if (!string.IsNullOrEmpty(update.Text))
-					yield return update.Text;
+				{
+					if (!textStreamStarted)
+					{
+						textStreamStarted = true;
+						AddStreamingMessage(sender, textChannel.Reader.ReadAllAsync());
+					}
+					textChannel.Writer.TryWrite(update.Text);
+				}
 			}
 		}
-
-		// Use the existing AddStreamingMessage method
-		AddStreamingMessage(sender, TextStream());
+		finally
+		{
+			textChannel.Writer.TryComplete();
+		}
 	}
 
 	/// <summary>

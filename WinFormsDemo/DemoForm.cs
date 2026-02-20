@@ -37,7 +37,7 @@ public partial class DemoForm : Form, IMessageFilter
 		SelectControl(chatControl);
 
 		// start a second demo showcasing the IChatClient implementation
-		new IChatClientDemoForm().Show();
+		new OllamaDemoForm().Show();
 	}
 
 	/// <summary>
