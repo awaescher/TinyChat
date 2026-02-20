@@ -1,84 +1,89 @@
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
-using System.Runtime.CompilerServices;
-using AIChatMessage = Microsoft.Extensions.AI.ChatMessage;
+using OllamaSharp;
+using System.ComponentModel;
 
 namespace WinFormsDemo;
 
 /// <summary>
-/// A simple test to demonstrate IChatClient integration
+/// Demonstrates IChatClient integration using OllamaSharp with Microsoft.Extensions.AI,
+/// including tool support for getting the current time and weather.
 /// </summary>
 public static class TestIChatClientDemo
 {
+	public const string ModelName = "qwen3:0.6b";
+
 	/// <summary>
-	/// Creates a service provider with a mock IChatClient
+	/// Creates a service provider backed by a real Ollama IChatClient with function invocation enabled.
+	/// The model is pulled automatically if it is not yet available locally.
 	/// </summary>
-	public static IServiceProvider CreateServiceProviderWithMockChatClient()
+	public static async Task<IServiceProvider> CreateServiceProviderWithOllamaChatClientAsync(
+		IProgress<string>? progress = null,
+		CancellationToken cancellationToken = default)
 	{
+		var ollamaClient = new OllamaApiClient(new Uri("http://localhost:11434"), ModelName);
+
+		await EnsureModelAvailableAsync(ollamaClient, progress, cancellationToken);
+
 		var services = new ServiceCollection();
 
-		// Register a mock IChatClient
-		services.AddSingleton<IChatClient>(new MockChatClient());
-
-		// Register a keyed mock IChatClient
-		services.AddKeyedSingleton<IChatClient>("premium", new MockChatClient(isPremium: true));
+		services.AddChatClient((IChatClient)ollamaClient)
+			.UseFunctionInvocation();
 
 		return services.BuildServiceProvider();
 	}
 
 	/// <summary>
-	/// A mock implementation of IChatClient for testing
+	/// Returns ChatOptions pre-configured with the available tools.
 	/// </summary>
-	private class MockChatClient : IChatClient
+	public static ChatOptions CreateChatOptions() => new()
 	{
-		private readonly bool _isPremium;
+		Tools =
+		[
+			AIFunctionFactory.Create(GetCurrentTime),
+			AIFunctionFactory.Create(GetCurrentWeather)
+		]
+	};
 
-		public MockChatClient(bool isPremium = false)
+	private static async Task EnsureModelAvailableAsync(
+		OllamaApiClient client,
+		IProgress<string>? progress,
+		CancellationToken cancellationToken)
+	{
+		var models = await client.ListLocalModelsAsync(cancellationToken);
+		var isAvailable = models.Any(m => m.Name.StartsWith(ModelName, StringComparison.OrdinalIgnoreCase));
+
+		if (!isAvailable)
 		{
-			_isPremium = isPremium;
-		}
+			progress?.Report($"Model '{ModelName}' not found locally. Downloading...");
 
-		public async Task<ChatResponse> GetResponseAsync(IEnumerable<AIChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
-		{
-			// Simulate a delay
-			await Task.Delay(500, cancellationToken);
-
-			var lastUserMessage = messages.LastOrDefault(m => m.Role == ChatRole.User)?.Text ?? "nothing";
-			var responseText = _isPremium
-				? $"[PREMIUM] Thank you for your message: '{lastUserMessage}'. This is a premium response!"
-				: $"I received your message: '{lastUserMessage}'. This is a standard response.";
-
-			return new ChatResponse(new AIChatMessage(ChatRole.Assistant, responseText));
-		}
-
-		public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
-			IEnumerable<AIChatMessage> messages,
-			ChatOptions? options = null,
-			[EnumeratorCancellation] CancellationToken cancellationToken = default)
-		{
-			var lastUserMessage = messages.LastOrDefault(m => m.Role == ChatRole.User)?.Text ?? "nothing";
-			var responseText = _isPremium
-				? $"[PREMIUM STREAMING] You said: '{lastUserMessage}'. Here's a streaming premium response with more details!"
-				: $"[STREAMING] You said: '{lastUserMessage}'. Here's a streaming response!";
-
-			// Simulate streaming by yielding chunks
-			for (int i = 0; i < responseText.Length; i += 3)
+			await foreach (var status in client.PullModelAsync(ModelName, cancellationToken))
 			{
-				if (cancellationToken.IsCancellationRequested)
-					yield break;
-
-				var chunk = responseText.Substring(i, Math.Min(3, responseText.Length - i));
-				yield return new ChatResponseUpdate(ChatRole.Assistant, chunk);
-
-				await Task.Delay(50, cancellationToken);
+				if (!string.IsNullOrWhiteSpace(status?.Status))
+					progress?.Report(status.Status);
 			}
+
+			progress?.Report($"Model '{ModelName}' is ready.");
 		}
-
-		public object? GetService(Type serviceType, object? serviceKey = null) => null;
-
-		public void Dispose()
+		else
 		{
-			// Nothing to dispose
+			progress?.Report($"Model '{ModelName}' is available.");
 		}
+	}
+
+	[Description("Gets the current local date and time.")]
+	private static string GetCurrentTime() =>
+		DateTime.Now.ToString("ddd, MMM d yyyy HH:mm:ss");
+
+	[Description("Gets the current weather for a given city with randomised data.")]
+	private static string GetCurrentWeather(
+		[Description("The city name to get the weather for")] string city)
+	{
+		var rng = new Random();
+		var conditions = new[] { "sunny", "partly cloudy", "overcast", "light rain", "heavy rain", "snow", "foggy", "windy" };
+		var temp = rng.Next(-10, 38);
+		var humidity = rng.Next(30, 95);
+		var condition = conditions[rng.Next(conditions.Length)];
+		return $"Weather in {city}: {temp}\u00b0C, {condition}, humidity {humidity}%.";
 	}
 }

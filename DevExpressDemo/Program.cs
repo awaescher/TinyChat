@@ -17,6 +17,6 @@ internal static class Program
 		var winFormsDemo = new WinFormsDemo.DemoForm();
 		winFormsDemo.Show();
 
-		Application.Run(new DemoForm());
+		Application.Run(new DXDemoForm());
 	}
 }

@@ -257,6 +257,46 @@ public class PlainTextMessageFormatterTests
 		}
 
 		[Test]
+		public void Formats_FunctionCallMessageContent()
+		{
+			var content = new FunctionCallMessageContent("call1", "get_weather", new Dictionary<string, object?> { ["location"] = "Paris" });
+			var result = _formatter.Format(content);
+			result.ShouldBe("[Calling: get_weather(location: Paris)]");
+		}
+
+		[Test]
+		public void Formats_FunctionCallMessageContent_Without_Arguments()
+		{
+			var content = new FunctionCallMessageContent("call1", "get_time", null);
+			var result = _formatter.Format(content);
+			result.ShouldBe("[Calling: get_time()]");
+		}
+
+		[Test]
+		public void Formats_FunctionCallMessageContent_With_Result()
+		{
+			var content = new FunctionCallMessageContent("call1", "get_weather", new Dictionary<string, object?> { ["city"] = "Amsterdam" }, result: "6°C");
+			var result = _formatter.Format(content);
+			result.ShouldBe("{Tool: get_weather(city: Amsterdam) = 6°C}");
+		}
+
+		[Test]
+		public void Formats_FunctionResultMessageContent()
+		{
+			var content = new FunctionResultMessageContent("call1", "15°C, cloudy");
+			var result = _formatter.Format(content);
+			result.ShouldBe("[Result: 15°C, cloudy]");
+		}
+
+		[Test]
+		public void Formats_FunctionResultMessageContent_With_Null_Result()
+		{
+			var content = new FunctionResultMessageContent("call1", null);
+			var result = _formatter.Format(content);
+			result.ShouldBe("[Result: ]");
+		}
+
+		[Test]
 		public void Extracts_Text_From_Multiple_Links_In_Same_Line()
 		{
 			var result = _formatter.Format("[link1](url1) and [link2](url2)");

@@ -1,6 +1,6 @@
 namespace DevExpressDemo
 {
-	partial class DemoForm
+	partial class DXDemoForm
 	{
 		/// <summary>
 		/// Required designer variable.

@@ -12,7 +12,7 @@ namespace DevExpressDemo;
 /// Main demonstration form that provides a DevExpress chat control interface with property inspection capabilities.
 /// Inherits from ToolbarForm for DevExpress theming and implements IMessageFilter for mouse message handling.
 /// </summary>
-public partial class DemoForm : ToolbarForm, IMessageFilter
+public partial class DXDemoForm : ToolbarForm, IMessageFilter
 {
 	/// <summary>
 	/// Windows message constant for left mouse button up event.
@@ -23,7 +23,7 @@ public partial class DemoForm : ToolbarForm, IMessageFilter
 	/// Initializes a new instance of the DemoForm class.
 	/// Sets up the form components and enables key preview for keyboard handling.
 	/// </summary>
-	public DemoForm()
+	public DXDemoForm()
 	{
 		InitializeComponent();
 		KeyPreview = true;
@@ -43,8 +43,11 @@ public partial class DemoForm : ToolbarForm, IMessageFilter
 
 		UserLookAndFeel.Default.SetSkinStyle(SkinStyle.Office2010Blue);
 
+		dxChatControl.IncludeFunctionCalls = true;
 		dxChatControl.Messages = DemoData.Create(Environment.UserName);
 		SelectControl(dxChatControl);
+
+		new DXOllamaDemoForm().Show();
 	}
 
 	/// <summary>
@@ -112,6 +115,6 @@ public partial class DemoForm : ToolbarForm, IMessageFilter
 	private void DxChatControl_MessageSent(object sender, MessageSentEventArgs e)
 	{
 		var cts = new CancellationTokenSource();
-		dxChatControl.AddStreamingMessage(new NamedSender(DemoData.AssistantName), DemoData.StreamAiAnswer(e.Content, isDevExpress: true, cts.Token), cancellationToken: cts.Token);
+		dxChatControl.AddStreamingMessage(new NamedSender(DemoData.AssistantName), DemoData.StreamAiAnswerWithFunctionCalls(e.Content, isDevExpress: true, cts.Token), cancellationToken: cts.Token);
 	}
 }

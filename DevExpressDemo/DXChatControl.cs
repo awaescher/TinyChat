@@ -15,6 +15,9 @@ public class DXChatControl : ChatControl
 	protected override IChatMessageControl CreateMessageControl(IChatMessage message) => new DXChatMessageControl { Message = message, MessageFormatter = MessageFormatter };
 
 	/// <inheritdoc />
+	protected override IChatMessageControl CreateFunctionCallMessageControl(IChatMessage message) => new DXFunctionCallMessageControl { Message = message };
+
+	/// <inheritdoc />
 	protected override IChatInputControl CreateChatInputControl() => new DXChatInputControl();
 
 	/// <inheritdoc />
@@ -27,4 +30,5 @@ public class DXChatControl : ChatControl
 	/// See: https://docs.devexpress.com/WindowsForms/4874/common-features/html-text-formatting
 	/// </summary>
 	protected override IMessageFormatter CreateDefaultMessageFormatter() => new SimplifiedHtmlMessageFormatter("b", "i", "s", "u", "br", "sub", "sup", "font", "p", "nbsp", "a", "href", "color", "backcolor", "size");
+
 }
