@@ -9,8 +9,13 @@ public class DemoData
 
 	public static IEnumerable<DemoChatMessage> Create(string currentUser)
 	{
+		var arguments = new Dictionary<string, object?> { ["city"] = "Stuttgart", ["unit"] = "Celsius" };
+
 		return [
-			new DemoChatMessage(AssistantName,"How can I help you today?")
+			new DemoChatMessage(AssistantName,"How can I help you today?"),
+			new DemoChatMessage(Environment.UserName, "How is the weather in Stuttgart, DE?"),
+			new DemoChatMessage("tool", new FunctionCallMessageContent("weather1", "get_weather", arguments, "26°C, sunny, no clouds")),
+			new DemoChatMessage(AssistantName,"The weather in Stuttgart is sunny at 26°C.")
 			];
 	}
 
@@ -100,6 +105,12 @@ public class DemoData
 		{
 			Sender = new NamedSender(sender);
 			Content = new StringMessageContent(message);
+		}
+
+		public DemoChatMessage(string sender, IChatMessageContent content)
+		{
+			Sender = new NamedSender(sender);
+			Content = content;
 		}
 
 		public ISender Sender { get; }

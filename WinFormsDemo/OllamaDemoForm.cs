@@ -8,77 +8,24 @@ namespace WinFormsDemo;
 /// </summary>
 public partial class OllamaDemoForm : Form
 {
-	private ChatControl chatControl = null!;
-	private CheckBox streamingCheckBox = null!;
-	private Label statusLabel = null!;
-	private Button newChatButton = null!;
-
 	public OllamaDemoForm()
 	{
 		InitializeComponent();
-		SetupForm();
+		Text = $"TinyChat - Ollama Demo ({TestIChatClientDemo.ModelName})";
+		statusLabel.Text = $"Connecting to Ollama and loading model '{TestIChatClientDemo.ModelName}'...";
+		chatControl.AssistantSenderName = TestIChatClientDemo.ModelName;
+		chatControl.ChatOptions = TestIChatClientDemo.CreateChatOptions();
 		_ = InitializeOllamaAsync();
 	}
 
-	private void SetupForm()
+	private void StreamingCheckBox_CheckedChanged(object? sender, EventArgs e)
 	{
-		this.Text = $"TinyChat - Ollama Demo ({TestIChatClientDemo.ModelName})";
-		this.Size = new Size(800, 600);
-		this.StartPosition = FormStartPosition.CenterScreen;
+		chatControl.UseStreaming = streamingCheckBox.Checked;
+	}
 
-		var topPanel = new Panel
-		{
-			Dock = DockStyle.Top,
-			Height = 60,
-			BackColor = SystemColors.Control
-		};
-
-		statusLabel = new Label
-		{
-			Text = $"Connecting to Ollama and loading model '{TestIChatClientDemo.ModelName}'...",
-			Location = new Point(10, 10),
-			Size = new Size(760, 18),
-			AutoSize = false
-		};
-		topPanel.Controls.Add(statusLabel);
-
-		streamingCheckBox = new CheckBox
-		{
-			Text = "Use Streaming",
-			Location = new Point(10, 33),
-			Checked = true,
-			Width = 130
-		};
-		streamingCheckBox.CheckedChanged += (s, e) =>
-		{
-			if (chatControl != null)
-				chatControl.UseStreaming = streamingCheckBox.Checked;
-		};
-		topPanel.Controls.Add(streamingCheckBox);
-
-		newChatButton = new Button
-		{
-			Text = "New Chat",
-			Location = new Point(150, 30),
-			Width = 90,
-			Height = 26
-		};
-		newChatButton.Click += (s, e) => chatControl.Messages = [];
-		topPanel.Controls.Add(newChatButton);
-
-		this.Controls.Add(topPanel);
-
-		chatControl = new ChatControl
-		{
-			Dock = DockStyle.Fill,
-			UseStreaming = true,
-			AssistantSenderName = TestIChatClientDemo.ModelName,
-			IncludeFunctionCalls = true,
-			ChatOptions = TestIChatClientDemo.CreateChatOptions(),
-			Enabled = false
-		};
-
-		this.Controls.Add(chatControl);
+	private void NewChatButton_Click(object? sender, EventArgs e)
+	{
+		chatControl.Messages = [];
 	}
 
 	private async Task InitializeOllamaAsync()
@@ -105,11 +52,5 @@ public partial class OllamaDemoForm : Form
 			statusLabel.Invoke(() =>
 				statusLabel.Text = $"Error: {ex.Message} — make sure Ollama is running on http://localhost:11434");
 		}
-	}
-
-	private void InitializeComponent()
-	{
-		this.SuspendLayout();
-		this.ResumeLayout(false);
 	}
 }

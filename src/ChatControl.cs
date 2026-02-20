@@ -392,7 +392,13 @@ public partial class ChatControl : UserControl
 	/// <param name="message">The chat message to append.</param>
 	protected virtual IChatMessageControl AppendMessageControl(IChatMessage message)
 	{
-		var messageControl = CreateMessageControl(message);
+		IChatMessageControl messageControl;
+
+		if (message.Content is FunctionCallMessageContent)
+			messageControl = CreateFunctionCallMessageControl(message);
+		else
+			messageControl = CreateMessageControl(message);
+
 		messageControl.Message = message;
 		var control = (Control)messageControl;
 
@@ -447,13 +453,14 @@ public partial class ChatControl : UserControl
 	/// </summary>
 	/// <param name="message">The chat message to create a control for.</param>
 	/// <returns>An <see cref="IChatMessageControl"/> instance for the message.</returns>
-	protected virtual IChatMessageControl CreateMessageControl(IChatMessage message)
-	{
-		if (message.Content is FunctionCallMessageContent)
-			return new ToolCallMessageControl { Message = message };
+	protected virtual IChatMessageControl CreateMessageControl(IChatMessage message) => new ChatMessageControl() { Message = message, MessageFormatter = MessageFormatter };
 
-		return new ChatMessageControl() { Message = message, MessageFormatter = MessageFormatter };
-	}
+	/// <summary>
+	/// Creates a control for displaying a tool call with its result
+	/// </summary>
+	/// <param name="message">The chat message to create a control for.</param>
+	/// <returns>An <see cref="IChatMessageControl"/> instance for the message.</returns>
+	protected virtual IChatMessageControl CreateFunctionCallMessageControl(IChatMessage message) => new FunctionCallMessageControl { Message = message };
 
 	/// <summary>
 	/// Applies layout settings to a chat message control and adds it to the container.
