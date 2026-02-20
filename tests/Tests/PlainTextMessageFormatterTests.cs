@@ -261,7 +261,7 @@ public class PlainTextMessageFormatterTests
 		{
 			var content = new FunctionCallMessageContent("call1", "get_weather", new Dictionary<string, object?> { ["location"] = "Paris" });
 			var result = _formatter.Format(content);
-			result.ShouldBe(content.ToString());
+			result.ShouldBe("[Calling: get_weather(location: Paris)]");
 		}
 
 		[Test]

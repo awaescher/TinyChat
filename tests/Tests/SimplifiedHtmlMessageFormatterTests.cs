@@ -487,7 +487,7 @@ public class SimplifiedHtmlMessageFormatterTests
 			var formatter = new SimplifiedHtmlMessageFormatter("b");
 			var content = new FunctionCallMessageContent("call1", "get_weather", new Dictionary<string, object?> { ["location"] = "Paris" });
 			var result = formatter.Format(content);
-			result.ShouldBe(content.ToString());
+			result.ShouldBe("[Calling: get_weather(location: Paris)]");
 		}
 
 		[Test]

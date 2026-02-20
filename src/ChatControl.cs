@@ -743,89 +743,18 @@ public partial class ChatControl : UserControl
 	/// </summary>
 	private async Task HandleStreamingResponseAsync(ISender sender, IAsyncEnumerable<ChatResponseUpdate> stream)
 	{
-		var cancellationToken = _chatClientCancellationTokenSource?.Token ?? CancellationToken.None;
-		var cancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-		void InputControl_CancellationRequested(object? s, EventArgs e) => cancellationSource.Cancel();
-
-		var inputControl = InputControl as IChatInputControl;
-
-		// Buffer function calls until their result arrives so they can be shown as a single combined message.
-		var pendingCalls = new Dictionary<string, (string Name, IDictionary<string, object?>? Arguments)>(StringComparer.Ordinal);
-
-		// The text message is created lazily on the first text chunk so that any tool-call messages
-		// that arrive before the LLM's text response appear above the text message in the chat.
-		NotifyingStringBuilder? textBuilder = null;
-		IChatMessageControl? textMessageControl = null;
-
-		var context = SynchronizationContext.Current ?? throw new InvalidOperationException("No synchronization context available. Please make sure the default SynchronizationContext is available.");
-
-		context.Post(async _ =>
+		// Create an async enumerable that yields text chunks
+		async IAsyncEnumerable<string> TextStream()
 		{
-			try
+			await foreach (var update in stream.ConfigureAwait(false))
 			{
-				if (inputControl != null)
-					inputControl.CancellationRequested += InputControl_CancellationRequested;
-
-				inputControl?.SetIsReceivingStream(true, allowCancellation: cancellationToken.CanBeCanceled);
-
-				await foreach (var update in stream.ConfigureAwait(true).WithCancellation(cancellationSource.Token))
-				{
-					foreach (var content in update.Contents)
-					{
-						if (content is Microsoft.Extensions.AI.TextContent textContent && !string.IsNullOrEmpty(textContent.Text))
-						{
-							// Lazily create the streaming text message on the first text chunk.
-							if (textBuilder == null)
-							{
-								textBuilder = new NotifyingStringBuilder();
-								var msgContent = new ChangingMessageContent(textBuilder);
-								var message = AddChatMessage(sender, msgContent);
-								UpdateWelcomeControlVisibility();
-								textMessageControl = AppendMessageControl(message);
-								textMessageControl.SetIsReceivingStream(true);
-							}
-							textBuilder.Append(textContent.Text);
-						}
-						else if (IncludeFunctionCalls && content is Microsoft.Extensions.AI.FunctionCallContent functionCall)
-						{
-							pendingCalls[functionCall.CallId ?? string.Empty] = (functionCall.Name ?? string.Empty, functionCall.Arguments);
-						}
-						else if (IncludeFunctionCalls && content is Microsoft.Extensions.AI.FunctionResultContent functionResult)
-						{
-							var callId = functionResult.CallId ?? string.Empty;
-							pendingCalls.TryGetValue(callId, out var callInfo);
-							pendingCalls.Remove(callId);
-
-							// Add the tool call and its result as a single inline message.
-							var toolContent = new FunctionCallMessageContent(callId, callInfo.Name ?? string.Empty, callInfo.Arguments, functionResult.Result);
-							AddMessage(new NamedSender("Tool"), toolContent);
-						}
-					}
-
-					if (cancellationToken.IsCancellationRequested)
-						break;
-				}
-
-				// Flush any function calls that arrived without a matching result.
-				foreach (var pending in pendingCalls.Values)
-				{
-					AddMessage(new NamedSender("Tool"), new FunctionCallMessageContent(string.Empty, pending.Name, pending.Arguments));
-				}
+				if (!string.IsNullOrEmpty(update.Text))
+					yield return update.Text;
 			}
-			catch (Exception ex)
-			{
-				if (!cancellationSource.Token.IsCancellationRequested)
-					AddMessage(new NamedSender("System"), new StringMessageContent($"Error: {ex.Message}"));
-			}
-			finally
-			{
-				textMessageControl?.SetIsReceivingStream(false);
-				inputControl?.SetIsReceivingStream(false, allowCancellation: false);
+		}
 
-				if (inputControl != null)
-					inputControl.CancellationRequested -= InputControl_CancellationRequested;
-			}
-		}, state: null);
+		// Use the existing AddStreamingMessage method
+		AddStreamingMessage(sender, TextStream());
 	}
 
 	/// <summary>
