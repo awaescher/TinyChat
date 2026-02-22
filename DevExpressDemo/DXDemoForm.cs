@@ -44,6 +44,7 @@ public partial class DXDemoForm : ToolbarForm, IMessageFilter
 		UserLookAndFeel.Default.SetSkinStyle(SkinStyle.Office2010Blue);
 
 		dxChatControl.IncludeFunctionCalls = true;
+		dxChatControl.IncludeReasoning = true;
 		dxChatControl.Messages = DemoData.Create(Environment.UserName);
 		SelectControl(dxChatControl);
 

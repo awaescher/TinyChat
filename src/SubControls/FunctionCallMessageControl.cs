@@ -6,8 +6,6 @@ namespace TinyChat;
 /// </summary>
 internal sealed class FunctionCallMessageControl : Panel, IChatMessageControl
 {
-
-
 	/// <summary>The font used to render the expanded arguments and result detail text.</summary>
 	private static readonly Font MonospaceFont = new("Consolas", 8f);
 
@@ -86,8 +84,10 @@ internal sealed class FunctionCallMessageControl : Panel, IChatMessageControl
 		get => _message;
 		set
 		{
+			UnsubscribeUpdates();
 			_message = value;
 			UpdateDisplay();
+			SubscribeUpdates();
 		}
 	}
 
@@ -156,5 +156,39 @@ internal sealed class FunctionCallMessageControl : Panel, IChatMessageControl
 
 		var bullet = _expanded ? "-" : "+";
 		_headerLabel.Text = $"{bullet} {fc.Name}";
+
+		if (fc.IsFunctionExecuting)
+			_headerLabel.Text += " (working)";
+	}
+
+	/// <summary>
+	/// Subscribes to any property updates of the message content
+	/// </summary>
+	private void SubscribeUpdates()
+	{
+		if (_message?.Content is not FunctionCallMessageContent fc)
+			return;
+
+		fc.PropertyChanged += Content_PropertyChanged;
+	}
+
+	/// <summary>
+	/// Removes the subscribtion of any property updates of the message content
+	/// </summary>
+	private void UnsubscribeUpdates()
+	{
+		if (_message?.Content is not FunctionCallMessageContent fc)
+			return;
+
+		fc.PropertyChanged -= Content_PropertyChanged;
+	}
+
+	private void Content_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+	{
+		if (e.PropertyName == nameof(FunctionCallMessageContent.IsFunctionExecuting))
+			UpdateHeader();
+
+		if (e.PropertyName == nameof(FunctionCallMessageContent.Result))
+			UpdateDisplay();
 	}
 }
