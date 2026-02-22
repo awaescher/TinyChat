@@ -85,6 +85,7 @@ namespace DevExpressDemo
 			_chatControl.Dock = System.Windows.Forms.DockStyle.Fill;
 			_chatControl.Enabled = false;
 			_chatControl.IncludeFunctionCalls = true;
+			_chatControl.IncludeReasoning = true;
 			_chatControl.Location = new System.Drawing.Point(0, 65);
 			_chatControl.Name = "_chatControl";
 			_chatControl.Size = new System.Drawing.Size(498, 503);

@@ -85,6 +85,7 @@ namespace WinFormsDemo
 			chatControl.Dock = DockStyle.Fill;
 			chatControl.Enabled = false;
 			chatControl.IncludeFunctionCalls = true;
+			chatControl.IncludeReasoning = true;
 			chatControl.Location = new Point(0, 60);
 			chatControl.Name = "chatControl";
 			chatControl.Size = new Size(484, 501);

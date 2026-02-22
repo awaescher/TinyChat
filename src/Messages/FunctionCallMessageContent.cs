@@ -30,6 +30,11 @@ public class FunctionCallMessageContent : IChatMessageContent
 	}
 
 	/// <summary>
+	/// Gets or sets wheather the function is currently beeing executed.
+	/// </summary>
+	public bool IsFunctionExecuting { get; set; }
+
+	/// <summary>
 	/// Gets the identifier of the function call.
 	/// </summary>
 	public string CallId { get; }
@@ -47,7 +52,7 @@ public class FunctionCallMessageContent : IChatMessageContent
 	/// <summary>
 	/// Gets the result returned by the function, or <see langword="null"/> if no result is available yet.
 	/// </summary>
-	public object? Result { get; }
+	public object? Result { get; private set; }
 
 	/// <inheritdoc />
 	public object? Content => this;
@@ -66,5 +71,18 @@ public class FunctionCallMessageContent : IChatMessageContent
 		if (Arguments is null || Arguments.Count == 0)
 			return string.Empty;
 		return string.Join(", ", Arguments.Select(kv => $"{kv.Key}: {kv.Value}"));
+	}
+
+	/// <summary>
+	/// Sets the function result and updates the <see cref="IsFunctionExecuting"/>.
+	/// </summary>
+	/// <param name="result">The result of the function</param>
+	public void SetResult(object? result)
+	{
+		Result = result;
+		IsFunctionExecuting = false;
+
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Result)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsFunctionExecuting)));
 	}
 }

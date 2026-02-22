@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using TinyChat;
+using TinyChat.Messages;
 
 namespace WinFormsDemo;
 
@@ -14,6 +15,7 @@ public class DemoData
 		return [
 			new DemoChatMessage(AssistantName,"How can I help you today?"),
 			new DemoChatMessage(Environment.UserName, "How is the weather in Stuttgart, DE?"),
+			new DemoChatMessage("assistant", new ReasoningMessageContent("The user want's to know the weather in Stuttgart, Germany.")),
 			new DemoChatMessage("tool", new FunctionCallMessageContent("weather1", "get_weather", arguments, "26°C, sunny, no clouds")),
 			new DemoChatMessage(AssistantName,"The weather in Stuttgart is sunny at 26°C.")
 			];

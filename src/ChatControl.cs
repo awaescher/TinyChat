@@ -2,7 +2,9 @@ using System.ComponentModel;
 using System.Threading.Channels;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
+using TinyChat.Messages;
 using TinyChat.Messages.Formatting;
+using TinyChat.SubControls;
 
 namespace TinyChat;
 
@@ -158,6 +160,17 @@ public partial class ChatControl : UserControl
 	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
 	public bool IncludeFunctionCalls { get; set; } = false;
 
+	/// <summary>
+	/// Gets or sets whether reasoning content should be included in the streaming visualization.
+	/// When true, reasoning text will be displayed alongside text content during streaming.
+	/// </summary>
+	[Category("Chat")]
+	[Description("Gets or sets whether reasoning content should be included in the streaming visualization.")]
+	[DefaultValue(false)]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+	public bool IncludeReasoning { get; set; } = false;
+
+	/// <summary>
 	/// Gets or sets the <see cref="Microsoft.Extensions.AI.ChatOptions"/> passed to every <see cref="IChatClient"/> request.
 	/// When set, these options are used as the default for each request. They can also be overridden per-request by handling the <see cref="ChatOptionsRequested"/> event.
 	/// </summary>
@@ -396,6 +409,8 @@ public partial class ChatControl : UserControl
 
 		if (message.Content is FunctionCallMessageContent)
 			messageControl = CreateFunctionCallMessageControl(message);
+		else if (message.Content is ReasoningMessageContent)
+			messageControl = CreateReasoningMessageControl(message);
 		else
 			messageControl = CreateMessageControl(message);
 
@@ -461,6 +476,13 @@ public partial class ChatControl : UserControl
 	/// <param name="message">The chat message to create a control for.</param>
 	/// <returns>An <see cref="IChatMessageControl"/> instance for the message.</returns>
 	protected virtual IChatMessageControl CreateFunctionCallMessageControl(IChatMessage message) => new FunctionCallMessageControl { Message = message };
+
+	/// <summary>
+	/// Creates a control for displaying reasoning message
+	/// </summary>
+	/// <param name="message">The chat message to create a control for.</param>
+	/// <returns>An <see cref="IChatMessageControl"/> instance for the message.</returns>
+	protected virtual IChatMessageControl CreateReasoningMessageControl(IChatMessage message) => new ReasoningMessageControl { Message = message, MessageFormatter = MessageFormatter };
 
 	/// <summary>
 	/// Applies layout settings to a chat message control and adds it to the container.
@@ -758,29 +780,60 @@ public partial class ChatControl : UserControl
 	/// </summary>
 	private async Task HandleStreamingResponseAsync(ISender sender, IAsyncEnumerable<ChatResponseUpdate> stream)
 	{
-		var pendingCalls = new Dictionary<string, (string name, IDictionary<string, object?>? args)>();
+		var pendingCalls = new Dictionary<string, FunctionCallMessageContent>();
 		var textChannel = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = true });
 		var textStreamStarted = false;
 
 		try
 		{
+			ReasoningMessageContent? reasoningMessageContent = null;
+
 			// Iterate without ConfigureAwait(false) so continuations stay on the UI thread,
 			// allowing direct AddMessage / AddStreamingMessage calls.
 			await foreach (var update in stream)
 			{
 				foreach (var item in update.Contents)
 				{
-					if (item is FunctionCallContent funcCall)
+					if (item is FunctionCallContent funcCall && IncludeFunctionCalls)
 					{
-						pendingCalls[funcCall.CallId] = (funcCall.Name ?? string.Empty, funcCall.Arguments);
+						var content = new FunctionCallMessageContent(funcCall.CallId, funcCall.Name ?? string.Empty, funcCall.Arguments) { IsFunctionExecuting = true };
+						AddMessage(sender, content);
+
+						pendingCalls[funcCall.CallId] = content;
+
+						// reset the reasoning to be able to start a new control
+						reasoningMessageContent = null;
 					}
 					else if (item is FunctionResultContent funcResult && IncludeFunctionCalls)
 					{
-						if (pendingCalls.TryGetValue(funcResult.CallId, out var callInfo))
+						if (pendingCalls.TryGetValue(funcResult.CallId, out var content))
 						{
 							pendingCalls.Remove(funcResult.CallId);
-							AddMessage(sender, new FunctionCallMessageContent(funcResult.CallId, callInfo.name, callInfo.args, funcResult.Result));
+							content.SetResult(funcResult.Result);
 						}
+
+						// reset the reasoning to be able to start a new control
+						reasoningMessageContent = null;
+					}
+					else if (item is TextReasoningContent reasoningContent && IncludeReasoning)
+					{
+						if (!string.IsNullOrEmpty(reasoningContent.Text))
+						{
+							if (reasoningMessageContent == null)
+							{
+								reasoningMessageContent = new ReasoningMessageContent(reasoningContent.Text);
+								AddMessage(sender, reasoningMessageContent);
+							}
+							else
+							{
+								reasoningMessageContent.AppendText(reasoningContent.Text);
+							}
+						}
+					}
+					else
+					{
+						// reset the reasoning to be able to start a new control for a new thinking
+						reasoningMessageContent = null;
 					}
 				}
 
