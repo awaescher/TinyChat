@@ -1,16 +1,20 @@
-namespace TinyChat;
+using System.ComponentModel;
+using TinyChat.Messages;
+using TinyChat.Messages.Formatting;
+
+namespace TinyChat.SubControls;
 
 /// <summary>
-/// Displays a function call and its result as a compact, click-to-expand bubble.
-/// Shows a wrench icon and the function name at a glance; click to reveal arguments and result.
+/// Displays a thinking text, click-to-expand bubble.
 /// </summary>
-internal sealed class FunctionCallMessageControl : Panel, IChatMessageControl
+internal class ReasoningMessageControl : Panel, IChatMessageControl
 {
-	/// <summary>The font used to render the expanded arguments and result detail text.</summary>
+	/// <summary>The font used to render the detail text.</summary>
 	private static readonly Font MonospaceFont = new("Consolas", 8f);
 
-	/// <summary>The chat message whose <see cref="FunctionCallMessageContent"/> is being displayed.</summary>
+	/// <summary>The chat message whose <see cref="ReasoningMessageContent"/> is being displayed.</summary>
 	private IChatMessage? _message;
+	private bool _isReceivingStream;
 
 	/// <summary>
 	/// Indicates whether the detail panel (arguments and result) is currently visible.
@@ -18,25 +22,26 @@ internal sealed class FunctionCallMessageControl : Panel, IChatMessageControl
 	/// </summary>
 	private bool _expanded;
 
-	/// <summary>The label that shows the collapsed one-line summary (icon, name, inline args, and expand arrow).</summary>
+	/// <summary>The label that shows the collapsed one-line summary (icon, name and expand arrow).</summary>
 	private readonly Label _headerLabel;
 
-	/// <summary>The label that shows the full argument list and function result when the control is expanded.</summary>
+	/// <summary>The label that shows the full text when the control is expanded.</summary>
 	private readonly Label _detailLabel;
 
 	/// <inheritdoc/>
-	/// <remarks>Tool call messages are never streamed, so this event is intentionally a no-op.</remarks>
-	public event EventHandler? SizeUpdatedWhileStreaming { add { } remove { } }
-
-	/// <inheritdoc/>
-	/// <remarks>Tool call messages are never streamed, so this method is intentionally a no-op.</remarks>
-	void IChatMessageControl.SetIsReceivingStream(bool isReceiving) { }
+	public event EventHandler? SizeUpdatedWhileStreaming;
 
 	/// <summary>
-	/// Initializes a new instance of <see cref="FunctionCallMessageControl"/>, creating and
-	/// wiring up the header and detail labels.
+	/// Gets or sets the formatter that converts message content into displayable strings.
 	/// </summary>
-	public FunctionCallMessageControl()
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	public required IMessageFormatter MessageFormatter { get; set; }
+
+	/// <summary>
+	/// Initializes a new instance of <see cref="ReasoningMessageControl"/> , creating and wiring up the header and detail
+	/// labels.
+	/// </summary>
+	public ReasoningMessageControl()
 	{
 		AutoSize = true;
 		BorderStyle = BorderStyle.FixedSingle;
@@ -67,6 +72,7 @@ internal sealed class FunctionCallMessageControl : Panel, IChatMessageControl
 		Controls.Add(_headerLabel);
 		_headerLabel.BringToFront();
 		_detailLabel.BringToFront();
+		AutoSize = true;
 
 		_headerLabel.Click += Toggle;
 		_detailLabel.Click += Toggle;
@@ -76,7 +82,7 @@ internal sealed class FunctionCallMessageControl : Panel, IChatMessageControl
 	/// <summary>
 	/// Gets or sets the chat message to display.
 	/// The message's <see cref="IChatMessage.Content"/> must be a
-	/// <see cref="FunctionCallMessageContent"/> for any content to be rendered.
+	/// <see cref="ReasoningMessageContent"/> for any content to be rendered.
 	/// </summary>
 	[System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
 	public IChatMessage? Message
@@ -85,36 +91,26 @@ internal sealed class FunctionCallMessageControl : Panel, IChatMessageControl
 		set
 		{
 			_message = value;
+
 			_detailLabel.DataBindings.Clear();
 			_headerLabel.DataBindings.Clear();
-			if (Message is not null && Message.Content is FunctionCallMessageContent fc)
+			if (Message is not null)
 			{
 				var binding = _detailLabel.DataBindings.Add(nameof(_detailLabel.Text), Message.Content, nameof(Message.Content.Content));
-				binding.Format += (_, e) =>
+				binding.Format += (_, e) => e.Value = MessageFormatter.Format(Message.Content);
+
+				if (Message.Content is ReasoningMessageContent rc)
 				{
-					var maxArgKeyLength = fc.Arguments?.Any() ?? false ? fc.Arguments.Keys.Max(k => k.Length) : 0;
-					var args = fc.Arguments?.Count > 0
-						? string.Join("\n", fc.Arguments.Select(kv => $"{(kv.Key + ":").PadRight(maxArgKeyLength + 1)} {kv.Value}"))
-						: "";
-
-					var result = fc.Result is not null ? $"\n\n🡪 {fc.Result}" : "";
-
-					e.Value = (args + result).TrimStart('\n');
-				};
-
-
-				binding = _headerLabel.DataBindings.Add(nameof(_headerLabel.Text), Message.Content, nameof(FunctionCallMessageContent.IsFunctionExecuting));
-				binding.Format += (_, e) =>
-				{
-					var bullet = _expanded ? "-" : "+";
-					var value = $"{bullet} {fc.Name}";
-
-					if (fc.IsFunctionExecuting)
-						value += " (working)";
-
-					e.Value = value;
-				};
-
+					binding = _headerLabel.DataBindings.Add(nameof(_headerLabel.Text), Message.Content, nameof(ReasoningMessageContent.IsThinking));
+					binding.Format += (_, e) =>
+					{
+						var bullet = _expanded ? "-" : "+";
+						if (rc.IsThinking)
+							e.Value = $"{bullet} Thinking...";
+						else
+							e.Value = $"{bullet} Thoughts";
+					};
+				}
 			}
 		}
 	}
@@ -135,7 +131,6 @@ internal sealed class FunctionCallMessageControl : Panel, IChatMessageControl
 		}
 	}
 
-
 	/// <summary>
 	/// Toggles the expanded/collapsed state of the detail panel when the user clicks
 	/// anywhere on the control.
@@ -150,14 +145,28 @@ internal sealed class FunctionCallMessageControl : Panel, IChatMessageControl
 	}
 
 	/// <summary>
-	/// Rebuilds the single-line header text that shows the wrench icon, function name,
-	/// inline argument summary, and the expand/collapse arrow indicator.
-	/// Does nothing if <see cref="Message"/> is <see langword="null"/> or its content is not
-	/// a <see cref="FunctionCallMessageContent"/>.
+	/// Rebuilds the single-line header text that shows the icon, header text, and the
+	/// expand/collapse arrow indicator. Does nothing if <see cref="Message"/> is <see langword="null"/> or its content is
+	/// not a <see cref="ReasoningMessageContent"/> .
 	/// </summary>
 	private void UpdateHeader()
 	{
 		if (_headerLabel.DataBindings.Count > 0)
 			_headerLabel.DataBindings[0].ReadValue();
+	}
+
+	/// <inheritdoc />
+	protected override void OnSizeChanged(EventArgs e)
+	{
+		base.OnSizeChanged(e);
+
+		if (_isReceivingStream)
+			SizeUpdatedWhileStreaming?.Invoke(this, EventArgs.Empty);
+	}
+
+	/// <inheritdoc />
+	void IChatMessageControl.SetIsReceivingStream(bool isReceiving)
+	{
+		_isReceivingStream = isReceiving;
 	}
 }

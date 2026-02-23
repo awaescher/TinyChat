@@ -1,7 +1,7 @@
+using System.ComponentModel;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using OllamaSharp;
-using System.ComponentModel;
 
 namespace WinFormsDemo;
 
@@ -76,9 +76,11 @@ public static class TestIChatClientDemo
 		DateTime.Now.ToString("ddd, MMM d yyyy HH:mm:ss");
 
 	[Description("Gets the current weather for a given city with randomised data.")]
-	private static string GetCurrentWeather(
+	private static async Task<string> GetCurrentWeather(
 		[Description("The city name to get the weather for")] string city)
 	{
+		await Task.Delay(2000);
+
 		var rng = new Random();
 		var conditions = new[] { "sunny", "partly cloudy", "overcast", "light rain", "heavy rain", "snow", "foggy", "windy" };
 		var temp = rng.Next(-10, 38);

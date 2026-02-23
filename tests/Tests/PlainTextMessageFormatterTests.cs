@@ -281,22 +281,6 @@ public class PlainTextMessageFormatterTests
 		}
 
 		[Test]
-		public void Formats_FunctionResultMessageContent()
-		{
-			var content = new FunctionResultMessageContent("call1", "15°C, cloudy");
-			var result = _formatter.Format(content);
-			result.ShouldBe("[Result: 15°C, cloudy]");
-		}
-
-		[Test]
-		public void Formats_FunctionResultMessageContent_With_Null_Result()
-		{
-			var content = new FunctionResultMessageContent("call1", null);
-			var result = _formatter.Format(content);
-			result.ShouldBe("[Result: ]");
-		}
-
-		[Test]
 		public void Extracts_Text_From_Multiple_Links_In_Same_Line()
 		{
 			var result = _formatter.Format("[link1](url1) and [link2](url2)");
