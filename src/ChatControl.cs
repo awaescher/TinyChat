@@ -802,6 +802,7 @@ public partial class ChatControl : UserControl
 						pendingCalls[funcCall.CallId] = content;
 
 						// reset the reasoning to be able to start a new control
+						reasoningMessageContent?.SetDone();
 						reasoningMessageContent = null;
 					}
 					else if (item is FunctionResultContent funcResult && IncludeFunctionCalls)
@@ -813,6 +814,7 @@ public partial class ChatControl : UserControl
 						}
 
 						// reset the reasoning to be able to start a new control
+						reasoningMessageContent?.SetDone();
 						reasoningMessageContent = null;
 					}
 					else if (item is TextReasoningContent reasoningContent && IncludeReasoning)
@@ -833,6 +835,7 @@ public partial class ChatControl : UserControl
 					else
 					{
 						// reset the reasoning to be able to start a new control for a new thinking
+						reasoningMessageContent?.SetDone();
 						reasoningMessageContent = null;
 					}
 				}

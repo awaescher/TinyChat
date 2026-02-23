@@ -94,10 +94,24 @@ internal class ReasoningMessageControl : Panel, IChatMessageControl
 			UpdateDisplay();
 
 			_detailLabel.DataBindings.Clear();
+			_headerLabel.DataBindings.Clear();
 			if (Message is not null)
 			{
 				var binding = _detailLabel.DataBindings.Add(nameof(_detailLabel.Text), Message.Content, nameof(Message.Content.Content));
 				binding.Format += (_, e) => e.Value = MessageFormatter.Format(Message.Content);
+
+				if (Message.Content is ReasoningMessageContent rc)
+				{
+					binding = _headerLabel.DataBindings.Add(nameof(_headerLabel.Text), Message.Content, nameof(ReasoningMessageContent.IsThinking));
+					binding.Format += (_, e) =>
+					{
+						var bullet = _expanded ? "-" : "+";
+						if (rc.IsThinking)
+							e.Value = $"{bullet} Thinking...";
+						else
+							e.Value = $"{bullet} Thoughts";
+					};
+				}
 			}
 		}
 	}
@@ -117,7 +131,6 @@ internal class ReasoningMessageControl : Panel, IChatMessageControl
 			_detailLabel.MaximumSize = new Size(value.Width - Padding.Horizontal, 0);
 		}
 	}
-
 
 	/// <summary>
 	/// Toggles the expanded/collapsed state of the detail panel when the user clicks
@@ -152,11 +165,11 @@ internal class ReasoningMessageControl : Panel, IChatMessageControl
 	/// </summary>
 	private void UpdateHeader()
 	{
-		if (_message?.Content is not ReasoningMessageContent)
+		if (_message?.Content is not ReasoningMessageContent rc)
 			return;
 
-		var bullet = _expanded ? "-" : "+";
-		_headerLabel.Text = $"{bullet} Thinking";
+		if (_headerLabel.DataBindings.Count > 0)
+			_headerLabel.DataBindings[0].ReadValue();
 	}
 
 	/// <inheritdoc />
