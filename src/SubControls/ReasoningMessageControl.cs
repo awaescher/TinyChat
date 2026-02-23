@@ -91,7 +91,6 @@ internal class ReasoningMessageControl : Panel, IChatMessageControl
 		set
 		{
 			_message = value;
-			UpdateDisplay();
 
 			_detailLabel.DataBindings.Clear();
 			_headerLabel.DataBindings.Clear();
@@ -146,28 +145,12 @@ internal class ReasoningMessageControl : Panel, IChatMessageControl
 	}
 
 	/// <summary>
-	/// Refreshes both the header and detail labels from the current <see cref="Message"/>.
-	/// Does nothing if <see cref="Message"/> is <see langword="null"/> or its content is not
-	/// a <see cref="ReasoningMessageContent"/>.
-	/// </summary>
-	private void UpdateDisplay()
-	{
-		if (_message?.Content is not ReasoningMessageContent rc)
-			return;
-
-		UpdateHeader();
-	}
-
-	/// <summary>
 	/// Rebuilds the single-line header text that shows the icon, header text, and the
 	/// expand/collapse arrow indicator. Does nothing if <see cref="Message"/> is <see langword="null"/> or its content is
 	/// not a <see cref="ReasoningMessageContent"/> .
 	/// </summary>
 	private void UpdateHeader()
 	{
-		if (_message?.Content is not ReasoningMessageContent rc)
-			return;
-
 		if (_headerLabel.DataBindings.Count > 0)
 			_headerLabel.DataBindings[0].ReadValue();
 	}

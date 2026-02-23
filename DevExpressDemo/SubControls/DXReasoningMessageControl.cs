@@ -103,7 +103,6 @@ internal sealed class DXReasoningMessageControl : PanelControl, IChatMessageCont
 		set
 		{
 			_message = value;
-			UpdateDisplay();
 
 			_detailLabel.DataBindings.Clear();
 			_headerLabel.DataBindings.Clear();
@@ -158,27 +157,12 @@ internal sealed class DXReasoningMessageControl : PanelControl, IChatMessageCont
 	}
 
 	/// <summary>
-	/// Refreshes both the header and detail labels from the current <see cref="Message"/> . Does nothing if
-	/// <see cref="Message"/> is <see langword="null"/> or its content is not a <see cref="ReasoningMessageContent"/> .
-	/// </summary>
-	private void UpdateDisplay()
-	{
-		if (_message?.Content is not ReasoningMessageContent)
-			return;
-
-		UpdateHeader();
-	}
-
-	/// <summary>
 	/// Rebuilds the single-line header text that shows the wrench icon, function name, inline argument summary, and the
 	/// expand/collapse arrow indicator. Does nothing if <see cref="Message"/> is <see langword="null"/> or its content is
 	/// not a <see cref="ReasoningMessageContent"/> .
 	/// </summary>
 	private void UpdateHeader()
 	{
-		if (_message?.Content is not ReasoningMessageContent rc)
-			return;
-
 		if (_headerLabel.DataBindings.Count > 0)
 			_headerLabel.DataBindings[0].ReadValue();
 	}

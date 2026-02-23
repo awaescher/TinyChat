@@ -84,10 +84,38 @@ internal sealed class FunctionCallMessageControl : Panel, IChatMessageControl
 		get => _message;
 		set
 		{
-			UnsubscribeUpdates();
 			_message = value;
-			UpdateDisplay();
-			SubscribeUpdates();
+			_detailLabel.DataBindings.Clear();
+			_headerLabel.DataBindings.Clear();
+			if (Message is not null && Message.Content is FunctionCallMessageContent fc)
+			{
+				var binding = _detailLabel.DataBindings.Add(nameof(_detailLabel.Text), Message.Content, nameof(Message.Content.Content));
+				binding.Format += (_, e) =>
+				{
+					var maxArgKeyLength = fc.Arguments?.Any() ?? false ? fc.Arguments.Keys.Max(k => k.Length) : 0;
+					var args = fc.Arguments?.Count > 0
+						? string.Join("\n", fc.Arguments.Select(kv => $"{(kv.Key + ":").PadRight(maxArgKeyLength + 1)} {kv.Value}"))
+						: "";
+
+					var result = fc.Result is not null ? $"\n\n🡪 {fc.Result}" : "";
+
+					e.Value = (args + result).TrimStart('\n');
+				};
+
+
+				binding = _headerLabel.DataBindings.Add(nameof(_headerLabel.Text), Message.Content, nameof(FunctionCallMessageContent.IsFunctionExecuting));
+				binding.Format += (_, e) =>
+				{
+					var bullet = _expanded ? "-" : "+";
+					var value = $"{bullet} {fc.Name}";
+
+					if (fc.IsFunctionExecuting)
+						value += " (working)";
+
+					e.Value = value;
+				};
+
+			}
 		}
 	}
 
@@ -122,28 +150,6 @@ internal sealed class FunctionCallMessageControl : Panel, IChatMessageControl
 	}
 
 	/// <summary>
-	/// Refreshes both the header and detail labels from the current <see cref="Message"/>.
-	/// Does nothing if <see cref="Message"/> is <see langword="null"/> or its content is not
-	/// a <see cref="FunctionCallMessageContent"/>.
-	/// </summary>
-	private void UpdateDisplay()
-	{
-		if (_message?.Content is not FunctionCallMessageContent fc)
-			return;
-
-		UpdateHeader();
-
-		var maxArgKeyLength = fc.Arguments?.Any() ?? false ? fc.Arguments.Keys.Max(k => k.Length) : 0;
-		var args = fc.Arguments?.Count > 0
-			? string.Join("\n", fc.Arguments.Select(kv => $"{(kv.Key + ":").PadRight(maxArgKeyLength + 1)} {kv.Value}"))
-			: "";
-
-		var result = fc.Result is not null ? $"\n\n🡪 {fc.Result}" : "";
-
-		_detailLabel.Text = (args + result).TrimStart('\n');
-	}
-
-	/// <summary>
 	/// Rebuilds the single-line header text that shows the wrench icon, function name,
 	/// inline argument summary, and the expand/collapse arrow indicator.
 	/// Does nothing if <see cref="Message"/> is <see langword="null"/> or its content is not
@@ -151,44 +157,7 @@ internal sealed class FunctionCallMessageControl : Panel, IChatMessageControl
 	/// </summary>
 	private void UpdateHeader()
 	{
-		if (_message?.Content is not FunctionCallMessageContent fc)
-			return;
-
-		var bullet = _expanded ? "-" : "+";
-		_headerLabel.Text = $"{bullet} {fc.Name}";
-
-		if (fc.IsFunctionExecuting)
-			_headerLabel.Text += " (working)";
-	}
-
-	/// <summary>
-	/// Subscribes to any property updates of the message content
-	/// </summary>
-	private void SubscribeUpdates()
-	{
-		if (_message?.Content is not FunctionCallMessageContent fc)
-			return;
-
-		fc.PropertyChanged += Content_PropertyChanged;
-	}
-
-	/// <summary>
-	/// Removes the subscribtion of any property updates of the message content
-	/// </summary>
-	private void UnsubscribeUpdates()
-	{
-		if (_message?.Content is not FunctionCallMessageContent fc)
-			return;
-
-		fc.PropertyChanged -= Content_PropertyChanged;
-	}
-
-	private void Content_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
-	{
-		if (e.PropertyName == nameof(FunctionCallMessageContent.IsFunctionExecuting))
-			UpdateHeader();
-
-		if (e.PropertyName == nameof(FunctionCallMessageContent.Result))
-			UpdateDisplay();
+		if (_headerLabel.DataBindings.Count > 0)
+			_headerLabel.DataBindings[0].ReadValue();
 	}
 }
