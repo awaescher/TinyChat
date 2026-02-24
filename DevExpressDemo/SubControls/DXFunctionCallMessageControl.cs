@@ -7,28 +7,26 @@ using DevExpress.XtraEditors;
 namespace TinyChat;
 
 /// <summary>
-/// Displays a function call and its result as a compact, click-to-expand bubble.
-/// Shows a wrench icon and the function name at a glance; click to reveal arguments and result.
+/// Displays a function call and its result in a structured two-column layout.
+/// The left column shows icon glyphs from Segoe MDL2 Assets; the right column shows
+/// the function name (bold), the arguments, and the result.
+/// Clicking anywhere on the control toggles the detail rows (arguments + result).
 /// </summary>
-internal sealed class DXFunctionCallMessageControl : PanelControl, IChatMessageControl
+internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChatMessageControl
 {
-	/// <summary>The font used to render the expanded arguments and result detail text.</summary>
-	private static readonly Font MonospaceFont = new("Consolas", 8f);
+	/// <summary>
+	/// Fixed pixel width reserved for the icon column.
+	/// </summary>
+	private const int ICON_WIDTH = 20;
 
 	/// <summary>The chat message whose <see cref="FunctionCallMessageContent"/> is being displayed.</summary>
 	private IChatMessage? _message;
 
 	/// <summary>
-	/// Indicates whether the detail panel (arguments and result) is currently visible.
-	/// <see langword="true"/> when expanded; <see langword="false"/> when collapsed.
+	/// Whether the detail panel (arguments + result) is currently visible.
+	/// Starts collapsed.
 	/// </summary>
 	private bool _expanded;
-
-	/// <summary>The label that shows the collapsed one-line summary (icon, name, inline args, and expand arrow).</summary>
-	private readonly LabelControl _headerLabel;
-
-	/// <summary>The label that shows the full argument list and function result when the control is expanded.</summary>
-	private readonly LabelControl _detailLabel;
 
 	/// <inheritdoc/>
 	/// <remarks>Tool call messages are never streamed, so this event is intentionally a no-op.</remarks>
@@ -39,52 +37,17 @@ internal sealed class DXFunctionCallMessageControl : PanelControl, IChatMessageC
 	void IChatMessageControl.SetIsReceivingStream(bool isReceiving) { }
 
 	/// <summary>
-	/// Initializes a new instance of <see cref="FunctionCallMessageControl"/>, creating and
-	/// wiring up the header and detail labels.
+	/// Initialises a new instance of <see cref="DXFunctionCallMessageControl"/>.
 	/// </summary>
 	public DXFunctionCallMessageControl()
 	{
-		AutoSize = true;
-		Padding = new Padding(8);
-		BorderStyle = DevExpress.XtraEditors.Controls.BorderStyles.NoBorder;
-		Cursor = Cursors.Hand;
+		InitializeComponent();
 
-		var borderPanel = new PanelControl
-		{
-			AutoSize = true,
-			Dock = DockStyle.Fill,
-			Padding = new Padding(8)
-		};
+		lblToolIcon.Font = new Font(lblTitle.Font.FontFamily, lblTitle.Font.Size);
+		lblResultIcon.Font = lblToolIcon.Font;
 
-		_headerLabel = new LabelControl
-		{
-			AutoSize = true,
-			Font = MonospaceFont,
-			UseMnemonic = false,
-			Dock = DockStyle.Top,
-			Cursor = Cursors.Hand,
-		};
-
-		_detailLabel = new LabelControl
-		{
-			AutoSize = true,
-			Font = MonospaceFont,
-			UseMnemonic = false,
-			Dock = DockStyle.Fill,
-			Visible = false,
-			Padding = new Padding(14, 4, 0, 0),
-		};
-
-		borderPanel.Controls.Add(_detailLabel);
-		borderPanel.Controls.Add(_headerLabel);
-		Controls.Add(borderPanel);
-		_headerLabel.BringToFront();
-		_detailLabel.BringToFront();
-
-		borderPanel.Click += Toggle;
-		_headerLabel.Click += Toggle;
-		_detailLabel.Click += Toggle;
-		Click += Toggle;
+		lblTitle.Font = new Font("Consolas", lblTitle.Font.Size);
+		lblArguments.Font = new Font(lblTitle.Font.FontFamily, lblArguments.Font.Size - 1);
 	}
 
 	/// <summary>
@@ -98,46 +61,37 @@ internal sealed class DXFunctionCallMessageControl : PanelControl, IChatMessageC
 		get => _message;
 		set
 		{
+			// Unsubscribe from the previous content's change notifications.
+			if (_message?.Content is FunctionCallMessageContent oldFc)
+				oldFc.PropertyChanged -= OnContentPropertyChanged;
+
 			_message = value;
 
-			_detailLabel.DataBindings.Clear();
-			_headerLabel.DataBindings.Clear();
-			if (Message is not null && Message.Content is FunctionCallMessageContent fc)
-			{
-				var binding = _detailLabel.DataBindings.Add(nameof(_detailLabel.Text), Message.Content, nameof(Message.Content.Content));
-				binding.Format += (_, e) =>
-				{
-					var maxArgKeyLength = fc.Arguments?.Any() ?? false ? fc.Arguments.Keys.Max(k => k.Length) : 0;
-					var args = fc.Arguments?.Count > 0
-						? string.Join("\n", fc.Arguments.Select(kv => $"{(kv.Key + ":").PadRight(maxArgKeyLength + 1)} {kv.Value}"))
-						: "";
+			// Subscribe to the new content so we redraw when IsFunctionExecuting
+			// or Result changes (raised by FunctionCallMessageContent.SetResult).
+			if (_message?.Content is FunctionCallMessageContent newFc)
+				newFc.PropertyChanged += OnContentPropertyChanged;
 
-					var result = fc.Result is not null ? $"\n\n🡪 {fc.Result}" : "";
-
-					e.Value = (args + result).TrimStart('\n');
-				};
-
-
-				binding = _headerLabel.DataBindings.Add(nameof(_headerLabel.Text), Message.Content, nameof(FunctionCallMessageContent.IsFunctionExecuting));
-				binding.Format += (_, e) =>
-				{
-					var bullet = _expanded ? "-" : "+";
-					var value = $"{bullet} {fc.Name}";
-
-					if (fc.IsFunctionExecuting)
-						value += " (working)";
-
-					e.Value = value;
-				};
-
-			}
+			UpdateDisplay();
 		}
 	}
 
 	/// <summary>
+	/// Handles <see cref="FunctionCallMessageContent.PropertyChanged"/> so the
+	/// control updates as soon as <see cref="FunctionCallMessageContent.IsFunctionExecuting"/>
+	/// or <see cref="FunctionCallMessageContent.Result"/> changes.
+	/// </summary>
+	private void OnContentPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+	{
+		if (InvokeRequired)
+			BeginInvoke(UpdateDisplay);
+		else
+			UpdateDisplay();
+	}
+
+	/// <summary>
 	/// Gets or sets the maximum size of this control.
-	/// Setting this value also propagates the horizontal constraint to the inner
-	/// <see cref="_headerLabel"/> and <see cref="_detailLabel"/> so that text wraps correctly.
+	/// The horizontal constraint is forwarded to the text labels so that long lines wrap.
 	/// </summary>
 	public override Size MaximumSize
 	{
@@ -145,34 +99,64 @@ internal sealed class DXFunctionCallMessageControl : PanelControl, IChatMessageC
 		set
 		{
 			base.MaximumSize = value;
-			_headerLabel.MaximumSize = new Size(value.Width - Padding.Horizontal, 0);
-			_detailLabel.MaximumSize = new Size(value.Width - Padding.Horizontal, 0);
+			// Account for outer padding and icon column.
+			var textWidth = Math.Max(0, value.Width - Padding.Horizontal - ICON_WIDTH);
+			lblTitle.MaximumSize = new Size(textWidth, 0);
+			lblArguments.MaximumSize = new Size(textWidth, 0);
+			lblResult.MaximumSize = new Size(textWidth, 0);
 		}
 	}
 
 	/// <summary>
-	/// Toggles the expanded/collapsed state of the detail panel when the user clicks
-	/// anywhere on the control.
+	/// Toggles the expanded/collapsed state and refreshes visibility.
 	/// </summary>
-	/// <param name="sender">The object that raised the click event.</param>
-	/// <param name="e">Event data (not used).</param>
 	private void Toggle(object? sender, EventArgs e)
 	{
 		_expanded = !_expanded;
-		_detailLabel.Visible = _expanded;
-		UpdateHeader();
+		ApplyVisibility();
 	}
 
 	/// <summary>
-	/// Rebuilds the single-line header text that shows the wrench icon, function name,
-	/// inline argument summary, and the expand/collapse arrow indicator.
+	/// Refreshes both the header and detail labels from the current <see cref="Message"/>.
 	/// Does nothing if <see cref="Message"/> is <see langword="null"/> or its content is not
 	/// a <see cref="FunctionCallMessageContent"/>.
 	/// </summary>
-	private void UpdateHeader()
+	private void UpdateDisplay()
 	{
-		if (_headerLabel.DataBindings.Count > 0)
-			_headerLabel.DataBindings[0].ReadValue();
+		if (_message?.Content is not FunctionCallMessageContent fc)
+			return;
+
+		lblTitle.Text = fc.IsFunctionExecuting
+			? fc.Name + " ..."
+			: fc.Name + " ✔ "; // keep extra space for to prevent capping the char;
+
+		if (fc.Arguments?.Count > 0)
+		{
+			var maxKeyLen = fc.Arguments.Keys.Max(k => k.Length);
+			lblArguments.Text = string.Join("\n",
+				fc.Arguments.Select(kv => $"{(kv.Key + ":").PadRight(maxKeyLen + 1)} {kv.Value}"));
+		}
+
+		if (fc.Result is not null)
+			lblResult.Text = fc.Result.ToString();
+
+		ApplyVisibility();
 	}
 
+	/// <summary>
+	/// Shows or hides the argument and result rows based on <see cref="_expanded"/>
+	/// and whether the data is actually present, and updates the chevron glyph.
+	/// </summary>
+	private void ApplyVisibility()
+	{
+		if (_message?.Content is not FunctionCallMessageContent fc)
+			return;
+
+		var hasArgs = fc.Arguments?.Count > 0;
+		var hasResult = fc.Result is not null;
+
+		lblArguments.Visible = _expanded && hasArgs;
+		lblResultIcon.Visible = _expanded && hasResult;
+		lblResult.Visible = _expanded && hasResult;
+	}
 }

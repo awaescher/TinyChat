@@ -29,7 +29,7 @@ public class ChatMessageControl : Panel, IChatMessageControl
 	/// </summary>
 	public ChatMessageControl()
 	{
-		_senderLabel = new Label() { Dock = DockStyle.Top, AutoSize = true, Font = new Font(Font, FontStyle.Bold), UseMnemonic = false };
+		_senderLabel = new Label() { Dock = DockStyle.Top, AutoSize = true, Font = new Font(Font, FontStyle.Bold), UseMnemonic = false, Padding = new Padding(0, 0, 0, 3) };
 		_messageLabel = new Label() { Dock = DockStyle.Fill, AutoSize = true, UseMnemonic = false };
 		Controls.Add(_senderLabel);
 		Controls.Add(_messageLabel);

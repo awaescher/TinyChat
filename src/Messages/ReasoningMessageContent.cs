@@ -51,7 +51,7 @@ public class ReasoningMessageContent : IChatMessageContent
 	/// <summary>
 	/// Sets the reasoning for completed
 	/// </summary>
-	public void SetDone()
+	public ReasoningMessageContent SetDone()
 	{
 		// Convert the string builder to a fixed string
 		_message = _builder?.ToString();
@@ -59,5 +59,7 @@ public class ReasoningMessageContent : IChatMessageContent
 
 		IsThinking = false;
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsThinking)));
+
+		return this;
 	}
 }

@@ -1,7 +1,6 @@
 using System;
 using System.ComponentModel;
 using System.Drawing;
-using System.Windows.Forms;
 using DevExpress.XtraEditors;
 using TinyChat.Messages;
 using TinyChat.Messages.Formatting;
@@ -11,10 +10,10 @@ namespace TinyChat;
 /// <summary>
 /// Displays a thinking text, click-to-expand bubble.
 /// </summary>
-internal sealed class DXReasoningMessageControl : PanelControl, IChatMessageControl
+internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMessageControl
 {
-	/// <summary>The font used to render the detail text.</summary>
-	private static readonly Font MonospaceFont = new("Consolas", 8f);
+	/// <summary>Fixed pixel width reserved for the icon column.</summary>
+	private const int IconColumnWidth = 20;
 
 	/// <summary>The chat message whose <see cref="ReasoningMessageContent"/> is being displayed.</summary>
 	private IChatMessage? _message;
@@ -26,12 +25,6 @@ internal sealed class DXReasoningMessageControl : PanelControl, IChatMessageCont
 	/// </summary>
 	private bool _expanded;
 
-	/// <summary>The label that shows the collapsed one-line summary (icon, name and expand arrow).</summary>
-	private readonly LabelControl _headerLabel;
-
-	/// <summary>The label that shows the full text when the control is expanded.</summary>
-	private readonly LabelControl _detailLabel;
-
 	/// <inheritdoc/>
 	public event EventHandler? SizeUpdatedWhileStreaming;
 
@@ -42,54 +35,13 @@ internal sealed class DXReasoningMessageControl : PanelControl, IChatMessageCont
 	public required IMessageFormatter MessageFormatter { get; set; }
 
 	/// <summary>
-	/// Initializes a new instance of <see cref="DXReasoningMessageControl"/> , creating and wiring up the header and
-	/// detail labels.
+	/// Initializes a new instance of <see cref="DXReasoningMessageControl"/>, creating and wiring up the
+	/// icon, header and detail labels via the designer-generated <see cref="InitializeComponent"/>.
 	/// </summary>
 	public DXReasoningMessageControl()
 	{
-		AutoSize = true;
-		Padding = new Padding(8);
-		BorderStyle = DevExpress.XtraEditors.Controls.BorderStyles.NoBorder;
-		Cursor = Cursors.Hand;
+		InitializeComponent();
 
-		var borderPanel = new PanelControl
-		{
-			AutoSize = true,
-			Dock = DockStyle.Fill,
-			Padding = new Padding(8)
-		};
-
-		_headerLabel = new LabelControl
-		{
-			AutoSize = true,
-			Font = MonospaceFont,
-			UseMnemonic = false,
-			Dock = DockStyle.Top,
-			Cursor = Cursors.Hand,
-		};
-
-		_detailLabel = new LabelControl
-		{
-			AllowHtmlString = true,
-			Font = MonospaceFont,
-			UseMnemonic = true,
-			Dock = DockStyle.Top,
-			AutoSizeMode = LabelAutoSizeMode.Vertical,
-			Visible = false,
-			Padding = new Padding(14, 4, 0, 0),
-		};
-		_detailLabel.Appearance.TextOptions.WordWrap = DevExpress.Utils.WordWrap.Wrap;
-
-		borderPanel.Controls.Add(_detailLabel);
-		borderPanel.Controls.Add(_headerLabel);
-		Controls.Add(borderPanel);
-		_headerLabel.BringToFront();
-		_detailLabel.BringToFront();
-
-		borderPanel.Click += Toggle;
-		_headerLabel.Click += Toggle;
-		_detailLabel.Click += Toggle;
-		Click += Toggle;
 	}
 
 	/// <summary>
@@ -104,23 +56,22 @@ internal sealed class DXReasoningMessageControl : PanelControl, IChatMessageCont
 		{
 			_message = value;
 
-			_detailLabel.DataBindings.Clear();
-			_headerLabel.DataBindings.Clear();
+			lblDetail.DataBindings.Clear();
+			lblTitle.DataBindings.Clear();
 			if (Message is not null)
 			{
-				var binding = _detailLabel.DataBindings.Add(nameof(_detailLabel.Text), Message.Content, nameof(Message.Content.Content));
+				var binding = lblDetail.DataBindings.Add(nameof(lblDetail.Text), Message.Content, nameof(Message.Content.Content));
 				binding.Format += (_, e) => e.Value = MessageFormatter.Format(Message.Content);
 
 				if (Message.Content is ReasoningMessageContent rc)
 				{
-					binding = _headerLabel.DataBindings.Add(nameof(_headerLabel.Text), Message.Content, nameof(ReasoningMessageContent.IsThinking));
+					binding = lblTitle.DataBindings.Add(nameof(lblTitle.Text), Message.Content, nameof(ReasoningMessageContent.IsThinking));
 					binding.Format += (_, e) =>
 					{
-						var bullet = _expanded ? "-" : "+";
 						if (rc.IsThinking)
-							e.Value = $"{bullet} Thinking...";
+							e.Value = "...";
 						else
-							e.Value = $"{bullet} Thoughts";
+							e.Value = "✔ "; // keep extra space for to prevent capping the char
 					};
 				}
 			}
@@ -130,7 +81,7 @@ internal sealed class DXReasoningMessageControl : PanelControl, IChatMessageCont
 	/// <summary>
 	/// Gets or sets the maximum size of this control.
 	/// Setting this value also propagates the horizontal constraint to the inner
-	/// <see cref="_headerLabel"/> and <see cref="_detailLabel"/> so that text wraps correctly.
+	/// <see cref="lblTitle"/> and <see cref="lblDetail"/> so that text wraps correctly.
 	/// </summary>
 	public override Size MaximumSize
 	{
@@ -138,8 +89,8 @@ internal sealed class DXReasoningMessageControl : PanelControl, IChatMessageCont
 		set
 		{
 			base.MaximumSize = value;
-			_headerLabel.MaximumSize = new Size(value.Width - Padding.Horizontal, 0);
-			_detailLabel.MaximumSize = new Size(value.Width - Padding.Horizontal, 0);
+			lblTitle.MaximumSize = new Size(value.Width - Padding.Horizontal, 0);
+			lblDetail.MaximumSize = new Size(value.Width - Padding.Horizontal, 0);
 		}
 	}
 
@@ -152,7 +103,7 @@ internal sealed class DXReasoningMessageControl : PanelControl, IChatMessageCont
 	private void Toggle(object? sender, EventArgs e)
 	{
 		_expanded = !_expanded;
-		_detailLabel.Visible = _expanded;
+		lblDetail.Visible = _expanded;
 		UpdateHeader();
 	}
 
@@ -163,8 +114,8 @@ internal sealed class DXReasoningMessageControl : PanelControl, IChatMessageCont
 	/// </summary>
 	private void UpdateHeader()
 	{
-		if (_headerLabel.DataBindings.Count > 0)
-			_headerLabel.DataBindings[0].ReadValue();
+		if (lblTitle.DataBindings.Count > 0)
+			lblTitle.DataBindings[0].ReadValue();
 	}
 
 	/// <inheritdoc />
