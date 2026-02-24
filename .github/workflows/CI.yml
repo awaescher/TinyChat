@@ -3,10 +3,10 @@ name: .NET Build, Test, and Publish Nuget Package
 on:
   push:
     branches: [ "main", "master" ]
-    paths: [ 'src/**', '.github/workflows/CI.yml' ]
+    paths: [ 'src/**', 'TinyChat.DevExpress/**', '.github/workflows/CI.yml' ]
   pull_request:
     branches: [ "main", "master" ]
-    paths: [ 'src/**' ]
+    paths: [ 'src/**', 'TinyChat.DevExpress/**' ]
 
 
 jobs:
@@ -39,13 +39,19 @@ jobs:
           10.0.x
 
     - name: Restore dependencies
-      run: dotnet restore ./src/TinyChat.csproj
+      run: |
+        dotnet restore ./TinyChat/TinyChat.csproj
+        dotnet restore ./TinyChat.DevExpress/TinyChat.DevExpress.csproj
       
     - name: Build
-      run: dotnet build ./src/TinyChat.csproj --no-restore --configuration=Release /p:Version=${{steps.gitversion.outputs.semVer}}
+      run: |
+        dotnet build ./TinyChat/TinyChat.csproj --no-restore --configuration=Release /p:Version=${{steps.gitversion.outputs.semVer}}
+        dotnet build ./TinyChat.DevExpress/TinyChat.DevExpress.csproj --no-restore --configuration=Release /p:Version=${{steps.gitversion.outputs.semVer}}
      
     - name: pack nuget packages
-      run: dotnet pack --output nupkgs --configuration=Release --no-restore --no-build /p:PackageVersion=${{steps.gitversion.outputs.semVer}}
+      run: |
+        dotnet pack ./TinyChat/TinyChat.csproj --output nupkgs --configuration=Release --no-restore --no-build /p:PackageVersion=${{steps.gitversion.outputs.semVer}}
+        dotnet pack ./TinyChat.DevExpress/TinyChat.DevExpress.csproj --output nupkgs --configuration=Release --no-restore --no-build /p:PackageVersion=${{steps.gitversion.outputs.semVer}}
 
     - name: Create a GitHub release
       uses: ncipollo/release-action@v1

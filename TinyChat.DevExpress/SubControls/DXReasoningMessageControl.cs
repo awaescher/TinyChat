@@ -1,6 +1,4 @@
-using System;
 using System.ComponentModel;
-using System.Drawing;
 using DevExpress.XtraEditors;
 using TinyChat.Messages;
 using TinyChat.Messages.Formatting;
@@ -14,6 +12,16 @@ internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMes
 {
 	/// <summary>Fixed pixel width reserved for the icon column.</summary>
 	private const int IconColumnWidth = 20;
+
+	/// <summary>SVG for the think/idea icon.</summary>
+	private const string ThinkSvg = """
+		<svg viewBox="0 0 32 32">
+			<style type="text/css">.Black{fill:#727272;}.Yellow{fill:#FFB115;}</style>
+			<path d="M13,24h6c0.6,0,1-0.5,1-1s-0.4-1-1-1h-6c-0.6,0-1,0.5-1,1S12.4,24,13,24z" class="Black" />
+			<path d="M19,26h-6c-0.6,0-1,0.5-1,1s0.4,1,1,1h1c0,1.1,0.9,2,2,2s2-0.9,2-2h1c0.6,0,1-0.5,1-1S19.6,26,19,26z" class="Black" />
+			<path d="M16,2c-4.4,0-8,3.6-8,8c0,5,4,6,4,10c2,0,6,0,8,0c0-4,4-5,4-10C24,5.6,20.4,2,16,2z" class="Yellow" />
+		</svg>
+		""";
 
 	/// <summary>The chat message whose <see cref="ReasoningMessageContent"/> is being displayed.</summary>
 	private IChatMessage? _message;

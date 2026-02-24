@@ -1,7 +1,3 @@
-using System;
-using System.Drawing;
-using System.Linq;
-using System.Windows.Forms;
 using DevExpress.XtraEditors;
 
 namespace TinyChat;
@@ -18,6 +14,22 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 	/// Fixed pixel width reserved for the icon column.
 	/// </summary>
 	private const int ICON_WIDTH = 20;
+
+	/// <summary>SVG for the tool/lightning icon.</summary>
+	private const string ToolSvg = """
+		<svg viewBox="0 0 32 32">
+			<style type="text/css">.Yellow{fill:#FFB115;}</style>
+			<polygon points="22,2 14,2 6,16 14,16 8,30 26,12 16.3,12" class="Yellow" />
+		</svg>
+		""";
+
+	/// <summary>SVG for the result/arrow icon.</summary>
+	private const string ResultSvg = """
+		<svg viewBox="0 0 32 32">
+			<style type="text/css">.Green{fill:#039C23;}</style>
+			<polygon points="18,6 12.3,6 20.3,14 4,14 4,18 20.3,18 12.3,26 18,26 28,16" class="Green" />
+		</svg>
+		""";
 
 	/// <summary>The chat message whose <see cref="FunctionCallMessageContent"/> is being displayed.</summary>
 	private IChatMessage? _message;

@@ -1,5 +1,8 @@
 using System.Drawing;
+using System.IO;
+using System.Text;
 using System.Windows.Forms;
+using DevExpress.Utils.Svg;
 using DevExpress.XtraEditors;
 
 namespace TinyChat;
@@ -17,7 +20,6 @@ partial class DXFunctionCallMessageControl
 
 	private void InitializeComponent()
 	{
-		var resources = new System.ComponentModel.ComponentResourceManager(typeof(DXFunctionCallMessageControl));
 		lblToolIcon = new LabelControl();
 		lblResultIcon = new LabelControl();
 		lblTitle = new LabelControl();
@@ -32,7 +34,7 @@ partial class DXFunctionCallMessageControl
 		// _callIconLabel
 		lblToolIcon.AutoSize = false;
 		lblToolIcon.Dock = DockStyle.Fill;
-		lblToolIcon.ImageOptions.SvgImage = (DevExpress.Utils.Svg.SvgImage)resources.GetObject("Tool");
+		lblToolIcon.ImageOptions.SvgImage = SvgImage.FromStream(new MemoryStream(Encoding.UTF8.GetBytes(ToolSvg)));
 		lblToolIcon.ImageOptions.SvgImageSize = new System.Drawing.Size(14, 14);
 		lblToolIcon.UseMnemonic = false;
 		lblToolIcon.Width = ICON_WIDTH;
@@ -40,7 +42,7 @@ partial class DXFunctionCallMessageControl
 		// _resultIconLabel
 		lblResultIcon.AutoSize = false;
 		lblResultIcon.Dock = DockStyle.Fill;
-		lblResultIcon.ImageOptions.SvgImage = (DevExpress.Utils.Svg.SvgImage)resources.GetObject("Result");
+		lblResultIcon.ImageOptions.SvgImage = SvgImage.FromStream(new MemoryStream(Encoding.UTF8.GetBytes(ResultSvg)));
 		lblResultIcon.ImageOptions.SvgImageSize = new System.Drawing.Size(14, 14);
 		lblResultIcon.UseMnemonic = false;
 		lblResultIcon.Visible = false;

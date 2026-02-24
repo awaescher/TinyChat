@@ -1,8 +1,6 @@
-using System.Windows.Forms;
 using DevExpress.XtraEditors;
-using TinyChat;
 
-namespace DevExpressDemo;
+namespace TinyChat;
 
 /// <summary>
 /// A DevExpress-based split container control specifically designed for chat interfaces.

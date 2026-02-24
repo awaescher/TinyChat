@@ -1,5 +1,8 @@
 using System.Drawing;
+using System.IO;
+using System.Text;
 using System.Windows.Forms;
+using DevExpress.Utils.Svg;
 using DevExpress.XtraEditors;
 
 namespace TinyChat;
@@ -17,7 +20,6 @@ partial class DXReasoningMessageControl
 
 	private void InitializeComponent()
 	{
-		var resources = new System.ComponentModel.ComponentResourceManager(typeof(DXReasoningMessageControl));
 		lblIcon = new LabelControl();
 		lblTitle = new LabelControl();
 		lblDetail = new LabelControl();
@@ -30,7 +32,7 @@ partial class DXReasoningMessageControl
 		// _iconLabel
 		lblIcon.AutoSize = false;
 		lblIcon.Dock = DockStyle.Fill;
-		lblIcon.ImageOptions.SvgImage = (DevExpress.Utils.Svg.SvgImage)resources.GetObject("Think");
+		lblIcon.ImageOptions.SvgImage = SvgImage.FromStream(new MemoryStream(Encoding.UTF8.GetBytes(ThinkSvg)));
 		lblIcon.ImageOptions.SvgImageSize = new Size(14, 14);
 		lblIcon.UseMnemonic = false;
 		lblIcon.Width = IconColumnWidth;
