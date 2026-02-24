@@ -1,12 +1,7 @@
-using System;
-using System.Drawing;
-using System.IO;
-using System.Windows.Forms;
 using DevExpress.Utils.Svg;
 using DevExpress.XtraEditors;
-using TinyChat;
 
-namespace DevExpressDemo;
+namespace TinyChat;
 
 /// <summary>
 /// Provides a DevExpress-based chat input control that allows users to enter and send messages.
@@ -53,7 +48,7 @@ public class DXChatInputControl : Control, IChatInputControl
 	private SvgImage StopImage { get; } = SvgImage.FromStream(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(STOP_SVG)));
 
 	/// <summary>
-	/// Initializes a new instance of the <see cref="ChatInputControl"/> class.
+	/// Initializes a new instance of the <see cref="DXChatInputControl"/> class.
 	/// </summary>
 	public DXChatInputControl()
 	{

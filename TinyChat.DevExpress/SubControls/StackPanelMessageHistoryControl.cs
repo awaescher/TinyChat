@@ -1,12 +1,7 @@
-using System;
-using System.Drawing;
-using System.Linq;
-using System.Windows.Forms;
 using DevExpress.Utils.Layout;
 using DevExpress.XtraEditors;
-using TinyChat;
 
-namespace DevExpressDemo;
+namespace TinyChat;
 
 /// <summary>
 /// A scrollable control that displays chat message history using a vertical stack panel layout.

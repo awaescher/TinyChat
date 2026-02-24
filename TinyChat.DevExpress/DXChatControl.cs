@@ -1,7 +1,6 @@
-using TinyChat;
 using TinyChat.Messages.Formatting;
 
-namespace DevExpressDemo;
+namespace TinyChat;
 
 /// <summary>
 /// The TinyChat chat control implementation using DevExpress controls.

@@ -1,12 +1,8 @@
-using System;
 using System.ComponentModel;
-using System.Drawing;
-using System.Windows.Forms;
 using DevExpress.XtraEditors;
-using TinyChat;
 using TinyChat.Messages.Formatting;
 
-namespace DevExpressDemo;
+namespace TinyChat;
 
 /// <summary>
 /// A DevExpress-based chat message control that displays a chat message with sender and content.
@@ -105,7 +101,6 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl
 	}
 
 	/// <inheritdoc />
-
 	void IChatMessageControl.SetIsReceivingStream(bool isReceiving)
 	{
 		_isReceivingStream = isReceiving;

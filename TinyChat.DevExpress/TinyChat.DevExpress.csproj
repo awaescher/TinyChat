@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFrameworks>net9.0-windows;net10.0-windows</TargetFrameworks>
+    <UseWindowsForms>true</UseWindowsForms>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <RootNamespace>TinyChat</RootNamespace>
+    <Title>TinyChat.DevExpress</Title>
+    <Copyright>Andreas Wäscher</Copyright>
+    <Authors>Andreas Wäscher</Authors>
+    <PackageIcon>TinyChat.png</PackageIcon>
+    <Description>DevExpress WinForms controls for the TinyChat chat control library</Description>
+    <PackageProjectUrl>https://github.com/awaescher/TinyChat</PackageProjectUrl>
+    <PackageReadmeFile>ReadMe.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/awaescher/TinyChat</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>chat;winforms;devexpress;llm;openai;ai;streaming;ichatclient</PackageTags>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="DevExpress.Win" Version="24.2.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TinyChat\TinyChat.csproj" />
+  </ItemGroup>
+
+	<ItemGroup>
+		<None Include="..\TinyChat.png">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+		<None Include="..\LICENSE">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+		<None Include="..\ReadMe.md">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+	</ItemGroup>
+
+</Project>

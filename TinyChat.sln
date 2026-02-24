@@ -1,15 +1,17 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.14.36109.1
+# Visual Studio Version 18
+VisualStudioVersion = 18.3.11505.172 d18.3
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TinyChat", "src\TinyChat.csproj", "{B88035E5-ACC2-47C9-81A2-0613B60441F5}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TinyChat", "TinyChat\TinyChat.csproj", "{B88035E5-ACC2-47C9-81A2-0613B60441F5}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WinFormsDemo", "WinFormsDemo\WinFormsDemo.csproj", "{D89E96EA-39ED-41A4-8CA6-41E8BB494039}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DevExpressDemo", "DevExpressDemo\DevExpressDemo.csproj", "{272BF95F-9FB5-4FAB-9CA1-0EC70E81610A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tests", "tests\Tests\Tests.csproj", "{DB851839-23DE-4078-83E0-D2D8DB7CB2E1}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tests", "Tests\Tests.csproj", "{DB851839-23DE-4078-83E0-D2D8DB7CB2E1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TinyChat.DevExpress", "TinyChat.DevExpress\TinyChat.DevExpress.csproj", "{06AE7C78-9238-3544-7692-8BC012192B44}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -33,6 +35,10 @@ Global
 		{DB851839-23DE-4078-83E0-D2D8DB7CB2E1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DB851839-23DE-4078-83E0-D2D8DB7CB2E1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DB851839-23DE-4078-83E0-D2D8DB7CB2E1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{06AE7C78-9238-3544-7692-8BC012192B44}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{06AE7C78-9238-3544-7692-8BC012192B44}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{06AE7C78-9238-3544-7692-8BC012192B44}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{06AE7C78-9238-3544-7692-8BC012192B44}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

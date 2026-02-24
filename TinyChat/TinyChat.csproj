@@ -22,6 +22,12 @@
 		<PackageLicenseFile>LICENSE</PackageLicenseFile>
 	</PropertyGroup>
 
+  <ItemGroup>
+    <Compile Remove="TinyChat.DevExpress\**" />
+    <EmbeddedResource Remove="TinyChat.DevExpress\**" />
+    <None Remove="TinyChat.DevExpress\**" />
+  </ItemGroup>
+
 	<ItemGroup>
 		<None Include="..\TinyChat.png">
 			<Pack>True</Pack>
