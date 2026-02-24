@@ -1,3 +1,5 @@
+using TinyChat;
+
 namespace DevExpressDemo
 {
 	partial class DXOllamaDemoForm
