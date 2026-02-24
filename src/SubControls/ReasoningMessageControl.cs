@@ -7,10 +7,13 @@ namespace TinyChat.SubControls;
 /// <summary>
 /// Displays a thinking text, click-to-expand bubble.
 /// </summary>
-internal class ReasoningMessageControl : Panel, IChatMessageControl
+internal partial class ReasoningMessageControl : Panel, IChatMessageControl
 {
-	/// <summary>The font used to render the detail text.</summary>
-	private static readonly Font MonospaceFont = new("Consolas", 8f);
+	/// <summary>Icon glyph rendered in the left icon column.</summary>
+	private const string IconGlyph = "💭";
+
+	/// <summary>Fixed pixel width reserved for the icon column.</summary>
+	private const int IconColumnWidth = 20;
 
 	/// <summary>The chat message whose <see cref="ReasoningMessageContent"/> is being displayed.</summary>
 	private IChatMessage? _message;
@@ -22,12 +25,6 @@ internal class ReasoningMessageControl : Panel, IChatMessageControl
 	/// </summary>
 	private bool _expanded;
 
-	/// <summary>The label that shows the collapsed one-line summary (icon, name and expand arrow).</summary>
-	private readonly Label _headerLabel;
-
-	/// <summary>The label that shows the full text when the control is expanded.</summary>
-	private readonly Label _detailLabel;
-
 	/// <inheritdoc/>
 	public event EventHandler? SizeUpdatedWhileStreaming;
 
@@ -38,45 +35,14 @@ internal class ReasoningMessageControl : Panel, IChatMessageControl
 	public required IMessageFormatter MessageFormatter { get; set; }
 
 	/// <summary>
-	/// Initializes a new instance of <see cref="ReasoningMessageControl"/> , creating and wiring up the header and detail
-	/// labels.
+	/// Initializes a new instance of <see cref="ReasoningMessageControl"/>, creating and wiring up the
+	/// icon, header and detail labels via the designer-generated <see cref="InitializeComponent"/>.
 	/// </summary>
 	public ReasoningMessageControl()
 	{
-		AutoSize = true;
-		BorderStyle = BorderStyle.FixedSingle;
-		Padding = new Padding(8);
-		Margin = new Padding(12, 0, 6, 0);
-		Cursor = Cursors.Hand;
+		InitializeComponent();
 
-		_headerLabel = new Label
-		{
-			AutoSize = true,
-			Font = MonospaceFont,
-			UseMnemonic = false,
-			Dock = DockStyle.Top,
-			Cursor = Cursors.Hand,
-		};
-
-		_detailLabel = new Label
-		{
-			AutoSize = true,
-			Font = MonospaceFont,
-			UseMnemonic = false,
-			Dock = DockStyle.Fill,
-			Visible = false,
-			Padding = new Padding(14, 4, 0, 0),
-		};
-
-		Controls.Add(_detailLabel);
-		Controls.Add(_headerLabel);
-		_headerLabel.BringToFront();
-		_detailLabel.BringToFront();
-		AutoSize = true;
-
-		_headerLabel.Click += Toggle;
-		_detailLabel.Click += Toggle;
-		Click += Toggle;
+		_iconLabel.Font = new Font("Arial", 11);
 	}
 
 	/// <summary>
@@ -104,11 +70,10 @@ internal class ReasoningMessageControl : Panel, IChatMessageControl
 					binding = _headerLabel.DataBindings.Add(nameof(_headerLabel.Text), Message.Content, nameof(ReasoningMessageContent.IsThinking));
 					binding.Format += (_, e) =>
 					{
-						var bullet = _expanded ? "-" : "+";
 						if (rc.IsThinking)
-							e.Value = $"{bullet} Thinking...";
+							e.Value = "...";
 						else
-							e.Value = $"{bullet} Thoughts";
+							e.Value = "✔ "; // keep extra space for to prevent capping the char
 					};
 				}
 			}

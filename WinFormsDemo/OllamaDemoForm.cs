@@ -1,5 +1,3 @@
-using TinyChat;
-
 namespace WinFormsDemo;
 
 /// <summary>
