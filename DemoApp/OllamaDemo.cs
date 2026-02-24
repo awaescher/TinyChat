@@ -1,17 +1,21 @@
+using System;
 using System.ComponentModel;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using OllamaSharp;
 
-namespace WinFormsDemo;
+namespace DemoApp;
 
 /// <summary>
 /// Demonstrates IChatClient integration using OllamaSharp with Microsoft.Extensions.AI,
 /// including tool support for getting the current time and weather.
 /// </summary>
-public static class TestIChatClientDemo
+public static class OllamaDemo
 {
-	public const string ModelName = "qwen3:0.6b";
+	public const string MODELNAME = "qwen3:0.6b";
 
 	/// <summary>
 	/// Creates a service provider backed by a real Ollama IChatClient with function invocation enabled.
@@ -21,7 +25,7 @@ public static class TestIChatClientDemo
 		IProgress<string>? progress = null,
 		CancellationToken cancellationToken = default)
 	{
-		var ollamaClient = new OllamaApiClient(new Uri("http://localhost:11434"), ModelName);
+		var ollamaClient = new OllamaApiClient(new Uri("http://localhost:11434"), MODELNAME);
 
 		await EnsureModelAvailableAsync(ollamaClient, progress, cancellationToken);
 
@@ -51,23 +55,23 @@ public static class TestIChatClientDemo
 		CancellationToken cancellationToken)
 	{
 		var models = await client.ListLocalModelsAsync(cancellationToken);
-		var isAvailable = models.Any(m => m.Name.StartsWith(ModelName, StringComparison.OrdinalIgnoreCase));
+		var isAvailable = models.Any(m => m.Name.StartsWith(MODELNAME, StringComparison.OrdinalIgnoreCase));
 
 		if (!isAvailable)
 		{
-			progress?.Report($"Model '{ModelName}' not found locally. Downloading...");
+			progress?.Report($"Model '{MODELNAME}' not found locally. Downloading...");
 
-			await foreach (var status in client.PullModelAsync(ModelName, cancellationToken))
+			await foreach (var status in client.PullModelAsync(MODELNAME, cancellationToken))
 			{
 				if (!string.IsNullOrWhiteSpace(status?.Status))
 					progress?.Report(status.Status);
 			}
 
-			progress?.Report($"Model '{ModelName}' is ready.");
+			progress?.Report($"Model '{MODELNAME}' is ready.");
 		}
 		else
 		{
-			progress?.Report($"Model '{ModelName}' is available.");
+			progress?.Report($"Model '{MODELNAME}' is available.");
 		}
 	}
 

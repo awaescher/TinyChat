@@ -18,7 +18,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\TinyChat.csproj" />
     <ProjectReference Include="..\TinyChat.DevExpress\TinyChat.DevExpress.csproj" />
     <ProjectReference Include="..\TinyChat\TinyChat.csproj" />
   </ItemGroup>

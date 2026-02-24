@@ -1,12 +1,15 @@
+using System;
+using System.Threading;
+using System.Windows.Forms;
 using TinyChat;
 
-namespace WinFormsDemo;
+namespace DemoApp;
 
 /// <summary>
 /// A demonstration form that implements a property grid inspector for WinForms controls.
 /// Allows users to click on controls to inspect their properties and navigate using keyboard shortcuts.
 /// </summary>
-public partial class DemoForm : Form, IMessageFilter
+public partial class NativeDemoForm : Form, IMessageFilter
 {
 	/// <summary>
 	/// Windows message constant for left mouse button up event.
@@ -14,9 +17,9 @@ public partial class DemoForm : Form, IMessageFilter
 	private const int WM_LBUTTONUP = 0x0202;
 
 	/// <summary>
-	/// Initializes a new instance of the <see cref="DemoForm"/> class.
+	/// Initializes a new instance of the <see cref="NativeDemoForm"/> class.
 	/// </summary>
-	public DemoForm()
+	public NativeDemoForm()
 	{
 		InitializeComponent();
 		KeyPreview = true;
@@ -36,9 +39,6 @@ public partial class DemoForm : Form, IMessageFilter
 		chatControl.IncludeReasoning = true;
 		chatControl.Messages = DemoData.Create(Environment.UserName);
 		SelectControl(chatControl);
-
-		// start a second demo showcasing the IChatClient implementation
-		new OllamaDemoForm().Show();
 	}
 
 	/// <summary>

@@ -1,6 +1,6 @@
 using TinyChat;
 
-namespace DevExpressDemo
+namespace DemoApp
 {
 	partial class DXDemoForm
 	{

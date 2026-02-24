@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -11,12 +11,22 @@
 
   <ItemGroup>
     <PackageReference Include="DevExpress.Win.Design" Version="20.1.*" />
+    <PackageReference Include="Microsoft.Extensions.AI" Version="10.3.0" />
+    <PackageReference Include="OllamaSharp" Version="5.4.16" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\TinyChat\TinyChat.csproj" />
     <ProjectReference Include="..\TinyChat.DevExpress\TinyChat.DevExpress.csproj" />
-    <ProjectReference Include="..\WinFormsDemo\WinFormsDemo.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="NativeDemoForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="NativeOllamaDemoForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
   </ItemGroup>
 
 </Project>

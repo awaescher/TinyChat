@@ -1,8 +1,12 @@
+using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
 using TinyChat;
 using TinyChat.Messages;
 
-namespace WinFormsDemo;
+namespace DemoApp;
 
 public class DemoData
 {

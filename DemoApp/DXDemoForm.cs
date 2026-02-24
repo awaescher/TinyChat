@@ -4,9 +4,8 @@ using System.Windows.Forms;
 using DevExpress.LookAndFeel;
 using DevExpress.XtraBars.ToolbarForm;
 using TinyChat;
-using WinFormsDemo;
 
-namespace DevExpressDemo;
+namespace DemoApp;
 
 /// <summary>
 /// Main demonstration form that provides a DevExpress chat control interface with property inspection capabilities.
@@ -47,8 +46,6 @@ public partial class DXDemoForm : ToolbarForm, IMessageFilter
 		dxChatControl.IncludeReasoning = true;
 		dxChatControl.Messages = DemoData.Create(Environment.UserName);
 		SelectControl(dxChatControl);
-
-		new DXOllamaDemoForm().Show();
 	}
 
 	/// <summary>

@@ -1,9 +1,8 @@
 using System;
 using System.Threading.Tasks;
 using DevExpress.XtraEditors;
-using WinFormsDemo;
 
-namespace DevExpressDemo;
+namespace DemoApp;
 
 /// <summary>
 /// A DevExpress demonstration form showing IChatClient integration backed by a real Ollama model
@@ -14,10 +13,10 @@ public partial class DXOllamaDemoForm : XtraForm
 	public DXOllamaDemoForm()
 	{
 		InitializeComponent();
-		Text = $"TinyChat – Ollama Demo [{TestIChatClientDemo.ModelName}] (DevExpress)";
-		statusLabel.Text = $"Connecting to Ollama and loading model '{TestIChatClientDemo.ModelName}'…";
-		chatControl.AssistantSenderName = TestIChatClientDemo.ModelName;
-		chatControl.ChatOptions = TestIChatClientDemo.CreateChatOptions();
+		Text = $"TinyChat – Ollama Demo [{OllamaDemo.MODELNAME}] (DevExpress)";
+		statusLabel.Text = $"Connecting to Ollama and loading model '{OllamaDemo.MODELNAME}'…";
+		chatControl.AssistantSenderName = OllamaDemo.MODELNAME;
+		chatControl.ChatOptions = OllamaDemo.CreateChatOptions();
 		_ = InitializeOllamaAsync();
 	}
 
@@ -41,13 +40,13 @@ public partial class DXOllamaDemoForm : XtraForm
 
 		try
 		{
-			var serviceProvider = await TestIChatClientDemo.CreateServiceProviderWithOllamaChatClientAsync(progress);
+			var serviceProvider = await OllamaDemo.CreateServiceProviderWithOllamaChatClientAsync(progress);
 
 			chatControl.Invoke(() =>
 			{
 				chatControl.ServiceProvider = serviceProvider;
 				chatControl.Enabled = true;
-				statusLabel.Text = $"Model '{TestIChatClientDemo.ModelName}' ready. Ask about the time or weather!";
+				statusLabel.Text = $"Model '{OllamaDemo.MODELNAME}' ready. Ask about the time or weather!";
 			});
 		}
 		catch (Exception ex)

@@ -1,18 +1,22 @@
-namespace WinFormsDemo;
+using System;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace DemoApp;
 
 /// <summary>
 /// A demonstration form showing IChatClient integration backed by a real Ollama model
 /// via OllamaSharp and Microsoft.Extensions.AI, with tools for time and weather.
 /// </summary>
-public partial class OllamaDemoForm : Form
+public partial class NativeOllamaDemoForm : Form
 {
-	public OllamaDemoForm()
+	public NativeOllamaDemoForm()
 	{
 		InitializeComponent();
-		Text = $"TinyChat - Ollama Demo ({TestIChatClientDemo.ModelName})";
-		statusLabel.Text = $"Connecting to Ollama and loading model '{TestIChatClientDemo.ModelName}'...";
-		chatControl.AssistantSenderName = TestIChatClientDemo.ModelName;
-		chatControl.ChatOptions = TestIChatClientDemo.CreateChatOptions();
+		Text = $"TinyChat - Ollama Demo ({OllamaDemo.MODELNAME})";
+		statusLabel.Text = $"Connecting to Ollama and loading model '{OllamaDemo.MODELNAME}'...";
+		chatControl.AssistantSenderName = OllamaDemo.MODELNAME;
+		chatControl.ChatOptions = OllamaDemo.CreateChatOptions();
 		_ = InitializeOllamaAsync();
 	}
 
@@ -36,13 +40,13 @@ public partial class OllamaDemoForm : Form
 
 		try
 		{
-			var serviceProvider = await TestIChatClientDemo.CreateServiceProviderWithOllamaChatClientAsync(progress);
+			var serviceProvider = await OllamaDemo.CreateServiceProviderWithOllamaChatClientAsync(progress);
 
 			chatControl.Invoke(() =>
 			{
 				chatControl.ServiceProvider = serviceProvider;
 				chatControl.Enabled = true;
-				statusLabel.Text = $"Model '{TestIChatClientDemo.ModelName}' ready. Ask about the time or weather!";
+				statusLabel.Text = $"Model '{OllamaDemo.MODELNAME}' ready. Ask about the time or weather!";
 			});
 		}
 		catch (Exception ex)

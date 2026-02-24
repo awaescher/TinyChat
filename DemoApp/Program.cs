@@ -1,7 +1,7 @@
 using System;
 using System.Windows.Forms;
 
-namespace DevExpressDemo;
+namespace DemoApp;
 
 internal static class Program
 {
@@ -14,9 +14,10 @@ internal static class Program
 		Application.EnableVisualStyles();
 		Application.SetCompatibleTextRenderingDefault(false);
 
-		var winFormsDemo = new WinFormsDemo.DemoForm();
-		winFormsDemo.Show();
+		new NativeDemoForm().Show();
+		new NativeOllamaDemoForm().Show();
+		new DXDemoForm().Show();
 
-		Application.Run(new DXDemoForm());
+		Application.Run(new DXOllamaDemoForm());
 	}
 }

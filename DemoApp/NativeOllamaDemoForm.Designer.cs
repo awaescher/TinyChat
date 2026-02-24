@@ -1,8 +1,10 @@
+using System.Drawing;
+using System.Windows.Forms;
 using TinyChat;
 
-namespace WinFormsDemo
+namespace DemoApp
 {
-	partial class OllamaDemoForm
+	partial class NativeOllamaDemoForm
 	{
 		/// <summary>
 		/// Required designer variable.

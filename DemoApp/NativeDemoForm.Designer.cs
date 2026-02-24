@@ -1,8 +1,10 @@
+using System.Drawing;
+using System.Windows.Forms;
 using TinyChat;
 
-namespace WinFormsDemo
+namespace DemoApp
 {
-    partial class DemoForm
+    partial class NativeDemoForm
     {
         /// <summary>
         ///  Required designer variable.
