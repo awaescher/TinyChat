@@ -24,7 +24,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="DevExpress.Win" Version="24.2.12" />
+    <PackageReference Include="DevExpress.Win" Version="20.1.*" />
   </ItemGroup>
 
   <ItemGroup>

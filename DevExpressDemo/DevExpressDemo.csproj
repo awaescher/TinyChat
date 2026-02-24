@@ -10,7 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="DevExpress.Win.Design" Version="25.1.3" />
+    <PackageReference Include="DevExpress.Win.Design" Version="20.1.*" />
   </ItemGroup>
 
   <ItemGroup>
