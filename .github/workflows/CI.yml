@@ -3,6 +3,7 @@ name: .NET Build, Test, and Publish Nuget Package
 on:
   push:
     branches: [ "main", "master" ]
+    tags: [ "*" ]
     paths: [ 'TinyChat/**', 'TinyChat.DevExpress/**', '.github/workflows/CI.yml' ]
   pull_request:
     branches: [ "main", "master" ]
