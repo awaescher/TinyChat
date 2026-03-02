@@ -36,6 +36,7 @@ partial class DXFunctionCallMessageControl
 		lblToolIcon.Dock = DockStyle.Fill;
 		lblToolIcon.ImageOptions.SvgImage = SvgImage.FromStream(new MemoryStream(Encoding.UTF8.GetBytes(ToolSvg)));
 		lblToolIcon.ImageOptions.SvgImageSize = new System.Drawing.Size(14, 14);
+		lblToolIcon.MaximumSize = new Size(0, 14);
 		lblToolIcon.UseMnemonic = false;
 		lblToolIcon.Width = ICON_WIDTH;
 
@@ -44,22 +45,23 @@ partial class DXFunctionCallMessageControl
 		lblResultIcon.Dock = DockStyle.Fill;
 		lblResultIcon.ImageOptions.SvgImage = SvgImage.FromStream(new MemoryStream(Encoding.UTF8.GetBytes(ResultSvg)));
 		lblResultIcon.ImageOptions.SvgImageSize = new System.Drawing.Size(14, 14);
+		lblResultIcon.MaximumSize = new Size(0, 14);
 		lblResultIcon.UseMnemonic = false;
 		lblResultIcon.Visible = false;
 		lblResultIcon.Width = ICON_WIDTH;
 
 		// _callTitleLabel
-		lblTitle.AutoSize = true;
+		lblTitle.AutoSizeMode = LabelAutoSizeMode.Vertical;
 		lblTitle.UseMnemonic = false;
 
 		// _argsLabel
-		lblArguments.AutoSize = true;
+		lblArguments.AutoSizeMode = LabelAutoSizeMode.Vertical;
 		lblArguments.Padding = new Padding(0, 2, 0, 6);
 		lblArguments.UseMnemonic = false;
 		lblArguments.Visible = false;
 
 		// _resultLabel
-		lblResult.AutoSize = true;
+		lblResult.AutoSizeMode = LabelAutoSizeMode.Vertical;
 		lblResult.UseMnemonic = false;
 		lblResult.Visible = false;
 

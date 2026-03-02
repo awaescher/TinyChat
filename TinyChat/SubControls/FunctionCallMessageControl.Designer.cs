@@ -35,6 +35,7 @@ partial class FunctionCallMessageControl
 		_resultIconLabel.Dock = DockStyle.Fill;
 		_resultIconLabel.Text = RESULT_ICON;
 		_resultIconLabel.TextAlign = ContentAlignment.MiddleCenter;
+		_resultIconLabel.MaximumSize = new Size(0, ICON_WIDTH);
 		_resultIconLabel.UseMnemonic = false;
 		_resultIconLabel.Visible = false;
 		_resultIconLabel.Width = ICON_WIDTH;
