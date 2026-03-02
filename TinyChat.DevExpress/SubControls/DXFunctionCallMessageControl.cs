@@ -141,7 +141,7 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 
 		lblTitle.Text = fc.IsFunctionExecuting
 			? fc.Name + " ..."
-			: fc.Name + " ✔ "; // keep extra space for to prevent capping the char;
+			: fc.Name + " <font=Tahoma>✔</font>";
 
 		if (fc.Arguments?.Count > 0)
 		{

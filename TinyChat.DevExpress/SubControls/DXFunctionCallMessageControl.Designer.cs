@@ -52,6 +52,7 @@ partial class DXFunctionCallMessageControl
 
 		// _callTitleLabel
 		lblTitle.AutoSizeMode = LabelAutoSizeMode.Vertical;
+		lblTitle.AllowHtmlString = true;
 		lblTitle.UseMnemonic = false;
 
 		// _argsLabel

@@ -130,7 +130,7 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageCo
 
 		_callTitleLabel.Text = fc.IsFunctionExecuting
 			? fc.Name + " ..."
-			: fc.Name + " ✔ "; // keep extra space for to prevent capping the char;
+			: fc.Name + " ✔";
 
 		if (fc.Arguments?.Count > 0)
 		{

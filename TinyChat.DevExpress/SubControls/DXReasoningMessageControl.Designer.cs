@@ -29,7 +29,7 @@ partial class DXReasoningMessageControl
 		paddingPanel.SuspendLayout();
 		SuspendLayout();
 
-		// _iconLabel
+		// lblDetail
 		lblIcon.AutoSize = false;
 		lblIcon.Dock = DockStyle.Fill;
 		lblIcon.ImageOptions.SvgImage = SvgImage.FromStream(new MemoryStream(Encoding.UTF8.GetBytes(ThinkSvg)));
@@ -38,18 +38,19 @@ partial class DXReasoningMessageControl
 		lblIcon.Width = IconColumnWidth;
 		lblIcon.Cursor = Cursors.Hand;
 
-		// _headerLabel
+		// lblTitle
+		lblTitle.AllowHtmlString = true;
 		lblTitle.AutoSize = true;
 		lblTitle.UseMnemonic = false;
 		lblTitle.Cursor = Cursors.Hand;
 
-		// _detailLabel
+		// lblDetail
+		lblDetail.Appearance.TextOptions.WordWrap = DevExpress.Utils.WordWrap.Wrap;
 		lblDetail.AllowHtmlString = true;
 		lblDetail.AutoSizeMode = LabelAutoSizeMode.Vertical;
 		lblDetail.Padding = new Padding(0, 2, 0, 6);
 		lblDetail.UseMnemonic = true;
 		lblDetail.Visible = false;
-		lblDetail.Appearance.TextOptions.WordWrap = DevExpress.Utils.WordWrap.Wrap;
 		lblDetail.Cursor = Cursors.Hand;
 
 		// _table
@@ -77,7 +78,7 @@ partial class DXReasoningMessageControl
 		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-		// _paddingPanel (provides consistent inner padding around the content)
+		// paddingPanel (provides consistent inner padding around the content)
 		paddingPanel.AutoSize = true;
 		paddingPanel.BackColor = Color.Transparent;
 		paddingPanel.BorderStyle = DevExpress.XtraEditors.Controls.BorderStyles.NoBorder;

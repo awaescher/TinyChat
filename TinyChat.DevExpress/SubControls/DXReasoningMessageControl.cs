@@ -79,7 +79,7 @@ internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMes
 						if (rc.IsThinking)
 							e.Value = "...";
 						else
-							e.Value = "✔ "; // keep extra space for to prevent capping the char
+							e.Value = "<font=Tahoma>✔</font>";
 					};
 				}
 			}
