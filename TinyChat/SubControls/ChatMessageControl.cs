@@ -38,6 +38,14 @@ public class ChatMessageControl : Panel, IChatMessageControl
 
 		AutoSize = true;
 		Padding = new Padding(8);
+
+		WireMouseDown(_senderLabel, _messageLabel);
+	}
+
+	private void WireMouseDown(params Control[] controls)
+	{
+		foreach (var c in controls)
+			c.MouseDown += (_, e) => OnMouseDown(e);
 	}
 
 	/// <summary>
@@ -95,5 +103,5 @@ public class ChatMessageControl : Panel, IChatMessageControl
 	}
 
 	/// <inheritdoc/>
-	public override string ToString() => $"{_senderLabel.Text}:{Environment.NewLine}{_messageLabel.Text}";
+	public override string ToString() => _messageLabel.Text;
 }

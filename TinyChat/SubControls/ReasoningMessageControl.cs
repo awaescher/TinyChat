@@ -43,6 +43,14 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageControl
 		InitializeComponent();
 
 		lblIcon.Font = new Font("Arial", 11);
+
+		WireMouseDown(tableLayout, lblIcon, lblHeader, lblDetail);
+	}
+
+	private void WireMouseDown(params Control[] controls)
+	{
+		foreach (var c in controls)
+			c.MouseDown += (_, e) => OnMouseDown(e);
 	}
 
 	/// <summary>

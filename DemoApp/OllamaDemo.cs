@@ -15,7 +15,7 @@ namespace DemoApp;
 /// </summary>
 public static class OllamaDemo
 {
-	public const string MODELNAME = "qwen3:0.6b";
+	public const string MODELNAME = "qwen3.5:0.8b";
 
 	/// <summary>
 	/// Creates a service provider backed by a real Ollama IChatClient with function invocation enabled.

@@ -1,3 +1,4 @@
+using DevExpress.DirectX.Common.Direct2D;
 using DevExpress.XtraEditors;
 
 namespace TinyChat;
@@ -61,6 +62,14 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 		lblTitle.Font = new Font("Consolas", lblTitle.Font.Size);
 		lblResult.Font = lblTitle.Font;
 		lblArguments.Font = new Font(lblTitle.Font.FontFamily, lblTitle.Font.Size - 1);
+
+		WireMouseDown(paddingPanel, tablePanel, lblToolIcon, lblTitle, lblArguments, lblResultIcon, lblResult);
+	}
+
+	private void WireMouseDown(params Control[] controls)
+	{
+		foreach (var c in controls)
+			c.MouseDown += (_, e) => OnMouseDown(e);
 	}
 
 	/// <summary>
@@ -139,15 +148,12 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 		if (_message?.Content is not FunctionCallMessageContent fc)
 			return;
 
-		lblTitle.Text = fc.IsFunctionExecuting
-			? fc.Name + " ..."
-			: fc.Name + " <font=Tahoma>✔</font>";
+		lblTitle.Text = fc.Name + $" <font=Tahoma>{(fc.IsFunctionExecuting ? "..." : "✔")}</font>";
 
 		if (fc.Arguments?.Count > 0)
 		{
 			var maxKeyLen = fc.Arguments.Keys.Max(k => k.Length);
-			lblArguments.Text = string.Join("\n",
-				fc.Arguments.Select(kv => $"{(kv.Key + ":").PadRight(maxKeyLen + 1)} {kv.Value}"));
+			lblArguments.Text = string.Join(Environment.NewLine, fc.Arguments.Select(kv => $"{(kv.Key + ":").PadRight(maxKeyLen + 1)} {kv.Value}"));
 		}
 
 		if (fc.Result is not null)

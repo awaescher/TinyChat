@@ -13,7 +13,7 @@ public partial class NativeOllamaDemoForm : Form
 	public NativeOllamaDemoForm()
 	{
 		InitializeComponent();
-		Text = $"TinyChat - Ollama Demo ({OllamaDemo.MODELNAME})";
+		Text = $"TinyChat - Ollama WinForms Demo";
 		statusLabel.Text = $"Connecting to Ollama and loading model '{OllamaDemo.MODELNAME}'...";
 		chatControl.AssistantSenderName = OllamaDemo.MODELNAME;
 		chatControl.ChatOptions = OllamaDemo.CreateChatOptions();
@@ -47,12 +47,13 @@ public partial class NativeOllamaDemoForm : Form
 				chatControl.ServiceProvider = serviceProvider;
 				chatControl.Enabled = true;
 				statusLabel.Text = $"Model '{OllamaDemo.MODELNAME}' ready. Ask about the time or weather!";
+				streamingCheckBox.Visible = true;
+				newChatButton.Visible = true;
 			});
 		}
 		catch (Exception ex)
 		{
-			statusLabel.Invoke(() =>
-				statusLabel.Text = $"Error: {ex.Message} — make sure Ollama is running on http://localhost:11434");
+			statusLabel.Invoke(() => statusLabel.Text = $"Error: {ex.Message} — make sure Ollama is running on http://localhost:11434");
 		}
 	}
 }

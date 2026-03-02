@@ -13,7 +13,7 @@ public partial class DXOllamaDemoForm : XtraForm
 	public DXOllamaDemoForm()
 	{
 		InitializeComponent();
-		Text = $"TinyChat – Ollama Demo [{OllamaDemo.MODELNAME}] (DevExpress)";
+		Text = $"TinyChat – Ollama DevExpress Demo";
 		statusLabel.Text = $"Connecting to Ollama and loading model '{OllamaDemo.MODELNAME}'…";
 		chatControl.AssistantSenderName = OllamaDemo.MODELNAME;
 		chatControl.ChatOptions = OllamaDemo.CreateChatOptions();
@@ -47,6 +47,8 @@ public partial class DXOllamaDemoForm : XtraForm
 				chatControl.ServiceProvider = serviceProvider;
 				chatControl.Enabled = true;
 				statusLabel.Text = $"Model '{OllamaDemo.MODELNAME}' ready. Ask about the time or weather!";
+				streamingCheckEdit.Visible = true;
+				newChatButton.Visible = true;
 			});
 		}
 		catch (Exception ex)

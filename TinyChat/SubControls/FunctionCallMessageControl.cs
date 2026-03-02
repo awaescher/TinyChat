@@ -51,6 +51,14 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageCo
 		lblTitle.Font = new Font("Consolas", lblTitle.Font.Size - 1);
 		lblResultIcon.Font = lblTitle.Font;
 		lblArgs.Font = new Font(lblTitle.Font.FontFamily, lblTitle.Font.Size - 1);
+
+		WireMouseDown(tableLayout, lblIcon, lblTitle, lblArgs, lblResultIcon, lblResult);
+	}
+
+	private void WireMouseDown(params Control[] controls)
+	{
+		foreach (var c in controls)
+			c.MouseDown += (_, e) => OnMouseDown(e);
 	}
 
 	/// <summary>
@@ -135,8 +143,7 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageCo
 		if (fc.Arguments?.Count > 0)
 		{
 			var maxKeyLen = fc.Arguments.Keys.Max(k => k.Length);
-			lblArgs.Text = string.Join("\n",
-			fc.Arguments.Select(kv => $"{(kv.Key + ":").PadRight(maxKeyLen + 1)} {kv.Value}"));
+			lblArgs.Text = string.Join(Environment.NewLine, fc.Arguments.Select(kv => $"{(kv.Key + ":").PadRight(maxKeyLen + 1)} {kv.Value}"));
 		}
 
 		if (fc.Result is not null)

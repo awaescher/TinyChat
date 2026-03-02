@@ -11,6 +11,7 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 {
 	private readonly StackPanel _stackPanel = new();
 	private bool _shouldFollowStreamScroll = true;
+	private IChatMessageControl? _selectedMessageControl;
 
 	/// <summary>
 	/// Gets the maximum vertical scroll value that indicates the bottom of the scrollable area.
@@ -40,6 +41,7 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 	public void AppendMessageControl(IChatMessageControl messageControl)
 	{
 		var control = (Control)messageControl;
+		control.MouseDown += OnMessageControlMouseDown;
 		_stackPanel.Controls.Add(control);
 
 		// queue this to the UI thread to ensure it runs after the control is added
@@ -59,7 +61,11 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 	public void ClearMessageControls()
 	{
 		foreach (var messageControl in _stackPanel.Controls.OfType<IChatMessageControl>())
+		{
+			var control = (Control)messageControl;
 			messageControl.SizeUpdatedWhileStreaming -= MessageControlStreamingSizeUpdate;
+			control.MouseDown -= OnMessageControlMouseDown;
+		}
 
 		_stackPanel.Controls.Clear();
 	}
@@ -72,8 +78,10 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 	{
 		if (_stackPanel.Controls.OfType<IChatMessageControl>().FirstOrDefault(mc => mc.Message?.Equals(message) ?? false) is { } messageControl)
 		{
+			var control = (Control)messageControl;
 			messageControl.SizeUpdatedWhileStreaming -= MessageControlStreamingSizeUpdate;
-			_stackPanel.Controls.Remove((Control)messageControl);
+			control.MouseDown -= OnMessageControlMouseDown;
+			_stackPanel.Controls.Remove(control);
 		}
 	}
 
@@ -142,5 +150,30 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 		// once the message controls gets larger than the flow layout panel
 		if (_shouldFollowStreamScroll)
 			BeginInvoke(() => VerticalScroll.Value = MaxVerticalScroll);
+	}
+
+
+	/// <inheritdoc/>
+	protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+	{
+		if (keyData == (Keys.Control | Keys.C) && _selectedMessageControl is not null)
+		{
+			try
+			{
+				Clipboard.SetText(_selectedMessageControl.ToString());
+			}
+			catch { }
+			return true;
+		}
+		return base.ProcessCmdKey(ref msg, keyData);
+	}
+
+	private void OnMessageControlMouseDown(object? sender, MouseEventArgs e)
+	{
+		if (e.Button == MouseButtons.Left)
+		{
+			_selectedMessageControl = sender as IChatMessageControl;
+			Focus(); // required to use ProcessCmdKey()
+		}
 	}
 }

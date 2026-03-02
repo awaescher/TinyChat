@@ -61,6 +61,7 @@ namespace DemoApp
 			newChatButton.TabIndex = 2;
 			newChatButton.Text = "New Chat";
 			newChatButton.Click += NewChatButton_Click;
+			newChatButton.Visible = false;
 			// 
 			// streamingCheckBox
 			// 
@@ -72,6 +73,7 @@ namespace DemoApp
 			streamingCheckBox.TabIndex = 1;
 			streamingCheckBox.Text = "Use Streaming";
 			streamingCheckBox.CheckedChanged += StreamingCheckBox_CheckedChanged;
+			streamingCheckBox.Visible = false;
 			// 
 			// statusLabel
 			// 
@@ -101,7 +103,6 @@ namespace DemoApp
 			Controls.Add(chatControl);
 			Controls.Add(topPanel);
 			Name = "OllamaDemoForm";
-			StartPosition = FormStartPosition.CenterScreen;
 			Text = "TinyChat - Ollama Demo";
 			topPanel.ResumeLayout(false);
 			ResumeLayout(false);

@@ -50,6 +50,13 @@ internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMes
 	{
 		InitializeComponent();
 
+		WireMouseDown(paddingPanel, tableLayout, lblIcon, lblTitle, lblDetail);
+	}
+
+	private void WireMouseDown(params Control[] controls)
+	{
+		foreach (var c in controls)
+			c.MouseDown += (_, e) => OnMouseDown(e);
 	}
 
 	/// <summary>
@@ -79,7 +86,7 @@ internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMes
 						if (rc.IsThinking)
 							e.Value = "...";
 						else
-							e.Value = "<font=Tahoma>✔</font>";
+							e.Value = "✔";
 					};
 				}
 			}

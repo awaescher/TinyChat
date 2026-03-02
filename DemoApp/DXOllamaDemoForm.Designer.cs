@@ -40,7 +40,7 @@ namespace DemoApp
 			((System.ComponentModel.ISupportInitialize)streamingCheckEdit.Properties).BeginInit();
 			SuspendLayout();
 			//
-			// _chatControl
+			// chatControl
 			//
 			chatControl.Dock = System.Windows.Forms.DockStyle.Fill;
 			chatControl.Enabled = false;
@@ -51,7 +51,7 @@ namespace DemoApp
 			chatControl.Size = new System.Drawing.Size(484, 501);
 			chatControl.TabIndex = 1;
 			//
-			// _topPanel
+			// topPanel
 			//
 			topPanel.BorderStyle = DevExpress.XtraEditors.Controls.BorderStyles.NoBorder;
 			topPanel.Controls.Add(newChatButton);
@@ -63,7 +63,7 @@ namespace DemoApp
 			topPanel.Size = new System.Drawing.Size(484, 60);
 			topPanel.TabIndex = 0;
 			//
-			// _newChatButton
+			// newChatButton
 			//
 			newChatButton.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
 			newChatButton.Location = new System.Drawing.Point(382, 28);
@@ -72,8 +72,9 @@ namespace DemoApp
 			newChatButton.TabIndex = 2;
 			newChatButton.Text = "New Chat";
 			newChatButton.Click += NewChatButton_Click;
+			newChatButton.Visible = false;
 			//
-			// _streamingCheckEdit
+			// streamingCheckEdit
 			//
 			streamingCheckEdit.Location = new System.Drawing.Point(12, 31);
 			streamingCheckEdit.Name = "streamingCheckEdit";
@@ -82,8 +83,9 @@ namespace DemoApp
 			streamingCheckEdit.Size = new System.Drawing.Size(140, 19);
 			streamingCheckEdit.TabIndex = 1;
 			streamingCheckEdit.CheckedChanged += StreamingCheckEdit_CheckedChanged;
+			streamingCheckEdit.Visible = false;
 			//
-			// _statusLabel
+			// statusLabel
 			//
 			statusLabel.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
 			statusLabel.Location = new System.Drawing.Point(12, 10);
@@ -100,7 +102,6 @@ namespace DemoApp
 			Controls.Add(chatControl);
 			Controls.Add(topPanel);
 			Name = "DXOllamaDemoForm";
-			StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
 			Text = "TinyChat - Ollama Demo (DevExpress)";
 			topPanel.ResumeLayout(false);
 			((System.ComponentModel.ISupportInitialize)topPanel).EndInit();
