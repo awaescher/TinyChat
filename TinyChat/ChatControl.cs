@@ -587,7 +587,7 @@ public partial class ChatControl : UserControl
 
 		if (!e.Cancel)
 		{
-			AppendMessageControl(AddChatMessage(sender, e.Content));
+			AddMessage(sender, e.Content);
 			SendMessageByChatClient();
 			MessageSent?.Invoke(this, new MessageSentEventArgs(sender, e.Content));
 		}
