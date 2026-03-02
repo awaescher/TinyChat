@@ -189,12 +189,6 @@ public partial class ChatControl : UserControl
 	private CancellationTokenSource? _chatClientCancellationTokenSource;
 
 	/// <summary>
-	/// Gets the cancellation token source for the current IChatClient operation, if any.
-	/// </summary>
-	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-	public CancellationTokenSource? ChatClientCancellationTokenSource => _chatClientCancellationTokenSource;
-
-	/// <summary>
 	/// Updates the visibility of the welcome control based on the current message history.
 	/// </summary>
 	protected virtual void UpdateWelcomeControlVisibility()
@@ -651,7 +645,7 @@ public partial class ChatControl : UserControl
 				{
 					// Use streaming response
 					var streamingResponse = chatClient.GetStreamingResponseAsync(chatMessages, chatOptions, cancellationToken: _chatClientCancellationTokenSource.Token);
-					await HandleStreamingResponseAsync(assistantSender, streamingResponse).ConfigureAwait(true);
+					await HandleStreamingResponseAsync(assistantSender, streamingResponse, _chatClientCancellationTokenSource.Token).ConfigureAwait(true);
 				}
 				else
 				{
@@ -778,7 +772,7 @@ public partial class ChatControl : UserControl
 	/// Handles a streaming response from the IChatClient.
 	/// Function calls are added as separate messages before the text response stream starts.
 	/// </summary>
-	private async Task HandleStreamingResponseAsync(ISender sender, IAsyncEnumerable<ChatResponseUpdate> stream)
+	private async Task HandleStreamingResponseAsync(ISender sender, IAsyncEnumerable<ChatResponseUpdate> stream, CancellationToken cancellationToken)
 	{
 		var pendingCalls = new Dictionary<string, FunctionCallMessageContent>();
 		var textChannel = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = true });
@@ -845,7 +839,7 @@ public partial class ChatControl : UserControl
 					if (!textStreamStarted)
 					{
 						textStreamStarted = true;
-						AddStreamingMessage(sender, textChannel.Reader.ReadAllAsync());
+						AddStreamingMessage(sender, textChannel.Reader.ReadAllAsync(), cancellationToken: cancellationToken);
 					}
 					textChannel.Writer.TryWrite(update.Text);
 				}
