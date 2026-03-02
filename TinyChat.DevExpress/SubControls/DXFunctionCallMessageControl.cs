@@ -59,7 +59,8 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 		lblResultIcon.Font = lblToolIcon.Font;
 
 		lblTitle.Font = new Font("Consolas", lblTitle.Font.Size);
-		lblArguments.Font = new Font(lblTitle.Font.FontFamily, lblArguments.Font.Size - 1);
+		lblResult.Font = lblTitle.Font;
+		lblArguments.Font = new Font(lblTitle.Font.FontFamily, lblTitle.Font.Size - 1);
 	}
 
 	/// <summary>

@@ -49,6 +49,7 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageCo
 		_resultIconLabel.Font = _callIconLabel.Font;
 
 		_callTitleLabel.Font = new Font("Consolas", _callTitleLabel.Font.Size - 1);
+		_resultIconLabel.Font = _callTitleLabel.Font;
 		_argsLabel.Font = new Font(_callTitleLabel.Font.FontFamily, _callTitleLabel.Font.Size - 1);
 	}
 
