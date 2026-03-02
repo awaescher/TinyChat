@@ -105,4 +105,7 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl
 	{
 		_isReceivingStream = isReceiving;
 	}
+
+	/// <inheritdoc/>
+	public override string ToString() => $"{_senderLabel.Text}:{Environment.NewLine}{_messageLabel.Text}";
 }

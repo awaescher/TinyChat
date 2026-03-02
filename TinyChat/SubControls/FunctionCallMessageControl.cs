@@ -45,12 +45,12 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageCo
 	{
 		InitializeComponent();
 
-		_callIconLabel.Font = new Font("Arial", 11);
-		_resultIconLabel.Font = _callIconLabel.Font;
+		lblIcon.Font = new Font("Arial", 11);
+		lblResultIcon.Font = lblIcon.Font;
 
-		_callTitleLabel.Font = new Font("Consolas", _callTitleLabel.Font.Size - 1);
-		_resultIconLabel.Font = _callTitleLabel.Font;
-		_argsLabel.Font = new Font(_callTitleLabel.Font.FontFamily, _callTitleLabel.Font.Size - 1);
+		lblTitle.Font = new Font("Consolas", lblTitle.Font.Size - 1);
+		lblResultIcon.Font = lblTitle.Font;
+		lblArgs.Font = new Font(lblTitle.Font.FontFamily, lblTitle.Font.Size - 1);
 	}
 
 	/// <summary>
@@ -103,9 +103,9 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageCo
 		{
 			base.MaximumSize = value;
 			var textWidth = Math.Max(0, value.Width - Padding.Horizontal - ICON_WIDTH);
-			_callTitleLabel.MaximumSize = new Size(textWidth, 0);
-			_argsLabel.MaximumSize = new Size(textWidth, 0);
-			_resultLabel.MaximumSize = new Size(textWidth, 0);
+			lblTitle.MaximumSize = new Size(textWidth, 0);
+			lblArgs.MaximumSize = new Size(textWidth, 0);
+			lblResult.MaximumSize = new Size(textWidth, 0);
 		}
 	}
 
@@ -128,19 +128,19 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageCo
 		if (_message?.Content is not FunctionCallMessageContent fc)
 			return;
 
-		_callTitleLabel.Text = fc.IsFunctionExecuting
+		lblTitle.Text = fc.IsFunctionExecuting
 			? fc.Name + " ..."
 			: fc.Name + " ✔";
 
 		if (fc.Arguments?.Count > 0)
 		{
 			var maxKeyLen = fc.Arguments.Keys.Max(k => k.Length);
-			_argsLabel.Text = string.Join("\n",
+			lblArgs.Text = string.Join("\n",
 			fc.Arguments.Select(kv => $"{(kv.Key + ":").PadRight(maxKeyLen + 1)} {kv.Value}"));
 		}
 
 		if (fc.Result is not null)
-			_resultLabel.Text = fc.Result.ToString() + " ";
+			lblResult.Text = fc.Result.ToString() + " ";
 
 		ApplyVisibility();
 	}
@@ -157,8 +157,11 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageCo
 		var hasArgs = fc.Arguments?.Count > 0;
 		var hasResult = fc.Result is not null;
 
-		_argsLabel.Visible = _expanded && hasArgs;
-		_resultIconLabel.Visible = _expanded && hasResult;
-		_resultLabel.Visible = _expanded && hasResult;
+		lblArgs.Visible = _expanded && hasArgs;
+		lblResultIcon.Visible = _expanded && hasResult;
+		lblResult.Visible = _expanded && hasResult;
 	}
+
+	/// <inheritdoc/>
+	public override string ToString() => $"{lblTitle.Text}{Environment.NewLine}{lblArgs.Text}{Environment.NewLine}{lblResult.Text}";
 }

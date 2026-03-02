@@ -13,56 +13,56 @@ partial class FunctionCallMessageControl
 
 	private void InitializeComponent()
 	{
-		_callIconLabel = new Label();
-		_resultIconLabel = new Label();
-		_callTitleLabel = new Label();
-		_argsLabel = new Label();
-		_resultLabel = new Label();
-		_table = new TableLayoutPanel();
-		_table.SuspendLayout();
+		lblIcon = new Label();
+		lblResultIcon = new Label();
+		lblTitle = new Label();
+		lblArgs = new Label();
+		lblResult = new Label();
+		tableLayout = new TableLayoutPanel();
+		tableLayout.SuspendLayout();
 		SuspendLayout();
 
-		// _callIconLabel
-		_callIconLabel.AutoSize = false;
-		_callIconLabel.Dock = DockStyle.Fill;
-		_callIconLabel.Text = TOOL_CALL_ICON;
-		_callIconLabel.TextAlign = ContentAlignment.MiddleCenter;
-		_callIconLabel.UseMnemonic = false;
-		_callIconLabel.Width = ICON_WIDTH;
+		// lblIcon
+		lblIcon.AutoSize = false;
+		lblIcon.Dock = DockStyle.Fill;
+		lblIcon.Text = TOOL_CALL_ICON;
+		lblIcon.TextAlign = ContentAlignment.MiddleCenter;
+		lblIcon.UseMnemonic = false;
+		lblIcon.Width = ICON_WIDTH;
 
-		// _resultIconLabel
-		_resultIconLabel.AutoSize = false;
-		_resultIconLabel.Dock = DockStyle.Fill;
-		_resultIconLabel.Text = RESULT_ICON;
-		_resultIconLabel.TextAlign = ContentAlignment.MiddleCenter;
-		_resultIconLabel.MaximumSize = new Size(0, ICON_WIDTH);
-		_resultIconLabel.UseMnemonic = false;
-		_resultIconLabel.Visible = false;
-		_resultIconLabel.Width = ICON_WIDTH;
+		// lblResultIcon
+		lblResultIcon.AutoSize = false;
+		lblResultIcon.Dock = DockStyle.Fill;
+		lblResultIcon.Text = RESULT_ICON;
+		lblResultIcon.TextAlign = ContentAlignment.MiddleCenter;
+		lblResultIcon.MaximumSize = new Size(0, ICON_WIDTH);
+		lblResultIcon.UseMnemonic = false;
+		lblResultIcon.Visible = false;
+		lblResultIcon.Width = ICON_WIDTH;
 
-		// _callTitleLabel
-		_callTitleLabel.AutoSize = true;
-		_callTitleLabel.Dock = DockStyle.Fill;
-		_callTitleLabel.Cursor = Cursors.Hand;
-		_callTitleLabel.UseMnemonic = false;
-		_callTitleLabel.TextAlign = ContentAlignment.MiddleLeft;
+		// lblTitle
+		lblTitle.AutoSize = true;
+		lblTitle.Dock = DockStyle.Fill;
+		lblTitle.Cursor = Cursors.Hand;
+		lblTitle.UseMnemonic = false;
+		lblTitle.TextAlign = ContentAlignment.MiddleLeft;
 
-		// _argsLabel
-		_argsLabel.AutoSize = true;
-		_argsLabel.Cursor = Cursors.Hand;
-		_argsLabel.Dock = DockStyle.Fill;
-		_argsLabel.Padding = new Padding(0, 2, 0, 6);
-		_argsLabel.UseMnemonic = false;
-		_argsLabel.TextAlign = ContentAlignment.TopLeft;
-		_argsLabel.Visible = false;
+		// lblArgs
+		lblArgs.AutoSize = true;
+		lblArgs.Cursor = Cursors.Hand;
+		lblArgs.Dock = DockStyle.Fill;
+		lblArgs.Padding = new Padding(0, 2, 0, 6);
+		lblArgs.UseMnemonic = false;
+		lblArgs.TextAlign = ContentAlignment.TopLeft;
+		lblArgs.Visible = false;
 
-		// _resultLabel
-		_resultLabel.AutoSize = true;
-		_resultLabel.Cursor = Cursors.Hand;
-		_resultLabel.Dock = DockStyle.Fill;
-		_resultLabel.UseMnemonic = false;
-		_resultLabel.TextAlign = ContentAlignment.MiddleLeft;
-		_resultLabel.Visible = false;
+		// lblResult
+		lblResult.AutoSize = true;
+		lblResult.Cursor = Cursors.Hand;
+		lblResult.Dock = DockStyle.Fill;
+		lblResult.UseMnemonic = false;
+		lblResult.TextAlign = ContentAlignment.MiddleLeft;
+		lblResult.Visible = false;
 
 		// _table
 		// Col 0: fixed icon width | Col 1: remaining text
@@ -72,26 +72,26 @@ partial class FunctionCallMessageControl
 		//
 		// IMPORTANT: do NOT put any always-visible control in rows 1 or 2;
 		// a hidden control contributes 0 height, so the row collapses automatically.
-		_table.AutoSize = true;
-		_table.CellBorderStyle = TableLayoutPanelCellBorderStyle.None;
-		_table.ColumnCount = 2;
-		_table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, ICON_WIDTH));
-		_table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-		_table.Controls.Add(_callIconLabel, 0, 0);
-		_table.Controls.Add(_callTitleLabel, 1, 0);
+		tableLayout.AutoSize = true;
+		tableLayout.CellBorderStyle = TableLayoutPanelCellBorderStyle.None;
+		tableLayout.ColumnCount = 2;
+		tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, ICON_WIDTH));
+		tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+		tableLayout.Controls.Add(lblIcon, 0, 0);
+		tableLayout.Controls.Add(lblTitle, 1, 0);
 		// Row 1, col 0 intentionally left empty - no spacer, so the row fully
 		// collapses when _argsLabel is hidden.
-		_table.Controls.Add(_argsLabel, 1, 1);
-		_table.Controls.Add(_resultIconLabel, 0, 2);
-		_table.Controls.Add(_resultLabel, 1, 2);
-		_table.Cursor = Cursors.Hand;
-		_table.Dock = DockStyle.Fill;
-		_table.Margin = Padding.Empty;
-		_table.Padding = new Padding(8, 0, 0, 0);
-		_table.RowCount = 3;
-		_table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-		_table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-		_table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+		tableLayout.Controls.Add(lblArgs, 1, 1);
+		tableLayout.Controls.Add(lblResultIcon, 0, 2);
+		tableLayout.Controls.Add(lblResult, 1, 2);
+		tableLayout.Cursor = Cursors.Hand;
+		tableLayout.Dock = DockStyle.Fill;
+		tableLayout.Margin = Padding.Empty;
+		tableLayout.Padding = new Padding(8, 0, 0, 0);
+		tableLayout.RowCount = 3;
+		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
 		// FunctionCallMessageControl
 		AutoSize = true;
@@ -99,25 +99,25 @@ partial class FunctionCallMessageControl
 		Cursor = Cursors.Hand;
 		Margin = new Padding(3);
 		Padding = new Padding(0);
-		Controls.Add(_table);
+		Controls.Add(tableLayout);
 		Click += Toggle;
-		_table.Click += Toggle;
-		_callIconLabel.Click += Toggle;
-		_callTitleLabel.Click += Toggle;
-		_argsLabel.Click += Toggle;
-		_resultIconLabel.Click += Toggle;
-		_resultLabel.Click += Toggle;
+		tableLayout.Click += Toggle;
+		lblIcon.Click += Toggle;
+		lblTitle.Click += Toggle;
+		lblArgs.Click += Toggle;
+		lblResultIcon.Click += Toggle;
+		lblResult.Click += Toggle;
 
-		_table.ResumeLayout(false);
-		_table.PerformLayout();
+		tableLayout.ResumeLayout(false);
+		tableLayout.PerformLayout();
 		ResumeLayout(false);
 		PerformLayout();
 	}
 
-	private TableLayoutPanel _table;
-	private Label _callIconLabel;
-	private Label _callTitleLabel;
-	private Label _argsLabel;
-	private Label _resultIconLabel;
-	private Label _resultLabel;
+	private TableLayoutPanel tableLayout;
+	private Label lblIcon;
+	private Label lblTitle;
+	private Label lblArgs;
+	private Label lblResultIcon;
+	private Label lblResult;
 }

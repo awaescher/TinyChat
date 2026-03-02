@@ -140,4 +140,7 @@ internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMes
 	{
 		_isReceivingStream = isReceiving;
 	}
+
+	/// <inheritdoc/>
+	public override string ToString() => lblDetail.Text;
 }

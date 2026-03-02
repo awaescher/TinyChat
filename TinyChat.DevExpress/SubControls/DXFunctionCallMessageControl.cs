@@ -172,4 +172,7 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 		lblResultIcon.Visible = _expanded && hasResult;
 		lblResult.Visible = _expanded && hasResult;
 	}
+
+	/// <inheritdoc/>
+	public override string ToString() => $"{lblTitle.Text}{Environment.NewLine}{lblArguments.Text}{Environment.NewLine}{lblResult.Text}";
 }

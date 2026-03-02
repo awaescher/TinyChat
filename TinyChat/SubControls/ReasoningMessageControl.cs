@@ -42,7 +42,7 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageControl
 	{
 		InitializeComponent();
 
-		_iconLabel.Font = new Font("Arial", 11);
+		lblIcon.Font = new Font("Arial", 11);
 	}
 
 	/// <summary>
@@ -58,16 +58,16 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageControl
 		{
 			_message = value;
 
-			_detailLabel.DataBindings.Clear();
-			_headerLabel.DataBindings.Clear();
+			lblDetail.DataBindings.Clear();
+			lblHeader.DataBindings.Clear();
 			if (Message is not null)
 			{
-				var binding = _detailLabel.DataBindings.Add(nameof(_detailLabel.Text), Message.Content, nameof(Message.Content.Content));
+				var binding = lblDetail.DataBindings.Add(nameof(lblDetail.Text), Message.Content, nameof(Message.Content.Content));
 				binding.Format += (_, e) => e.Value = MessageFormatter.Format(Message.Content);
 
 				if (Message.Content is ReasoningMessageContent rc)
 				{
-					binding = _headerLabel.DataBindings.Add(nameof(_headerLabel.Text), Message.Content, nameof(ReasoningMessageContent.IsThinking));
+					binding = lblHeader.DataBindings.Add(nameof(lblHeader.Text), Message.Content, nameof(ReasoningMessageContent.IsThinking));
 					binding.Format += (_, e) =>
 					{
 						if (rc.IsThinking)
@@ -83,7 +83,7 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageControl
 	/// <summary>
 	/// Gets or sets the maximum size of this control.
 	/// Setting this value also propagates the horizontal constraint to the inner
-	/// <see cref="_headerLabel"/> and <see cref="_detailLabel"/> so that text wraps correctly.
+	/// <see cref="lblHeader"/> and <see cref="lblDetail"/> so that text wraps correctly.
 	/// </summary>
 	public override Size MaximumSize
 	{
@@ -91,8 +91,8 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageControl
 		set
 		{
 			base.MaximumSize = value;
-			_headerLabel.MaximumSize = new Size(value.Width - Padding.Horizontal, 0);
-			_detailLabel.MaximumSize = new Size(value.Width - Padding.Horizontal, 0);
+			lblHeader.MaximumSize = new Size(value.Width - Padding.Horizontal, 0);
+			lblDetail.MaximumSize = new Size(value.Width - Padding.Horizontal, 0);
 		}
 	}
 
@@ -105,7 +105,7 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageControl
 	private void Toggle(object? sender, EventArgs e)
 	{
 		_expanded = !_expanded;
-		_detailLabel.Visible = _expanded;
+		lblDetail.Visible = _expanded;
 		UpdateHeader();
 	}
 
@@ -116,8 +116,8 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageControl
 	/// </summary>
 	private void UpdateHeader()
 	{
-		if (_headerLabel.DataBindings.Count > 0)
-			_headerLabel.DataBindings[0].ReadValue();
+		if (lblHeader.DataBindings.Count > 0)
+			lblHeader.DataBindings[0].ReadValue();
 	}
 
 	/// <inheritdoc />
@@ -134,4 +134,7 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageControl
 	{
 		_isReceivingStream = isReceiving;
 	}
+
+	/// <inheritdoc/>
+	public override string ToString() => lblDetail.Text;
 }
