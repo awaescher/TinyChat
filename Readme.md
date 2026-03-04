@@ -11,7 +11,7 @@ A minimalistic but extensible chat control library for Windows Forms.
 - **Simplistic chat interface**: Clean, responsive chat UI with message history and input controls
 - **Streaming support**: Real-time message streaming for AI assistants and live conversations
 - **Basic formatting support**: Supports cleaning HTML and Markdown formatting for WinForms controls and basic HTML and Markdown support for DevExpress controls
-- **Function calling Support**: Native support for tool/function calls with automatic argument and result display
+- **Function calling support**: Native support for tool/function calls with automatic argument and result display
 - **Reasoning support**: Display model reasoning steps when the model thinks before generating final responses
 - **Extensible architecture**: Interface-driven design allowing custom message types and custom UI components
 - **Made for WinForms**: Because business applications might need AI chats, too
