@@ -8,10 +8,12 @@ A minimalistic but extensible chat control library for Windows Forms.
 
 ## ✨ Features
 
-- **Simplistic Chat Interface**: Clean, responsive chat UI with message history and input controls
-- **Streaming Support**: Real-time message streaming for AI assistants and live conversations
+- **Simplistic chat interface**: Clean, responsive chat UI with message history and input controls
+- **Streaming support**: Real-time message streaming for AI assistants and live conversations
 - **Basic formatting support**: Supports cleaning HTML and Markdown formatting for WinForms controls and basic HTML and Markdown support for DevExpress controls
-- **Extensible Architecture**: Interface-driven design allowing custom message types and custom UI components
+- **Function calling Support**: Native support for tool/function calls with automatic argument and result display
+- **Reasoning support**: Display model reasoning steps when the model thinks before generating final responses
+- **Extensible architecture**: Interface-driven design allowing custom message types and custom UI components
 - **Made for WinForms**: Because business applications might need AI chats, too
 
 ## 💖 Motivation
@@ -136,15 +138,10 @@ It's possible to create a custom formatter by implementing `IMessageFormatter` a
 
 ## 🎬 Demos
 
-The repository includes multiple demo applications:
-- **WinFormsDemo**: A basic Windows Forms application with dependency-free standard controls
-- **WinFormsDemo with IChatClient**: Shows automatic IChatClient integration (run with `--ichatclient` flag)
-- **DevExpressDemo**: Showcases the customizability with skinned DevExpress components *(requires a DevExpress license)*
+The repository includes a demo application that demonstrates a basic Windows Forms application with dependency-free standard controls and a DevExpress application that showcases the customizability with skinned DevExpress components.
 
 ```bash
-dotnet run --project WinFormsDemo                  # Basic demo
-dotnet run --project WinFormsDemo -- --ichatclient # IChatClient integration demo
-dotnet run --project DevExpressDemo
+dotnet run --project DemoApp
 ```
 
 ## Credits
