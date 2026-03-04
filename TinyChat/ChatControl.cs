@@ -186,7 +186,7 @@ public partial class ChatControl : UserControl
 	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
 	public string AssistantSenderName { get; set; } = "Assistant";
 
-	private CancellationTokenSource? _chatClientCancellationTokenSource;
+	private CancellationTokenSource? _currentCancellationTokenSource;
 
 	/// <summary>
 	/// Updates the visibility of the welcome control based on the current message history.
@@ -249,7 +249,8 @@ public partial class ChatControl : UserControl
 		CancellationToken cancellationToken = default)
 	{
 		var cancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-		void InputControl_CancellationRequested(object? sender, EventArgs e) => cancellationSource.Cancel();
+
+		_currentCancellationTokenSource = cancellationSource;
 
 		var stringBuilder = new NotifyingStringBuilder();
 		var content = new ChangingMessageContent(stringBuilder);
@@ -267,9 +268,6 @@ public partial class ChatControl : UserControl
 		{
 			try
 			{
-				if (inputControl != null)
-					inputControl.CancellationRequested += InputControl_CancellationRequested;
-
 				messageControl.SetIsReceivingStream(true);
 				inputControl?.SetIsReceivingStream(true, allowCancellation: cancellationToken.CanBeCanceled);
 
@@ -293,8 +291,7 @@ public partial class ChatControl : UserControl
 				inputControl?.SetIsReceivingStream(false, allowCancellation: false);
 				messageControl.SetIsReceivingStream(false);
 
-				if (inputControl != null)
-					inputControl.CancellationRequested -= InputControl_CancellationRequested;
+				cancellationSource.Dispose();
 			}
 
 			completionCallback?.Invoke(stringBuilder.ToString());
@@ -371,6 +368,7 @@ public partial class ChatControl : UserControl
 
 		var inputControl = CreateChatInputControl();
 		inputControl.MessageSending += (_, e) => SendMessage(e);
+		inputControl.CancellationRequested += (_, _) => RequestCancellation();
 		InputControl = (Control)inputControl;
 
 		splitContainer?.ChatInputPanel?.Controls.Add(InputControl);
@@ -588,6 +586,14 @@ public partial class ChatControl : UserControl
 	}
 
 	/// <summary>
+	/// Canceles a current operation if a cancellationTokenSource is present
+	/// </summary>
+	internal virtual void RequestCancellation()
+	{
+		_currentCancellationTokenSource?.Cancel();
+	}
+
+	/// <summary>
 	/// Creates a new chat message instance.
 	/// </summary>
 	/// <param name="sender">The sender of the message.</param>
@@ -625,9 +631,7 @@ public partial class ChatControl : UserControl
 				return;
 
 			// Cancel any existing IChatClient operation
-			_chatClientCancellationTokenSource?.Cancel();
-			_chatClientCancellationTokenSource?.Dispose();
-			_chatClientCancellationTokenSource = new CancellationTokenSource();
+			_currentCancellationTokenSource = new CancellationTokenSource();
 
 			// Convert message history to Microsoft.Extensions.AI format
 			var chatMessages = ConvertToChatMessages();
@@ -644,13 +648,13 @@ public partial class ChatControl : UserControl
 				if (UseStreaming)
 				{
 					// Use streaming response
-					var streamingResponse = chatClient.GetStreamingResponseAsync(chatMessages, chatOptions, cancellationToken: _chatClientCancellationTokenSource.Token);
-					await HandleStreamingResponseAsync(assistantSender, streamingResponse, _chatClientCancellationTokenSource.Token).ConfigureAwait(true);
+					var streamingResponse = chatClient.GetStreamingResponseAsync(chatMessages, chatOptions, cancellationToken: _currentCancellationTokenSource.Token);
+					await HandleStreamingResponseAsync(assistantSender, streamingResponse, _currentCancellationTokenSource.Token).ConfigureAwait(true);
 				}
 				else
 				{
 					// Use non-streaming response
-					var response = await chatClient.GetResponseAsync(chatMessages, chatOptions, cancellationToken: _chatClientCancellationTokenSource.Token).ConfigureAwait(true);
+					var response = await chatClient.GetResponseAsync(chatMessages, chatOptions, cancellationToken: _currentCancellationTokenSource.Token).ConfigureAwait(true);
 					HandleNonStreamingResponse(assistantSender, response);
 				}
 			}
@@ -665,8 +669,7 @@ public partial class ChatControl : UserControl
 			}
 			finally
 			{
-				_chatClientCancellationTokenSource?.Dispose();
-				_chatClientCancellationTokenSource = null;
+				_currentCancellationTokenSource?.Dispose();
 			}
 		}
 		catch (Exception ex)
@@ -778,6 +781,11 @@ public partial class ChatControl : UserControl
 		var textChannel = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = true });
 		var textStreamStarted = false;
 
+		// this is usually done in AddStreamingMessage() but in this case has been done before to include thinking and tool calls
+		// calling SetIsReceivingStream() with true and false twice each does not bother
+		var inputControl = InputControl as IChatInputControl;
+		inputControl?.SetIsReceivingStream(true, allowCancellation: cancellationToken.CanBeCanceled);
+
 		try
 		{
 			ReasoningMessageContent? reasoningMessageContent = null;
@@ -786,8 +794,14 @@ public partial class ChatControl : UserControl
 			// allowing direct AddMessage / AddStreamingMessage calls.
 			await foreach (var update in stream)
 			{
+				if (cancellationToken.IsCancellationRequested)
+					break;
+
 				foreach (var item in update.Contents)
 				{
+					if (cancellationToken.IsCancellationRequested)
+						break;
+
 					if (item is FunctionCallContent funcCall && IncludeFunctionCalls)
 					{
 						var content = new FunctionCallMessageContent(funcCall.CallId, funcCall.Name ?? string.Empty, funcCall.Arguments) { IsFunctionExecuting = true };
@@ -838,8 +852,11 @@ public partial class ChatControl : UserControl
 				{
 					if (!textStreamStarted)
 					{
+						if (cancellationToken.IsCancellationRequested)
+							break;
+
 						textStreamStarted = true;
-						AddStreamingMessage(sender, textChannel.Reader.ReadAllAsync(), cancellationToken: cancellationToken);
+						AddStreamingMessage(sender, textChannel.Reader.ReadAllAsync(cancellationToken), cancellationToken: cancellationToken);
 					}
 					textChannel.Writer.TryWrite(update.Text);
 				}
@@ -848,6 +865,7 @@ public partial class ChatControl : UserControl
 		finally
 		{
 			textChannel.Writer.TryComplete();
+			inputControl?.SetIsReceivingStream(false, allowCancellation: false);
 		}
 	}
 
