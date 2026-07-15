@@ -3,10 +3,13 @@ namespace TinyChat;
 /// <summary>
 /// A flow layout panel control that manages and displays chat message history with automatic scrolling and width management.
 /// </summary>
-public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHistoryControl
+public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHistoryControl, IChatMessageHistoryViewport
 {
 	private bool _shouldFollowStreamScroll = true;
 	private IChatMessageControl? _selectedMessageControl;
+
+	/// <inheritdoc />
+	public event EventHandler? ViewportChanged;
 
 	/// <summary>
 	/// Gets the maximum vertical scroll value that indicates the bottom of the scrollable area.
@@ -34,7 +37,7 @@ public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHist
 		control.MouseDown += OnMessageControlMouseDown;
 		Controls.Add(control);
 
-		SetMaxWidthToPreventHorizontalScrollbar(control);
+		SetSizeConstraints(control);
 		ScrollControlIntoView(control);
 
 		messageControl.SizeUpdatedWhileStreaming += MessageControlStreamingSizeUpdate;
@@ -83,24 +86,29 @@ public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHist
 	protected override void OnClientSizeChanged(EventArgs e)
 	{
 		base.OnClientSizeChanged(e);
+		ViewportChanged?.Invoke(this, EventArgs.Empty);
 
 		SuspendLayout();
 
 		foreach (Control control in Controls)
-			SetMaxWidthToPreventHorizontalScrollbar(control);
+			SetSizeConstraints(control);
 
 		ResumeLayout();
 		PerformLayout(); // to hide the H-scrollbar that pops up from time to time
 	}
 
 	/// <summary>
-	/// Sets the maximum width of a control to prevent horizontal scrollbars by accounting for
-	/// the vertical scrollbar width when present.
+	/// Sets the minimum and maximum width of a control to the available history width while
+	/// accounting for the vertical scrollbar and control margins.
 	/// </summary>
-	/// <param name="control">The control whose maximum width should be adjusted.</param>
-	private void SetMaxWidthToPreventHorizontalScrollbar(Control control)
+	/// <param name="control">The control whose width should be adjusted.</param>
+	private void SetSizeConstraints(Control control)
 	{
-		control.MaximumSize = new Size(ClientRectangle.Width - SystemInformation.VerticalScrollBarWidth, 0);
+		var availableWidth = Math.Max(
+			0,
+			ClientRectangle.Width - SystemInformation.VerticalScrollBarWidth - control.Margin.Horizontal);
+		control.MinimumSize = new Size(availableWidth, 0);
+		control.MaximumSize = new Size(availableWidth, 0);
 	}
 
 
@@ -108,6 +116,7 @@ public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHist
 	protected override void OnScroll(ScrollEventArgs se)
 	{
 		base.OnScroll(se);
+		ViewportChanged?.Invoke(this, EventArgs.Empty);
 
 		var didScrollUp = se.ScrollOrientation == ScrollOrientation.VerticalScroll && se.NewValue < se.OldValue;
 		var didScrollToBottom = se.NewValue >= MaxVerticalScroll;
@@ -119,6 +128,7 @@ public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHist
 	protected override void OnMouseWheel(MouseEventArgs e)
 	{
 		base.OnMouseWheel(e);
+		ViewportChanged?.Invoke(this, EventArgs.Empty);
 
 		var didScrollUp = e.Delta > 0;
 		var didScrollToBottom = VerticalScroll.Value >= MaxVerticalScroll;

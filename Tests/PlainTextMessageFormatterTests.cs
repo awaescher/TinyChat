@@ -273,6 +273,15 @@ public class PlainTextMessageFormatterTests
 		}
 
 		[Test]
+		public void Formats_File_Attachment_Message_Content()
+		{
+			var attachment = new ChatFileAttachment("photo.png", "image/png", new byte[] { 1, 2, 3 });
+			var content = new FileAttachmentMessageContent([attachment], "Describe this");
+			var result = _formatter.Format(content);
+			result.ShouldBe("Describe this");
+		}
+
+		[Test]
 		public void Formats_FunctionCallMessageContent_With_Result()
 		{
 			var content = new FunctionCallMessageContent("call1", "get_weather", new Dictionary<string, object?> { ["city"] = "Amsterdam" }, result: "6°C");

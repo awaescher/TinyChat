@@ -1,3 +1,4 @@
+using DevExpress.XtraEditors;
 using TinyChat.Messages.Formatting;
 
 namespace TinyChat;
@@ -11,13 +12,22 @@ public class DXChatControl : ChatControl
 	protected override IChatMessageHistoryControl CreateMessageHistoryControl() => new StackPanelMessageHistoryControl();
 
 	/// <inheritdoc />
-	protected override IChatMessageControl CreateMessageControl(IChatMessage message) => new DXChatMessageControl { Message = message, MessageFormatter = MessageFormatter };
+	protected override IChatMessageControl CreateMessageControl(IChatMessage message) => new DXChatMessageControl { MessageFormatter = MessageFormatter, Message = message };
+
+	/// <inheritdoc />
+	protected override Control CreateMessageCopyButton() => new SimpleButton
+	{
+		Cursor = Cursors.Hand,
+		Size = new Size(26, 26),
+		TabStop = false,
+		Text = "⧉"
+	};
 
 	/// <inheritdoc />
 	protected override IFunctionCallMessageControl CreateFunctionCallMessageControl(IChatMessage message) => new DXFunctionCallMessageControl { Message = message, AllowExpand = AllowExpandFunctionCalls };
 
 	/// <inheritdoc />
-	protected override IChatMessageControl CreateReasoningMessageControl(IChatMessage message) => new DXReasoningMessageControl { Message = message, MessageFormatter = MessageFormatter };
+	protected override IChatMessageControl CreateReasoningMessageControl(IChatMessage message) => new DXReasoningMessageControl { MessageFormatter = MessageFormatter, Message = message };
 
 	/// <inheritdoc />
 	protected override IChatInputControl CreateChatInputControl() => new DXChatInputControl();

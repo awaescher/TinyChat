@@ -25,6 +25,16 @@ public class SimplifiedHtmlMessageFormatterTests
 		}
 
 		[Test]
+		public void Formats_File_Attachment_Message_Content()
+		{
+			var formatter = new SimplifiedHtmlMessageFormatter("b");
+			var attachment = new ChatFileAttachment("photo.png", "image/png", new byte[] { 1, 2, 3 });
+			var content = new FileAttachmentMessageContent([attachment], "Describe this");
+			var result = formatter.Format(content);
+			result.ShouldBe("Describe this");
+		}
+
+		[Test]
 		public void Converts_Markdown_Bold_To_Html_When_Supported()
 		{
 			var formatter = new SimplifiedHtmlMessageFormatter("b");

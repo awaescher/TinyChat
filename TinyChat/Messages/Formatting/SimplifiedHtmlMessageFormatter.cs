@@ -128,10 +128,10 @@ public partial class SimplifiedHtmlMessageFormatter(params string[] supportedTag
 		if (content is StringMessageContent stringContent)
 			return Format(stringContent.ToString());
 
-		if (content is FunctionCallMessageContent or ReasoningMessageContent)
+		if (content is FunctionCallMessageContent or ReasoningMessageContent or FileAttachmentMessageContent)
 			return Format(content.ToString() ?? string.Empty);
 
-		throw new NotSupportedException($"Only {nameof(StringMessageContent)}, {nameof(ReasoningMessageContent)} and {nameof(FunctionCallMessageContent)} are supported by {nameof(SimplifiedHtmlMessageFormatter)}.");
+		throw new NotSupportedException($"Only {nameof(StringMessageContent)}, {nameof(ReasoningMessageContent)}, {nameof(FunctionCallMessageContent)} and {nameof(FileAttachmentMessageContent)} are supported by {nameof(SimplifiedHtmlMessageFormatter)}.");
 	}
 
 	/// <summary>

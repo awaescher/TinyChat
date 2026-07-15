@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Drawing.Imaging;
 using System.Threading.Channels;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,7 +16,18 @@ public partial class ChatControl : UserControl
 {
 	private const string ROBOT_WELCOME = "●\n┌─┴─┐\n◉‿◉\n└───┘\n\nGreetings human.\nHow can I help you today?";
 
+	private const long DEFAULT_MAXIMUM_ATTACHMENT_FILE_SIZE = 20 * 1024 * 1024;
+
 	private List<IChatMessage> _messages = [];
+	private readonly object _cancellationLock = new();
+	private readonly HashSet<Control> _fileDropTargets = [];
+	private CancellationTokenSource? _currentCancellationTokenSource;
+	private Control? _messageCopyButton;
+	private IChatMessageControl? _messageCopyTarget;
+	private System.Windows.Forms.Timer? _messageCopyHoverTimer;
+	private System.Windows.Forms.Timer? _messageCopyHideTimer;
+	private bool _attachmentDraftVisible;
+	private bool _suppressMessageCopyButton;
 
 	/// <summary>
 	/// Occurs when a message is sent from the text box and allows the cancellation of sending.
@@ -212,7 +224,42 @@ public partial class ChatControl : UserControl
 	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
 	public string AssistantSenderName { get; set; } = "Assistant";
 
-	private CancellationTokenSource? _currentCancellationTokenSource;
+	/// <summary>
+	/// Gets or sets whether files can be dropped onto the chat and sent as attachments.
+	/// </summary>
+	[Category("Chat")]
+	[Description("Gets or sets whether files can be dropped onto the chat and sent as attachments.")]
+	[DefaultValue(true)]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+	public bool AllowFileAttachments { get; set; } = true;
+
+	/// <summary>
+	/// Gets or sets the maximum size of a single dropped attachment in bytes.
+	/// Set to zero to allow files of any size.
+	/// </summary>
+	[Category("Chat")]
+	[Description("Gets or sets the maximum size of a single dropped attachment in bytes. Set to zero for no limit.")]
+	[DefaultValue(DEFAULT_MAXIMUM_ATTACHMENT_FILE_SIZE)]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+	public long MaximumAttachmentFileSize { get; set; } = DEFAULT_MAXIMUM_ATTACHMENT_FILE_SIZE;
+
+	/// <summary>
+	/// Gets or sets whether a copy button is shown when the pointer rests over a message.
+	/// </summary>
+	[Category("Chat")]
+	[Description("Gets or sets whether a delayed copy button is shown when the pointer rests over a message.")]
+	[DefaultValue(true)]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+	public bool ShowCopyButton { get; set; } = true;
+
+	/// <summary>
+	/// Gets or sets the delay in milliseconds before the message copy button is shown.
+	/// </summary>
+	[Category("Chat")]
+	[Description("Gets or sets the hover delay in milliseconds before the message copy button is shown.")]
+	[DefaultValue(600)]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+	public int CopyButtonHoverDelay { get; set; } = 600;
 
 	private List<IFunctionCallMessageControl> _functionCallMessageControls = new();
 	private bool _allowExpandFunctionCalls = true;
@@ -238,6 +285,18 @@ public partial class ChatControl : UserControl
 		base.OnHandleCreated(e);
 
 		MessageFormatter = CreateDefaultMessageFormatter() ?? MessageFormatter;
+	}
+
+	/// <inheritdoc />
+	protected override void OnHandleDestroyed(EventArgs e)
+	{
+		if (Disposing)
+		{
+			CancelCurrentOperation();
+			DisposeMessageCopyButton();
+		}
+
+		base.OnHandleDestroyed(e);
 	}
 
 	/// <summary>
@@ -278,8 +337,7 @@ public partial class ChatControl : UserControl
 		CancellationToken cancellationToken = default)
 	{
 		var cancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-
-		_currentCancellationTokenSource = cancellationSource;
+		var ownsCurrentOperation = RegisterCancellationSource(cancellationSource, cancellationToken);
 
 		var stringBuilder = new NotifyingStringBuilder();
 		var content = new ChangingMessageContent(stringBuilder);
@@ -298,16 +356,17 @@ public partial class ChatControl : UserControl
 			try
 			{
 				messageControl.SetIsReceivingStream(true);
-				inputControl?.SetIsReceivingStream(true, allowCancellation: cancellationToken.CanBeCanceled);
+				if (ownsCurrentOperation)
+					inputControl?.SetIsReceivingStream(true, allowCancellation: true);
 
-				await foreach (var chunk in stream.ConfigureAwait(true).WithCancellation(cancellationSource.Token))
+				await foreach (var chunk in EnumerateWithCancellation(stream, cancellationSource.Token).ConfigureAwait(true))
 				{
 					stringBuilder.Append(chunk);
-
-					// leave the chat if cancellation was requested, the stream might or might not support cancellation.
-					if (cancellationToken.IsCancellationRequested)
-						break;
 				}
+			}
+			catch (OperationCanceledException) when (cancellationSource.IsCancellationRequested)
+			{
+				// Cancellation is expected and must not be reported as an error.
 			}
 			catch (Exception ex)
 			{
@@ -319,10 +378,18 @@ public partial class ChatControl : UserControl
 			}
 			finally
 			{
-				inputControl?.SetIsReceivingStream(false, allowCancellation: false);
-				messageControl.SetIsReceivingStream(false);
-
-				cancellationSource.Dispose();
+				try
+				{
+					if (ownsCurrentOperation)
+						inputControl?.SetIsReceivingStream(false, allowCancellation: false);
+					messageControl.SetIsReceivingStream(false);
+				}
+				finally
+				{
+					if (ownsCurrentOperation)
+						ClearCancellationSource(cancellationSource);
+					cancellationSource.Dispose();
+				}
 			}
 
 			completionCallback?.Invoke(stringBuilder.ToString());
@@ -399,11 +466,18 @@ public partial class ChatControl : UserControl
 
 		var inputControl = CreateChatInputControl();
 		inputControl.MessageSending += (_, e) => SendMessage(e);
-		inputControl.CancellationRequested += (_, _) => RequestCancellation();
+		inputControl.CancellationRequested += (_, _) => CancelCurrentOperation();
+		if (inputControl is IChatAttachmentInputControl attachmentInputControl)
+		{
+			attachmentInputControl.AttachmentPasteRequested += AttachmentInputControl_AttachmentPasteRequested;
+			attachmentInputControl.AttachmentsChanged += AttachmentInputControl_AttachmentsChanged;
+		}
 		InputControl = (Control)inputControl;
 
 		splitContainer?.ChatInputPanel?.Controls.Add(InputControl);
 		LayoutChatInputControl(InputControl);
+
+		ConfigureFileDropTarget(this);
 
 		PopulateMessages();
 	}
@@ -459,6 +533,9 @@ public partial class ChatControl : UserControl
 			LayoutMessageControl(MessageHistoryControl, control);
 			casted.AppendMessageControl(messageControl);
 		}
+
+		if (ShowCopyButton && control.Parent is not null)
+			AttachCopyButton(messageControl);
 
 		return messageControl;
 	}
@@ -522,7 +599,25 @@ public partial class ChatControl : UserControl
 	/// </summary>
 	/// <param name="message">The chat message to create a control for.</param>
 	/// <returns>An <see cref="IChatMessageControl"/> instance for the message.</returns>
-	protected virtual IChatMessageControl CreateMessageControl(IChatMessage message) => new ChatMessageControl() { Message = message, MessageFormatter = MessageFormatter };
+	protected virtual IChatMessageControl CreateMessageControl(IChatMessage message) => new ChatMessageControl() { MessageFormatter = MessageFormatter, Message = message };
+
+	/// <summary>
+	/// Creates the button shown after hovering over a message.
+	/// </summary>
+	/// <returns>The copy button control.</returns>
+	protected virtual Control CreateMessageCopyButton()
+	{
+		var button = new Button
+		{
+			Cursor = Cursors.Hand,
+			FlatStyle = FlatStyle.Flat,
+			Size = new Size(26, 26),
+			TabStop = false,
+			Text = "⧉"
+		};
+		button.FlatAppearance.BorderSize = 0;
+		return button;
+	}
 
 	/// <summary>
 	/// Creates a control for displaying a tool call with its result
@@ -536,7 +631,7 @@ public partial class ChatControl : UserControl
 	/// </summary>
 	/// <param name="message">The chat message to create a control for.</param>
 	/// <returns>An <see cref="IChatMessageControl"/> instance for the message.</returns>
-	protected virtual IChatMessageControl CreateReasoningMessageControl(IChatMessage message) => new ReasoningMessageControl { Message = message, MessageFormatter = MessageFormatter };
+	protected virtual IChatMessageControl CreateReasoningMessageControl(IChatMessage message) => new ReasoningMessageControl { MessageFormatter = MessageFormatter, Message = message };
 
 	/// <summary>
 	/// Applies layout settings to a chat message control and adds it to the container.
@@ -575,6 +670,93 @@ public partial class ChatControl : UserControl
 	/// </summary>
 	/// <param name="textBox">The text box control to layout.</param>
 	protected virtual void LayoutChatInputControl(Control textBox) => textBox.Dock = DockStyle.Fill;
+
+	/// <summary>
+	/// Loads files from disk and adds them to the attachment draft in the chat input.
+	/// </summary>
+	/// <param name="filePaths">The files to add.</param>
+	/// <param name="cancellationToken">The token used to cancel file loading.</param>
+	/// <returns>The number of files added to the draft.</returns>
+	public async Task<int> AddFilesToInputAsync(
+		IEnumerable<string> filePaths,
+		CancellationToken cancellationToken = default)
+	{
+		var attachmentInput = GetAttachmentInputControl();
+		var attachments = await LoadAttachmentsAsync(filePaths, cancellationToken).ConfigureAwait(true);
+		attachmentInput.AddAttachments(attachments);
+		return attachments.Count;
+	}
+
+	/// <summary>
+	/// Adds supported clipboard data to the attachment draft in the chat input.
+	/// </summary>
+	/// <remarks>
+	/// File-drop data, such as files copied in Windows Explorer, and bitmap data are supported.
+	/// Bitmap data is stored as a PNG attachment.
+	/// </remarks>
+	/// <param name="data">The clipboard data to add.</param>
+	/// <param name="cancellationToken">The token used to cancel file loading.</param>
+	/// <returns>The number of attachments added to the draft.</returns>
+	public async Task<int> AddClipboardContentToInputAsync(
+		IDataObject data,
+		CancellationToken cancellationToken = default)
+	{
+		ArgumentNullException.ThrowIfNull(data);
+
+		if (data.GetDataPresent(DataFormats.FileDrop) && data.GetData(DataFormats.FileDrop) is string[] filePaths)
+			return await AddFilesToInputAsync(filePaths, cancellationToken).ConfigureAwait(true);
+
+		if (!data.GetDataPresent(DataFormats.Bitmap) || data.GetData(DataFormats.Bitmap) is not Image image)
+			return 0;
+
+		cancellationToken.ThrowIfCancellationRequested();
+		using var stream = new MemoryStream();
+		image.Save(stream, ImageFormat.Png);
+		var fileName = $"image-{DateTime.Now:yyyyMMdd-HHmmssfff}.png";
+		if (MaximumAttachmentFileSize > 0 && stream.Length > MaximumAttachmentFileSize)
+			throw new IOException($"The image exceeds the maximum attachment size of {MaximumAttachmentFileSize:N0} bytes.");
+
+		var attachment = new ChatFileAttachment(fileName, "image/png", stream.ToArray());
+		GetAttachmentInputControl().AddAttachments([attachment]);
+		return 1;
+	}
+
+	/// <summary>
+	/// Loads files from disk and sends them together as a chat message.
+	/// </summary>
+	/// <param name="filePaths">The files to attach.</param>
+	/// <param name="message">Optional text accompanying the files.</param>
+	/// <param name="cancellationToken">The token used to cancel file loading.</param>
+	/// <returns><see langword="true"/> when the message was sent; otherwise, <see langword="false"/>.</returns>
+	public async Task<bool> SendFilesAsync(
+		IEnumerable<string> filePaths,
+		string? message = null,
+		CancellationToken cancellationToken = default)
+	{
+		var attachments = await LoadAttachmentsAsync(filePaths, cancellationToken).ConfigureAwait(true);
+
+		if (attachments.Count == 0)
+			return false;
+
+		return SendMessage(Sender, new FileAttachmentMessageContent(attachments, message));
+	}
+
+	private async Task<List<ChatFileAttachment>> LoadAttachmentsAsync(
+		IEnumerable<string> filePaths,
+		CancellationToken cancellationToken)
+	{
+		ArgumentNullException.ThrowIfNull(filePaths);
+
+		var maximumFileSize = MaximumAttachmentFileSize > 0 ? MaximumAttachmentFileSize : (long?)null;
+		var attachments = new List<ChatFileAttachment>();
+		foreach (var filePath in filePaths.Distinct(StringComparer.OrdinalIgnoreCase))
+		{
+			cancellationToken.ThrowIfCancellationRequested();
+			attachments.Add(await ChatFileAttachment.LoadAsync(filePath, maximumFileSize, cancellationToken));
+		}
+
+		return attachments;
+	}
 
 	/// <summary>
 	/// Sends a message from the current sender with the specified text content.
@@ -648,11 +830,367 @@ public partial class ChatControl : UserControl
 	}
 
 	/// <summary>
-	/// Canceles a current operation if a cancellationTokenSource is present
+	/// Cancels the current chat client or streaming operation, if one is running.
 	/// </summary>
-	internal virtual void RequestCancellation()
+	public virtual void CancelCurrentOperation()
 	{
-		_currentCancellationTokenSource?.Cancel();
+		CancellationTokenSource? cancellationSource;
+		lock (_cancellationLock)
+			cancellationSource = _currentCancellationTokenSource;
+
+		TryCancel(cancellationSource);
+	}
+
+	private bool RegisterCancellationSource(CancellationTokenSource cancellationSource, CancellationToken parentToken = default)
+	{
+		CancellationTokenSource? previousSource;
+		lock (_cancellationLock)
+		{
+			if (_currentCancellationTokenSource is { } currentSource &&
+				parentToken.CanBeCanceled &&
+				parentToken == currentSource.Token)
+			{
+				return false;
+			}
+
+			previousSource = _currentCancellationTokenSource;
+			_currentCancellationTokenSource = cancellationSource;
+		}
+
+		if (!ReferenceEquals(previousSource, cancellationSource))
+			TryCancel(previousSource);
+
+		return true;
+	}
+
+	private void ClearCancellationSource(CancellationTokenSource cancellationSource)
+	{
+		lock (_cancellationLock)
+		{
+			if (ReferenceEquals(_currentCancellationTokenSource, cancellationSource))
+				_currentCancellationTokenSource = null;
+		}
+	}
+
+	private static void TryCancel(CancellationTokenSource? cancellationSource)
+	{
+		try
+		{
+			cancellationSource?.Cancel();
+		}
+		catch (ObjectDisposedException)
+		{
+			// The owning operation completed between reading and cancelling the source.
+		}
+	}
+
+	private void ConfigureFileDropTarget(Control control)
+	{
+		if (!_fileDropTargets.Add(control))
+			return;
+
+		control.AllowDrop = true;
+		control.DragEnter += FileDropTarget_DragEnter;
+		control.DragDrop += FileDropTarget_DragDrop;
+		control.ControlAdded += FileDropTarget_ControlAdded;
+		control.Disposed += (_, _) => _fileDropTargets.Remove(control);
+
+		foreach (Control child in control.Controls)
+			ConfigureFileDropTarget(child);
+	}
+
+	private void FileDropTarget_ControlAdded(object? sender, ControlEventArgs e)
+	{
+		if (e.Control is not null)
+			ConfigureFileDropTarget(e.Control);
+	}
+
+	private void FileDropTarget_DragEnter(object? sender, DragEventArgs e)
+	{
+		e.Effect = AllowFileAttachments && e.Data?.GetDataPresent(DataFormats.FileDrop) == true
+			? DragDropEffects.Copy
+			: DragDropEffects.None;
+	}
+
+	private async void FileDropTarget_DragDrop(object? sender, DragEventArgs e)
+	{
+		try
+		{
+			if (!AllowFileAttachments ||
+				e.Data?.GetDataPresent(DataFormats.FileDrop) != true ||
+				e.Data.GetData(DataFormats.FileDrop) is not string[] filePaths)
+			{
+				return;
+			}
+
+			await AddFilesToInputAsync(filePaths).ConfigureAwait(true);
+		}
+		catch (OperationCanceledException)
+		{
+			// File loading was cancelled; nothing was added to the draft.
+		}
+		catch (Exception ex)
+		{
+			ReportAttachmentError(ex);
+		}
+	}
+
+	private async void AttachmentInputControl_AttachmentPasteRequested(object? sender, AttachmentPasteRequestedEventArgs e)
+	{
+		try
+		{
+			await AddClipboardContentToInputAsync(e.Data).ConfigureAwait(true);
+		}
+		catch (OperationCanceledException)
+		{
+			// Clipboard attachment processing was cancelled; nothing was added to the draft.
+		}
+		catch (Exception ex)
+		{
+			ReportAttachmentError(ex);
+		}
+	}
+
+	private void AttachmentInputControl_AttachmentsChanged(object? sender, EventArgs e)
+	{
+		if (sender is not IChatAttachmentInputControl attachmentInput)
+			return;
+
+		var hasAttachments = attachmentInput.PendingAttachments.Count > 0;
+		if (hasAttachments == _attachmentDraftVisible)
+			return;
+
+		try
+		{
+			var heightChange = hasAttachments
+				? attachmentInput.AttachmentDisplayHeight
+				: -attachmentInput.AttachmentDisplayHeight;
+			SplitterPosition = Math.Max(1, SplitterPosition + heightChange);
+		}
+		catch (ArgumentOutOfRangeException)
+		{
+			// Very small host controls may not have enough room to expand the input panel.
+		}
+		catch (InvalidOperationException)
+		{
+			// The splitter may still be completing layout while attachments are being added.
+		}
+
+		_attachmentDraftVisible = hasAttachments;
+	}
+
+	private IChatAttachmentInputControl GetAttachmentInputControl()
+	{
+		return InputControl as IChatAttachmentInputControl
+			?? throw new InvalidOperationException("The configured chat input control does not support attachment drafts.");
+	}
+
+	private void ReportAttachmentError(Exception exception)
+	{
+		try
+		{
+			var errorArgs = new Helper.ChatErrorEventArgs(exception);
+			ErrorOccurred?.Invoke(this, errorArgs);
+			if (!errorArgs.Handled)
+				AddMessage(new NamedSender("System"), new StringMessageContent($"Could not attach file: {exception.Message}"));
+		}
+		catch
+		{
+			// Prevent an exception in error reporting from escaping an async event handler.
+		}
+	}
+
+	private void AttachCopyButton(IChatMessageControl messageControl)
+	{
+		EnsureMessageCopyButton();
+
+		void WireHoverEvents(Control control)
+		{
+			control.MouseEnter += (_, _) => StartMessageCopyHover(messageControl);
+			control.MouseMove += (_, _) => StartMessageCopyHover(messageControl);
+			control.MouseLeave += (_, _) => StartMessageCopyHideDelay();
+			control.ControlAdded += (_, e) =>
+			{
+				if (e.Control is not null)
+					WireHoverEvents(e.Control);
+			};
+
+			foreach (Control child in control.Controls)
+				WireHoverEvents(child);
+		}
+
+		WireHoverEvents((Control)messageControl);
+	}
+
+	private void EnsureMessageCopyButton()
+	{
+		if (_messageCopyButton is not null)
+			return;
+
+		_messageCopyHoverTimer = new System.Windows.Forms.Timer { Interval = Math.Max(1, CopyButtonHoverDelay) };
+		_messageCopyHideTimer = new System.Windows.Forms.Timer { Interval = 75 };
+		_messageCopyButton = CreateMessageCopyButton();
+		_messageCopyButton.Visible = false;
+		_messageCopyButton.Click += MessageCopyButton_Click;
+		_messageCopyButton.MouseEnter += (_, _) => _messageCopyHideTimer.Stop();
+		_messageCopyButton.MouseLeave += (_, _) => StartMessageCopyHideDelay();
+		_messageCopyHoverTimer.Tick += (_, _) =>
+		{
+			_messageCopyHoverTimer.Stop();
+			ShowMessageCopyButton();
+		};
+		_messageCopyHideTimer.Tick += (_, _) =>
+		{
+			_messageCopyHideTimer.Stop();
+			if (!IsPointerInsideMessageCopyArea())
+			{
+				_suppressMessageCopyButton = false;
+				HideMessageCopyButton(clearTarget: true);
+			}
+		};
+
+		Controls.Add(_messageCopyButton);
+		_messageCopyButton.BringToFront();
+
+		if (MessageHistoryControl is IChatMessageHistoryViewport viewport)
+			viewport.ViewportChanged += MessageHistoryViewport_Changed;
+
+		if (MessageHistoryControl is not null)
+		{
+			MessageHistoryControl.SizeChanged += MessageHistoryViewport_Changed;
+			MessageHistoryControl.VisibleChanged += MessageHistoryViewport_Changed;
+		}
+	}
+
+	private void StartMessageCopyHover(IChatMessageControl messageControl)
+	{
+		if (_messageCopyButton is null || _messageCopyHoverTimer is null || _messageCopyHideTimer is null)
+			return;
+
+		_messageCopyHideTimer.Stop();
+		if (!ReferenceEquals(_messageCopyTarget, messageControl))
+		{
+			HideMessageCopyButton(clearTarget: false);
+			_messageCopyTarget = messageControl;
+			_suppressMessageCopyButton = false;
+		}
+
+		if (_suppressMessageCopyButton || _messageCopyButton.Visible || _messageCopyHoverTimer.Enabled)
+			return;
+
+		_messageCopyHoverTimer.Interval = Math.Max(1, CopyButtonHoverDelay);
+		_messageCopyHoverTimer.Start();
+	}
+
+	private void StartMessageCopyHideDelay()
+	{
+		if (_messageCopyHideTimer is null)
+			return;
+
+		_messageCopyHideTimer.Stop();
+		_messageCopyHideTimer.Start();
+	}
+
+	private void ShowMessageCopyButton()
+	{
+		if (_messageCopyButton is null ||
+			_messageCopyTarget is not Control messageControl ||
+			MessageHistoryControl is null ||
+			messageControl.IsDisposed ||
+			!messageControl.Visible ||
+			!IsHandleCreated ||
+			!messageControl.IsHandleCreated ||
+			!MessageHistoryControl.IsHandleCreated ||
+			!IsPointerInsideMessageCopyArea())
+		{
+			return;
+		}
+
+		var messageBounds = RectangleToClient(messageControl.RectangleToScreen(messageControl.ClientRectangle));
+		var historyBounds = RectangleToClient(MessageHistoryControl.RectangleToScreen(MessageHistoryControl.ClientRectangle));
+		historyBounds.Intersect(ClientRectangle);
+		var visibleMessageBounds = Rectangle.Intersect(messageBounds, historyBounds);
+		if (visibleMessageBounds.Width < _messageCopyButton.Width || visibleMessageBounds.Height < _messageCopyButton.Height)
+			return;
+
+		var preferredX = messageBounds.Right - messageControl.Padding.Right - _messageCopyButton.Width;
+		var maximumX = visibleMessageBounds.Right - _messageCopyButton.Width;
+		var preferredY = messageBounds.Top + messageControl.Padding.Top;
+		var maximumY = visibleMessageBounds.Bottom - _messageCopyButton.Height;
+		var location = new Point(
+			Math.Clamp(preferredX, visibleMessageBounds.Left, maximumX),
+			Math.Clamp(preferredY, visibleMessageBounds.Top, maximumY));
+
+		_messageCopyButton.Location = location;
+		_messageCopyButton.BringToFront();
+		_messageCopyButton.Visible = true;
+	}
+
+	private bool IsPointerInsideMessageCopyArea()
+	{
+		var pointerPosition = Cursor.Position;
+		var insideMessage = _messageCopyTarget is Control messageControl &&
+			messageControl.IsHandleCreated &&
+			messageControl.RectangleToScreen(messageControl.ClientRectangle).Contains(pointerPosition);
+		var insideButton = _messageCopyButton is { Visible: true, IsHandleCreated: true } &&
+			_messageCopyButton.RectangleToScreen(_messageCopyButton.ClientRectangle).Contains(pointerPosition);
+		return insideMessage || insideButton;
+	}
+
+	private void HideMessageCopyButton(bool clearTarget)
+	{
+		_messageCopyHoverTimer?.Stop();
+		_messageCopyHideTimer?.Stop();
+		if (_messageCopyButton is { IsDisposed: false })
+			_messageCopyButton.Visible = false;
+
+		if (clearTarget)
+			_messageCopyTarget = null;
+	}
+
+	private void MessageCopyButton_Click(object? sender, EventArgs e)
+	{
+		try
+		{
+			var text = _messageCopyTarget?.Message?.Content?.ToString() ?? _messageCopyTarget?.ToString();
+			if (!string.IsNullOrEmpty(text))
+				Clipboard.SetText(text);
+		}
+		catch
+		{
+			// The clipboard can temporarily be unavailable; keep the chat responsive.
+		}
+		finally
+		{
+			_suppressMessageCopyButton = true;
+			HideMessageCopyButton(clearTarget: false);
+		}
+	}
+
+	private void MessageHistoryViewport_Changed(object? sender, EventArgs e)
+	{
+		_suppressMessageCopyButton = false;
+		HideMessageCopyButton(clearTarget: true);
+	}
+
+	private void DisposeMessageCopyButton()
+	{
+		if (MessageHistoryControl is IChatMessageHistoryViewport viewport)
+			viewport.ViewportChanged -= MessageHistoryViewport_Changed;
+
+		if (MessageHistoryControl is not null)
+		{
+			MessageHistoryControl.SizeChanged -= MessageHistoryViewport_Changed;
+			MessageHistoryControl.VisibleChanged -= MessageHistoryViewport_Changed;
+		}
+
+		_messageCopyHoverTimer?.Dispose();
+		_messageCopyHideTimer?.Dispose();
+		_messageCopyButton?.Dispose();
+		_messageCopyHoverTimer = null;
+		_messageCopyHideTimer = null;
+		_messageCopyButton = null;
+		_messageCopyTarget = null;
 	}
 
 	/// <summary>
@@ -691,16 +1229,19 @@ public partial class ChatControl : UserControl
 				return;
 
 			var cancellationSource = new CancellationTokenSource();
-			_currentCancellationTokenSource = cancellationSource;
-
-			var chatMessages = ConvertToChatMessages();
-
-			var chatOptionsArgs = new ChatOptionsRequestedEventArgs(ChatOptions);
-			ChatOptionsRequested?.Invoke(this, chatOptionsArgs);
-			var chatOptions = chatOptionsArgs.ChatOptions;
+			RegisterCancellationSource(cancellationSource);
+			var inputControl = InputControl as IChatInputControl;
 
 			try
 			{
+				inputControl?.SetIsReceivingStream(true, allowCancellation: true);
+
+				var chatMessages = ConvertToChatMessages();
+
+				var chatOptionsArgs = new ChatOptionsRequestedEventArgs(ChatOptions);
+				ChatOptionsRequested?.Invoke(this, chatOptionsArgs);
+				var chatOptions = chatOptionsArgs.ChatOptions;
+
 				var assistantSender = new NamedSender(AssistantSenderName);
 
 				if (UseStreaming)
@@ -712,7 +1253,10 @@ public partial class ChatControl : UserControl
 				else
 				{
 					// Use non-streaming response
-					var response = await chatClient.GetResponseAsync(chatMessages, chatOptions, cancellationToken: cancellationSource.Token).ConfigureAwait(true);
+					var response = await chatClient
+						.GetResponseAsync(chatMessages, chatOptions, cancellationToken: cancellationSource.Token)
+						.WaitAsync(cancellationSource.Token)
+						.ConfigureAwait(true);
 					HandleNonStreamingResponse(assistantSender, response);
 				}
 			}
@@ -729,7 +1273,15 @@ public partial class ChatControl : UserControl
 			}
 			finally
 			{
-				cancellationSource.Dispose();
+				try
+				{
+					inputControl?.SetIsReceivingStream(false, allowCancellation: false);
+				}
+				finally
+				{
+					ClearCancellationSource(cancellationSource);
+					cancellationSource.Dispose();
+				}
 			}
 		}
 		catch (Exception ex)
@@ -822,6 +1374,18 @@ public partial class ChatControl : UserControl
 					result.Add(functionResultMessage);
 				}
 			}
+			else if (message.Content is FileAttachmentMessageContent attachmentContent)
+			{
+				var contents = new List<AIContent>();
+				if (!string.IsNullOrWhiteSpace(attachmentContent.Text))
+					contents.Add(new TextContent(attachmentContent.Text));
+
+				foreach (var attachment in attachmentContent.Attachments)
+					contents.AddRange(ConvertFileAttachment(attachment));
+
+				var role = DetermineChatRole(senderName);
+				result.Add(new Microsoft.Extensions.AI.ChatMessage(role, contents));
+			}
 			else
 			{
 				// Handle regular text messages
@@ -833,6 +1397,39 @@ public partial class ChatControl : UserControl
 		}
 
 		return result;
+	}
+
+	/// <summary>
+	/// Converts an attached file into one or more Microsoft.Extensions.AI content items.
+	/// </summary>
+	/// <remarks>
+	/// Text formats are decoded and sent as named text sections. Other formats are sent as typed binary data.
+	/// Override this method to extract PDF or Office text, upload files to provider-specific storage, or replace
+	/// large documents with RAG references.
+	/// </remarks>
+	/// <param name="attachment">The attachment to convert.</param>
+	/// <returns>The content items passed to the chat client.</returns>
+	protected virtual IEnumerable<AIContent> ConvertFileAttachment(ChatFileAttachment attachment)
+	{
+		if (attachment.IsText)
+		{
+			var lineBreak = Environment.NewLine;
+			var text = attachment.GetText();
+			yield return new TextContent(
+				$"--- BEGIN ATTACHED FILE: {attachment.Name} ({attachment.MediaType}) ---{lineBreak}" +
+				$"{text}{lineBreak}" +
+				$"--- END ATTACHED FILE: {attachment.Name} ---");
+			yield break;
+		}
+
+		if (!attachment.IsImage)
+		{
+			yield return new TextContent(
+				$"An attached file named '{attachment.Name}' with media type '{attachment.MediaType}' follows as binary content. " +
+				"Read it if this model and provider support that document format.");
+		}
+
+		yield return attachment.ToDataContent();
 	}
 
 	/// <summary>
@@ -875,18 +1472,13 @@ public partial class ChatControl : UserControl
 		var textStreamStarted = false;
 		var hadNonTextContentSinceLastText = false;
 
-		// this is usually done in AddStreamingMessage() but in this case has been done before to include thinking and tool calls
-		// calling SetIsReceivingStream() with true and false twice each does not bother
-		var inputControl = InputControl as IChatInputControl;
-		inputControl?.SetIsReceivingStream(true, allowCancellation: cancellationToken.CanBeCanceled);
-
 		try
 		{
 			ReasoningMessageContent? reasoningMessageContent = null;
 
 			// Iterate without ConfigureAwait(false) so continuations stay on the UI thread,
 			// allowing direct AddMessage / AddStreamingMessage calls.
-			await foreach (var update in stream)
+			await foreach (var update in EnumerateWithCancellation(stream, cancellationToken).ConfigureAwait(true))
 			{
 				if (cancellationToken.IsCancellationRequested)
 					break;
@@ -976,7 +1568,6 @@ public partial class ChatControl : UserControl
 		finally
 		{
 			textChannel.Writer.TryComplete();
-			inputControl?.SetIsReceivingStream(false, allowCancellation: false);
 		}
 	}
 
@@ -987,5 +1578,61 @@ public partial class ChatControl : UserControl
 	{
 		var content = response.Text ?? string.Empty;
 		AddMessage(sender, new StringMessageContent(content));
+	}
+
+	private static async IAsyncEnumerable<T> EnumerateWithCancellation<T>(
+		IAsyncEnumerable<T> source,
+		[System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+	{
+		IAsyncEnumerator<T>? enumerator = source.GetAsyncEnumerator(cancellationToken);
+		try
+		{
+			while (true)
+			{
+				var moveNextTask = enumerator.MoveNextAsync().AsTask();
+				bool hasNext;
+				try
+				{
+					hasNext = await moveNextTask.WaitAsync(cancellationToken).ConfigureAwait(false);
+				}
+				catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+				{
+					_ = DisposeAfterMoveNextAsync(enumerator, moveNextTask);
+					enumerator = null;
+					throw;
+				}
+
+				if (!hasNext)
+					yield break;
+
+				yield return enumerator.Current;
+			}
+		}
+		finally
+		{
+			if (enumerator is not null)
+				await enumerator.DisposeAsync().ConfigureAwait(false);
+		}
+	}
+
+	private static async Task DisposeAfterMoveNextAsync<T>(IAsyncEnumerator<T> enumerator, Task<bool> moveNextTask)
+	{
+		try
+		{
+			await moveNextTask.ConfigureAwait(false);
+		}
+		catch
+		{
+			// The abandoned move-next operation is observed before the enumerator is disposed.
+		}
+
+		try
+		{
+			await enumerator.DisposeAsync().ConfigureAwait(false);
+		}
+		catch
+		{
+			// Cleanup runs in the background after cancellation and must not surface an exception.
+		}
 	}
 }

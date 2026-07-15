@@ -14,6 +14,8 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl
 	private bool _isReceivingStream;
 	private readonly LabelControl _senderLabel;
 	private readonly LabelControl _messageLabel;
+	private FileAttachmentPreviewPanel? _attachmentPreviewPanel;
+	private IMessageFormatter _messageFormatter = new PlainTextMessageFormatter();
 
 	/// <inheritdoc/>
 	public event EventHandler? SizeUpdatedWhileStreaming;
@@ -28,7 +30,15 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl
 	/// Gets or sets the formatter that converts message content into displayable strings.
 	/// </summary>
 	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-	public required IMessageFormatter MessageFormatter { get; set; }
+	public required IMessageFormatter MessageFormatter
+	{
+		get => _messageFormatter;
+		set
+		{
+			_messageFormatter = value ?? throw new ArgumentNullException(nameof(value));
+			UpdateMessageDisplay();
+		}
+	}
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="DXChatMessageControl"/> class.
@@ -73,14 +83,8 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl
 		set
 		{
 			_message = value;
-			_senderLabel.Text = Message?.Sender?.Name ?? string.Empty;
-
-			_messageLabel.DataBindings.Clear();
-			if (Message is not null)
-			{
-				var binding = _messageLabel.DataBindings.Add(nameof(_messageLabel.Text), Message.Content, nameof(Message.Content.Content));
-				binding.Format += (_, e) => e.Value = MessageFormatter.Format(e.Value?.ToString() ?? string.Empty);
-			}
+			UpdateMessageDisplay();
+			UpdateAttachmentPreview();
 		}
 	}
 
@@ -98,8 +102,11 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl
 		set
 		{
 			base.MaximumSize = value;
-			_senderLabel.MaximumSize = new Size(value.Width - Padding.Horizontal, 0);
-			_messageLabel.MaximumSize = new Size(value.Width - Padding.Horizontal, 0);
+			var contentWidth = value.Width == 0 ? 0 : Math.Max(0, value.Width - Padding.Horizontal);
+			_senderLabel.MaximumSize = new Size(contentWidth, 0);
+			_messageLabel.MaximumSize = new Size(contentWidth, 0);
+			if (_attachmentPreviewPanel is not null)
+				_attachmentPreviewPanel.MaximumSize = new Size(contentWidth, 0);
 		}
 	}
 
@@ -126,4 +133,48 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl
 
 	/// <inheritdoc/>
 	public override string ToString() => _messageLabel.Text;
+
+	private void UpdateMessageDisplay()
+	{
+		_senderLabel.Text = Message?.Sender?.Name ?? string.Empty;
+
+		_messageLabel.DataBindings.Clear();
+		_messageLabel.Text = string.Empty;
+		_messageLabel.Visible = Message is not null;
+		if (Message is null)
+			return;
+
+		if (Message.Content is FileAttachmentMessageContent attachmentContent)
+		{
+			_messageLabel.Text = MessageFormatter.Format(new StringMessageContent(attachmentContent.Text));
+			_messageLabel.Visible = !string.IsNullOrWhiteSpace(_messageLabel.Text);
+		}
+		else
+		{
+			var binding = _messageLabel.DataBindings.Add(nameof(_messageLabel.Text), Message.Content, nameof(Message.Content.Content));
+			binding.Format += (_, e) => e.Value = MessageFormatter.Format(e.Value?.ToString() ?? string.Empty);
+		}
+	}
+
+	private void UpdateAttachmentPreview()
+	{
+		_attachmentPreviewPanel?.Dispose();
+		_attachmentPreviewPanel = null;
+
+		if (Message?.Content is not FileAttachmentMessageContent attachmentContent)
+			return;
+
+		var previewPanel = new FileAttachmentPreviewPanel(attachmentContent) { Dock = DockStyle.Top };
+		if (!previewPanel.HasPreviews)
+		{
+			previewPanel.Dispose();
+			return;
+		}
+
+		var contentWidth = MaximumSize.Width == 0 ? 0 : Math.Max(0, MaximumSize.Width - Padding.Horizontal);
+		previewPanel.MaximumSize = new Size(contentWidth, 0);
+		_attachmentPreviewPanel = previewPanel;
+		Controls.Add(previewPanel);
+		previewPanel.BringToFront();
+	}
 }
