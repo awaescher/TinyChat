@@ -8,6 +8,8 @@ partial class FunctionCallMessageControl
 
 	protected override void Dispose(bool disposing)
 	{
+		if (disposing && _message?.Content is FunctionCallMessageContent content)
+			content.PropertyChanged -= OnContentPropertyChanged;
 		if (disposing && (components != null))
 			components.Dispose();
 		base.Dispose(disposing);
@@ -19,8 +21,8 @@ partial class FunctionCallMessageControl
 		lblIcon = new Label();
 		lblResultIcon = new Label();
 		lblTitle = new Label();
-		lblArgs = new Label();
-		lblResult = new Label();
+		lblArgs = new SelectableMessageTextControl();
+		lblResult = new SelectableMessageTextControl();
 		tableLayout = new TableLayoutPanel();
 		tableLayout.SuspendLayout();
 		SuspendLayout();
@@ -30,7 +32,7 @@ partial class FunctionCallMessageControl
 		lblSender.Dock = DockStyle.Top;
 		lblSender.Font = new Font(Font, FontStyle.Bold);
 		lblSender.UseMnemonic = false;
-		lblSender.Padding = new Padding(8, 8, 0, 3);
+		lblSender.Padding = new Padding(0, 0, 0, 3);
 
 		// lblIcon
 		lblIcon.AutoSize = false;
@@ -57,20 +59,12 @@ partial class FunctionCallMessageControl
 		lblTitle.TextAlign = ContentAlignment.MiddleLeft;
 
 		// lblArgs
-		lblArgs.AutoSize = true;
-		lblArgs.Cursor = Cursors.Hand;
 		lblArgs.Dock = DockStyle.Fill;
-		lblArgs.Padding = new Padding(0, 2, 0, 6);
-		lblArgs.UseMnemonic = false;
-		lblArgs.TextAlign = ContentAlignment.TopLeft;
+		lblArgs.Margin = new Padding(0, 2, 0, 6);
 		lblArgs.Visible = false;
 
 		// lblResult
-		lblResult.AutoSize = true;
-		lblResult.Cursor = Cursors.Hand;
 		lblResult.Dock = DockStyle.Fill;
-		lblResult.UseMnemonic = false;
-		lblResult.TextAlign = ContentAlignment.MiddleLeft;
 		lblResult.Visible = false;
 
 		// _table
@@ -93,10 +87,10 @@ partial class FunctionCallMessageControl
 		tableLayout.Controls.Add(lblArgs, 1, 1);
 		tableLayout.Controls.Add(lblResultIcon, 0, 2);
 		tableLayout.Controls.Add(lblResult, 1, 2);
-		
+
 		tableLayout.Dock = DockStyle.Fill;
 		tableLayout.Margin = Padding.Empty;
-		tableLayout.Padding = new Padding(8, 0, 0, 0);
+		tableLayout.Padding = Padding.Empty;
 		tableLayout.RowCount = 3;
 		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -107,7 +101,7 @@ partial class FunctionCallMessageControl
 		BorderStyle = BorderStyle.None;
 		Cursor = Cursors.Hand;
 		Margin = new Padding(3);
-		Padding = new Padding(0);
+		Padding = new Padding(8);
 		Controls.Add(lblSender);
 		Controls.Add(tableLayout);
 		tableLayout.BringToFront();
@@ -115,9 +109,7 @@ partial class FunctionCallMessageControl
 		tableLayout.Click += Toggle;
 		lblIcon.Click += Toggle;
 		lblTitle.Click += Toggle;
-		lblArgs.Click += Toggle;
 		lblResultIcon.Click += Toggle;
-		lblResult.Click += Toggle;
 
 		tableLayout.ResumeLayout(false);
 		tableLayout.PerformLayout();
@@ -129,7 +121,7 @@ partial class FunctionCallMessageControl
 	private TableLayoutPanel tableLayout;
 	private Label lblIcon;
 	private Label lblTitle;
-	private Label lblArgs;
+	private SelectableMessageTextControl lblArgs;
 	private Label lblResultIcon;
-	private Label lblResult;
+	private SelectableMessageTextControl lblResult;
 }

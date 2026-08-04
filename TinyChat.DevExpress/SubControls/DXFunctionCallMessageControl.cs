@@ -1,7 +1,5 @@
-using DevExpress.DirectX.Common.Direct2D;
-using DevExpress.XtraEditors;
-using Microsoft.VisualBasic.ApplicationServices;
 using System.ComponentModel;
+using DevExpress.XtraEditors;
 
 namespace TinyChat;
 
@@ -9,9 +7,10 @@ namespace TinyChat;
 /// Displays a function call and its result in a structured two-column layout.
 /// The left column shows icon glyphs from Segoe MDL2 Assets; the right column shows
 /// the function name (bold), the arguments, and the result.
-/// Clicking anywhere on the control toggles the detail rows (arguments + result).
+/// Clicking the header or icon areas toggles the detail rows (arguments + result).
+/// The detail editors remain dedicated to text selection.
 /// </summary>
-internal sealed partial class DXFunctionCallMessageControl : PanelControl, IFunctionCallMessageControl
+internal sealed partial class DXFunctionCallMessageControl : PanelControl, IFunctionCallMessageControl, IChatMessageLayoutControl
 {
 	/// <summary>
 	/// Fixed pixel width reserved for the icon column.
@@ -19,7 +18,7 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IFunc
 	private const int ICON_WIDTH = 20;
 
 	/// <summary>SVG for the tool/lightning icon.</summary>
-	private const string ToolSvg = """
+	private const string TOOL_SVG = """
 		<svg viewBox="0 0 32 32">
 			<style type="text/css">.Yellow{fill:#FFB115;}</style>
 			<polygon points="22,2 14,2 6,16 14,16 8,30 26,12 16.3,12" class="Yellow" />
@@ -27,7 +26,7 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IFunc
 		""";
 
 	/// <summary>SVG for the result/arrow icon.</summary>
-	private const string ResultSvg = """
+	private const string RESULT_SVG = """
 		<svg viewBox="0 0 32 32">
 			<style type="text/css">.Green{fill:#039C23;}</style>
 			<polygon points="18,6 12.3,6 20.3,14 4,14 4,18 20.3,18 12.3,26 18,26 28,16" class="Green" />
@@ -71,14 +70,12 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IFunc
 	{
 		InitializeComponent();
 
-		lblToolIcon.Font = new Font(lblTitle.Font.FontFamily, lblTitle.Font.Size);
-		lblResultIcon.Font = lblToolIcon.Font;
-
-		lblTitle.Font = new Font("Consolas", lblTitle.Font.Size);
-		lblResult.Font = lblTitle.Font;
-		lblArguments.Font = new Font(lblTitle.Font.FontFamily, lblTitle.Font.Size - 1);
-
-		WireMouseDown(paddingPanel, tableLayout, lblToolIcon, lblTitle, lblArguments, lblResultIcon, lblResult);
+		txtArguments.ContentHeightChanging += SelectableText_ContentHeightChanging;
+		txtArguments.ContentHeightChanged += SelectableText_ContentHeightChanged;
+		txtResult.ContentHeightChanging += SelectableText_ContentHeightChanging;
+		txtResult.ContentHeightChanged += SelectableText_ContentHeightChanged;
+		WireMouseDown(paddingPanel, tableLayout, lblToolIcon, lblTitle, lblResultIcon);
+		ApplyAppearance();
 	}
 
 	/// <inheritdoc/>
@@ -96,6 +93,15 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IFunc
 			lblTitle.Cursor = cursor;
 			lblToolIcon.Cursor = cursor;
 		}
+	}
+
+	/// <inheritdoc />
+	[Browsable(false)]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	public Padding ContentPadding
+	{
+		get => Padding;
+		set => Padding = value;
 	}
 
 	/// <summary>
@@ -140,7 +146,7 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IFunc
 
 	/// <summary>
 	/// Gets or sets the maximum size of this control.
-	/// The horizontal constraint is forwarded to the text labels so that long lines wrap.
+	/// The horizontal constraint is forwarded to the text controls so that long lines wrap.
 	/// </summary>
 	public override Size MaximumSize
 	{
@@ -148,12 +154,16 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IFunc
 		set
 		{
 			base.MaximumSize = value;
-			// Account for outer padding and icon column.
-			var textWidth = Math.Max(0, value.Width - Padding.Horizontal - ICON_WIDTH);
-			lblTitle.MaximumSize = new Size(textWidth, 0);
-			lblArguments.MaximumSize = new Size(textWidth, 0);
-			lblResult.MaximumSize = new Size(textWidth, 0);
+			UpdateContentWidthConstraints();
 		}
+	}
+
+	/// <inheritdoc />
+	protected override void OnPaddingChanged(EventArgs e)
+	{
+		base.OnPaddingChanged(e);
+		UpdateContentWidthConstraints();
+		PerformLayout();
 	}
 
 	/// <summary>
@@ -168,7 +178,7 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IFunc
 		}
 	}
 	/// <summary>
-	/// Refreshes both the header and detail labels from the current <see cref="Message"/>.
+	/// Refreshes the header and selectable detail editors from the current <see cref="Message"/>.
 	/// Does nothing if <see cref="Message"/> is <see langword="null"/> or its content is not
 	/// a <see cref="FunctionCallMessageContent"/>.
 	/// </summary>
@@ -177,16 +187,17 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IFunc
 		if (_message?.Content is not FunctionCallMessageContent fc)
 			return;
 
-		lblTitle.Text = fc.Name + $" <font=Tahoma>{(fc.IsFunctionExecuting ? "..." : "✔")}</font>";
+		lblTitle.Text = $"{fc.Name} {(fc.IsFunctionExecuting ? "..." : "\u2714")}";
 
+		var argumentsText = string.Empty;
 		if (fc.Arguments?.Count > 0)
 		{
 			var maxKeyLen = fc.Arguments.Keys.Max(k => k.Length);
-			lblArguments.Text = string.Join(Environment.NewLine, fc.Arguments.Select(kv => $"{(kv.Key + ":").PadRight(maxKeyLen + 1)} {kv.Value}"));
+			argumentsText = string.Join(Environment.NewLine, fc.Arguments.Select(kv => $"{(kv.Key + ":").PadRight(maxKeyLen + 1)} {kv.Value}"));
 		}
+		txtArguments.SetTextPreservingSelection(argumentsText);
 
-		if (fc.Result is not null)
-			lblResult.Text = fc.Result.ToString();
+		txtResult.SetTextPreservingSelection(fc.Result?.ToString());
 
 		ApplyVisibility();
 	}
@@ -207,13 +218,76 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IFunc
 		var hasArgs = fc.Arguments?.Count > 0;
 		var hasResult = fc.Result is not null;
 
-		lblArguments.Visible = _expanded && hasArgs;
+		txtArguments.Visible = _expanded && hasArgs;
 		lblResultIcon.Visible = _expanded && hasResult;
-		lblResult.Visible = _expanded && hasResult;
+		txtResult.Visible = _expanded && hasResult;
 
 		tableLayout.ResumeLayout();
 		ResumeLayout();
 		AfterLayoutChange?.Invoke(this, EventArgs.Empty);
+	}
+
+	/// <inheritdoc />
+	protected override void OnFontChanged(EventArgs e)
+	{
+		base.OnFontChanged(e);
+		ApplyAppearance();
+	}
+
+	/// <inheritdoc />
+	protected override void OnForeColorChanged(EventArgs e)
+	{
+		base.OnForeColorChanged(e);
+		ApplyAppearance();
+	}
+
+	/// <inheritdoc />
+	protected override void OnBackColorChanged(EventArgs e)
+	{
+		base.OnBackColorChanged(e);
+		ApplyAppearance();
+	}
+
+	private void ApplyAppearance()
+	{
+		if (lblSender is null)
+			return;
+
+		ApplyLabelAppearance(lblSender, FontStyle.Bold);
+		ApplyLabelAppearance(lblToolIcon);
+		ApplyLabelAppearance(lblTitle);
+		ApplyLabelAppearance(lblResultIcon);
+		txtArguments.ApplyTextAppearance(Font, ForeColor, BackColor);
+		txtResult.ApplyTextAppearance(Font, ForeColor, BackColor);
+
+		paddingPanel.BackColor = BackColor;
+		tableLayout.BackColor = BackColor;
+	}
+
+	private void ApplyLabelAppearance(LabelControl label, FontStyle fontStyle = FontStyle.Regular)
+	{
+		label.Appearance.Font = Font;
+		label.Appearance.FontStyleDelta = fontStyle;
+		label.Appearance.ForeColor = ForeColor;
+		label.Appearance.BackColor = BackColor;
+		label.Appearance.Options.UseFont = true;
+		label.Appearance.Options.UseForeColor = true;
+		label.Appearance.Options.UseBackColor = true;
+	}
+
+	private void UpdateContentWidthConstraints()
+	{
+		if (lblTitle is null || txtArguments is null || txtResult is null)
+			return;
+
+		var textWidth = MaximumSize.Width == 0
+			? 0
+			: Math.Max(0, MaximumSize.Width - ContentPadding.Horizontal - ICON_WIDTH);
+		lblTitle.MaximumSize = new Size(textWidth, 0);
+		txtArguments.MaximumSize = new Size(textWidth, 0);
+		txtResult.MaximumSize = new Size(textWidth, 0);
+		txtArguments.UpdateContentHeight();
+		txtResult.UpdateContentHeight();
 	}
 
 	private void WireMouseDown(params Control[] controls)
@@ -222,6 +296,16 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IFunc
 			c.MouseDown += (_, e) => OnMouseDown(e);
 	}
 
+	private void SelectableText_ContentHeightChanging(object? sender, EventArgs e)
+	{
+		BeforeLayoutChange?.Invoke(this, EventArgs.Empty);
+	}
+
+	private void SelectableText_ContentHeightChanged(object? sender, EventArgs e)
+	{
+		AfterLayoutChange?.Invoke(this, EventArgs.Empty);
+	}
+
 	/// <inheritdoc/>
-	public override string ToString() => $"{lblTitle.Text}{Environment.NewLine}{lblArguments.Text}{Environment.NewLine}{lblResult.Text}";
+	public override string ToString() => $"{lblTitle.Text}{Environment.NewLine}{txtArguments.Text}{Environment.NewLine}{txtResult.Text}";
 }

@@ -6,9 +6,10 @@ namespace TinyChat;
 /// Displays a function call and its result in a structured two-column layout.
 /// The left column shows icon glyphs from Segoe MDL2 Assets; the right column shows
 /// the function name (bold), the arguments, and the result.
-/// Clicking anywhere on the control toggles the detail rows (arguments + result).
+/// Clicking the header or icon areas toggles the detail rows (arguments + result).
+/// The detail text controls remain dedicated to text selection.
 /// </summary>
-internal sealed partial class FunctionCallMessageControl : Panel, IFunctionCallMessageControl
+internal sealed partial class FunctionCallMessageControl : Panel, IFunctionCallMessageControl, IChatMessageLayoutControl
 {
 	/// <summary>
 	/// Icon used to mark the function-call row.
@@ -25,6 +26,7 @@ internal sealed partial class FunctionCallMessageControl : Panel, IFunctionCallM
 
 	/// <summary>The chat message whose <see cref="FunctionCallMessageContent"/> is being displayed.</summary>
 	private IChatMessage? _message;
+	private Font? _senderFont;
 
 	/// <summary>
 	/// Whether the detail panel (arguments + result) is currently visible.
@@ -62,12 +64,81 @@ internal sealed partial class FunctionCallMessageControl : Panel, IFunctionCallM
 
 		lblIcon.Font = new Font("Arial", 11);
 		lblResultIcon.Font = lblIcon.Font;
+		ApplyTextFont();
+		ApplyColors();
+		Disposed += (_, _) =>
+		{
+			_senderFont?.Dispose();
+			_senderFont = null;
+		};
 
-		lblTitle.Font = new Font("Consolas", lblTitle.Font.Size - 1);
-		lblResultIcon.Font = lblTitle.Font;
-		lblArgs.Font = new Font(lblTitle.Font.FontFamily, lblTitle.Font.Size - 1);
+		WireMouseDown(tableLayout, lblIcon, lblTitle, lblResultIcon);
+	}
 
-		WireMouseDown(tableLayout, lblIcon, lblTitle, lblArgs, lblResultIcon, lblResult);
+	/// <inheritdoc />
+	[Browsable(false)]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	public Padding ContentPadding
+	{
+		get => Padding;
+		set => Padding = value;
+	}
+
+	/// <inheritdoc />
+	protected override void OnBackColorChanged(EventArgs e)
+	{
+		base.OnBackColorChanged(e);
+		ApplyColors();
+	}
+
+	/// <inheritdoc />
+	protected override void OnFontChanged(EventArgs e)
+	{
+		base.OnFontChanged(e);
+
+		if (lblSender is not null)
+			ApplyTextFont();
+	}
+
+	/// <inheritdoc />
+	protected override void OnForeColorChanged(EventArgs e)
+	{
+		base.OnForeColorChanged(e);
+		ApplyColors();
+	}
+
+	/// <inheritdoc />
+	protected override void OnPaddingChanged(EventArgs e)
+	{
+		BeforeLayoutChange?.Invoke(this, EventArgs.Empty);
+		try
+		{
+			base.OnPaddingChanged(e);
+			UpdateContentWidthConstraints();
+			PerformLayout();
+		}
+		finally
+		{
+			AfterLayoutChange?.Invoke(this, EventArgs.Empty);
+		}
+	}
+
+	/// <inheritdoc />
+	protected override void OnParentBackColorChanged(EventArgs e)
+	{
+		base.OnParentBackColorChanged(e);
+		ApplyColors();
+	}
+
+	private void ApplyTextFont()
+	{
+		var oldSenderFont = _senderFont;
+		_senderFont = new Font(Font, Font.Style | FontStyle.Bold);
+		lblSender.Font = _senderFont;
+		lblTitle.Font = Font;
+		lblArgs.Font = Font;
+		lblResult.Font = Font;
+		oldSenderFont?.Dispose();
 	}
 
 	/// <inheritdoc/>
@@ -129,7 +200,7 @@ internal sealed partial class FunctionCallMessageControl : Panel, IFunctionCallM
 
 	/// <summary>
 	/// Gets or sets the maximum size of this control.
-	/// The horizontal constraint is forwarded to the text labels so that long lines wrap.
+	/// The horizontal constraint is forwarded to the text controls so that long lines wrap.
 	/// </summary>
 	public override Size MaximumSize
 	{
@@ -137,10 +208,7 @@ internal sealed partial class FunctionCallMessageControl : Panel, IFunctionCallM
 		set
 		{
 			base.MaximumSize = value;
-			var textWidth = Math.Max(0, value.Width - Padding.Horizontal - ICON_WIDTH);
-			lblTitle.MaximumSize = new Size(textWidth, 0);
-			lblArgs.MaximumSize = new Size(textWidth, 0);
-			lblResult.MaximumSize = new Size(textWidth, 0);
+			UpdateContentWidthConstraints();
 		}
 	}
 
@@ -157,7 +225,7 @@ internal sealed partial class FunctionCallMessageControl : Panel, IFunctionCallM
 	}
 
 	/// <summary>
-	/// Rebuilds all labels from the current <see cref="Message"/> and applies visibility.
+	/// Rebuilds the header and selectable detail controls from the current <see cref="Message"/> and applies visibility.
 	/// Does nothing if <see cref="Message"/> is <see langword="null"/> or its content is not
 	/// a <see cref="FunctionCallMessageContent"/>.
 	/// </summary>
@@ -212,6 +280,46 @@ internal sealed partial class FunctionCallMessageControl : Panel, IFunctionCallM
 	{
 		foreach (var c in controls)
 			c.MouseDown += (_, e) => OnMouseDown(e);
+	}
+
+	private void UpdateContentWidthConstraints()
+	{
+		if (lblSender is null || lblTitle is null || lblArgs is null || lblResult is null)
+			return;
+
+		var contentWidth = MaximumSize.Width == 0
+			? 0
+			: Math.Max(0, MaximumSize.Width - ContentPadding.Horizontal);
+		var textWidth = contentWidth == 0 ? 0 : Math.Max(0, contentWidth - ICON_WIDTH);
+		lblSender.MaximumSize = new Size(contentWidth, 0);
+		lblTitle.MaximumSize = new Size(textWidth, 0);
+		lblArgs.MaximumSize = new Size(textWidth, 0);
+		lblResult.MaximumSize = new Size(textWidth, 0);
+	}
+
+	private void ApplyColors()
+	{
+		if (lblSender is null || tableLayout is null)
+			return;
+
+		var backColor = GetOpaqueBackColor();
+		tableLayout.BackColor = backColor;
+		foreach (var label in new Control[] { lblSender, lblIcon, lblTitle, lblArgs, lblResultIcon, lblResult })
+		{
+			label.BackColor = backColor;
+			label.ForeColor = ForeColor;
+		}
+	}
+
+	private Color GetOpaqueBackColor()
+	{
+		for (Control? current = this; current is not null; current = current.Parent)
+		{
+			if (current.BackColor.A == byte.MaxValue)
+				return current.BackColor;
+		}
+
+		return SystemColors.Control;
 	}
 
 	/// <inheritdoc/>

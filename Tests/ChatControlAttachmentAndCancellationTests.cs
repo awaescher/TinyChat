@@ -206,8 +206,8 @@ public class ChatControlAttachmentAndCancellationTests
 
 			messageControl.MinimumSize.Width.ShouldBe(messageControl.MaximumSize.Width);
 			messageControl.Width.ShouldBeGreaterThan(300);
-			var messageLabel = messageControl.Controls.OfType<Label>().Single(label => label.Text.StartsWith("A caption"));
-			messageLabel.Width.ShouldBeGreaterThan(300);
+			var messageTextControl = messageControl.Controls.OfType<TextBox>().Single(textBox => textBox.Text.StartsWith("A caption"));
+			messageTextControl.Width.ShouldBeGreaterThan(300);
 			var previewPanel = messageControl.Controls.OfType<FileAttachmentPreviewPanel>().Single();
 			previewPanel.Width.ShouldBeGreaterThan(128);
 			previewPanel.Controls.OfType<PictureBox>().Count().ShouldBe(2);
@@ -506,7 +506,7 @@ public class ChatControlAttachmentAndCancellationTests
 		{
 			yield return "Started";
 			entered.TrySetResult();
-			await release.Task;
+			await release.Task.ConfigureAwait(false);
 		}
 		finally
 		{

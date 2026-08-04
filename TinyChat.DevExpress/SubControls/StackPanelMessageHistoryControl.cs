@@ -45,6 +45,7 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 	{
 		var control = (Control)messageControl;
 		control.MouseDown += OnMessageControlMouseDown;
+		control.MarginChanged += MessageControlMarginChanged;
 		_stackPanel.Controls.Add(control);
 
 		// queue this to the UI thread to ensure it runs after the control is added
@@ -52,6 +53,9 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 		// is not visible
 		BeginInvoke(() =>
 		{
+			if (IsDisposed || Disposing || control.IsDisposed || !ReferenceEquals(control.Parent, _stackPanel))
+				return;
+
 			SetSizeConstraints(control);
 			ScrollControlIntoView(control);
 
@@ -66,7 +70,8 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 	/// </summary>
 	public void ClearMessageControls()
 	{
-		foreach (var messageControl in _stackPanel.Controls.OfType<IChatMessageControl>())
+		var messageControls = _stackPanel.Controls.OfType<IChatMessageControl>().ToArray();
+		foreach (var messageControl in messageControls)
 		{
 			messageControl.SizeUpdatedWhileStreaming -= MessageControlStreamingSizeUpdate;
 			messageControl.BeforeLayoutChange -= BeforeMessageLayoutChange;
@@ -74,9 +79,16 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 
 			var control = (Control)messageControl;
 			control.MouseDown -= OnMessageControlMouseDown;
+			control.MarginChanged -= MessageControlMarginChanged;
 		}
 
 		_stackPanel.Controls.Clear();
+		_selectedMessageControl = null;
+		foreach (var messageControl in messageControls)
+		{
+			messageControl.Message = null;
+			((Control)messageControl).Dispose();
+		}
 	}
 
 	/// <summary>
@@ -89,8 +101,16 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 		{
 			var control = (Control)messageControl;
 			messageControl.SizeUpdatedWhileStreaming -= MessageControlStreamingSizeUpdate;
+			messageControl.BeforeLayoutChange -= BeforeMessageLayoutChange;
+			messageControl.AfterLayoutChange -= AfterMessageLayoutChange;
 			control.MouseDown -= OnMessageControlMouseDown;
+			control.MarginChanged -= MessageControlMarginChanged;
 			_stackPanel.Controls.Remove(control);
+			messageControl.Message = null;
+			control.Dispose();
+
+			if (ReferenceEquals(_selectedMessageControl, messageControl))
+				_selectedMessageControl = null;
 		}
 	}
 
@@ -127,8 +147,9 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 	/// <param name="control">The control to apply size constraints to.</param>
 	private void SetSizeConstraints(Control control)
 	{
-		control.MinimumSize = new Size(_stackPanel.ClientRectangle.Width, 0);
-		control.MaximumSize = new Size(_stackPanel.ClientRectangle.Width, 0);
+		var availableWidth = Math.Max(0, _stackPanel.ClientRectangle.Width - control.Margin.Horizontal);
+		control.MinimumSize = new Size(availableWidth, 0);
+		control.MaximumSize = new Size(availableWidth, 0);
 	}
 
 
@@ -159,16 +180,35 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 	/// <inheritdoc/>
 	protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
 	{
+		if (keyData == (Keys.Control | Keys.C) && HasFocusedEditor(this))
+			return base.ProcessCmdKey(ref msg, keyData);
+
 		if (keyData == (Keys.Control | Keys.C) && _selectedMessageControl is not null)
 		{
 			try
 			{
-				Clipboard.SetText(_selectedMessageControl.ToString());
+				var text = _selectedMessageControl.ToString();
+				if (!string.IsNullOrEmpty(text))
+					Clipboard.SetText(text);
 			}
 			catch { }
 			return true;
 		}
 		return base.ProcessCmdKey(ref msg, keyData);
+	}
+
+	private static bool HasFocusedEditor(Control parent)
+	{
+		foreach (Control child in parent.Controls)
+		{
+			if (child is BaseEdit or HtmlContentControl && child.ContainsFocus)
+				return true;
+
+			if (child.ContainsFocus && HasFocusedEditor(child))
+				return true;
+		}
+
+		return false;
 	}
 
 	private void OnMessageControlMouseDown(object? sender, MouseEventArgs e)
@@ -178,6 +218,15 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 			_selectedMessageControl = sender as IChatMessageControl;
 			Focus(); // required to use ProcessCmdKey()
 		}
+	}
+
+	private void MessageControlMarginChanged(object? sender, EventArgs e)
+	{
+		if (sender is not Control control || !ReferenceEquals(control.Parent, _stackPanel))
+			return;
+
+		SetSizeConstraints(control);
+		_stackPanel.PerformLayout();
 	}
 
 	private void MessageControlStreamingSizeUpdate(object? sender, EventArgs args)

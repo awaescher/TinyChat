@@ -8,137 +8,198 @@ A minimalistic but extensible chat control library for Windows Forms.
 
 ## ✨ Features
 
-- **Simplistic chat interface**: Clean, responsive chat UI with message history and input controls
-- **Streaming support**: Real-time message streaming for AI assistants and live conversations
-- **Basic formatting support**: Supports cleaning HTML and Markdown formatting for WinForms controls and basic HTML and Markdown support for DevExpress controls
-- **Function calling support**: Native support for tool/function calls with automatic argument and result display
-- **Reasoning support**: Display model reasoning steps when the model thinks before generating final responses
-- **Extensible architecture**: Interface-driven design allowing custom message types and custom UI components
-- **Made for WinForms**: Because business applications might need AI chats, too
+- **Two control suites**: vendor-control-free Windows Forms controls in `TinyChat` and a skinnable DevExpress implementation in `TinyChat.DevExpress`
+- **Streaming support**: real-time message streaming for AI assistants and live conversations
+- **Microsoft.Extensions.AI integration**: use any registered `IChatClient`, including keyed services, with streaming, cancellation, chat options, reasoning, and function calls
+- **File and image attachments**: add files through drag and drop, clipboard paste, or the public API; images are shown as previews
+- **Selectable and copyable content**: directly select regular message text, function-call arguments and results, or reasoning details, or copy any complete message with its hover button
+- **Designer-friendly appearance**: configure fonts, colors, history, message and input spacing, welcome alignment, the splitter, and behavioral options in the Windows Forms Designer
+- **New-chat lifecycle**: cancel the active response and clear the conversation and input draft in one call
+- **Readable message rendering**: native controls use cleaned plain text, while the DevExpress suite keeps its safe HTML/CSS formatting in a permanently selectable message surface
+- **Extensible architecture**: interface-driven design and factory methods for custom message types and UI components
+
+## Control suites
+
+| NuGet package | Control | UI components | Default formatter |
+|---|---|---|---|
+| `TinyChat` | `ChatControl` | Native Windows Forms controls | `PlainTextMessageFormatter` |
+| `TinyChat.DevExpress` | `DXChatControl` | DevExpress controls | `SimplifiedHtmlMessageFormatter` (selectable HTML/CSS body view) |
+
+Both controls share the same public chat API. `DXChatControl` derives from `ChatControl` and replaces the primary editors, message controls, history, welcome surface, and splitter with DevExpress counterparts.
+`TinyChat.DevExpress` is built and tested with DevExpress 24.2.12 and requires the corresponding DevExpress license.
 
 ## 💖 Motivation
 
-While there are countless web-based chat controls, there's nearly to none for the good old Windows Forms ecosystem and this is not surprising. However, I needed a very basic user interface to interact with AI models within an WinForms application. 
+While there are countless web-based chat controls, there are very few for the good old Windows Forms ecosystem. TinyChat provides a focused user interface for interacting with AI models inside an existing WinForms application.
 
-DevExpress, the component vendor of my choice, [has a very nice chat control](http://docs.devexpress.com/WindowsForms/405218). However, it's built upon web technologies and with that [it introduces a significant number of dependencies to ship](https://supportcenter.devexpress.com/ticket/details/t1294891/aichatcontrol-without-webview). I didn't want to pack additional 50MB of assemblies for a single control and theirs is so feature-rich that I would have to to disable 90% of it's functionality nevertheless.
+DevExpress also offers a feature-rich [AI Chat Control](https://docs.devexpress.com/WindowsForms/405218). It is based on web technologies and therefore [adds a significant set of deployment dependencies](https://supportcenter.devexpress.com/ticket/details/t1294891/aichatcontrol-without-webview). TinyChat deliberately stays smaller and exposes factory methods and interfaces for applications that need to customize it.
 
-That's why I quickly hacked down TinyChat. I hope this might help anyone out there. But please keep in mind that I never inteded to build a full-featured chat client with advanced text formatting support and so on. If you need more features, please consider sending pull-requests or using the DevExpress chat control.
+## Known limitations
 
-## 🤷‍♂️ Not implemented
+- **Full formatting specifications are not implemented.** Native Windows Forms message controls display cleaned plain text. The DevExpress controls support a practical subset of common HTML and Markdown constructs, but not every HTML, Markdown, or RTF feature an assistant may emit.
+- **Image rendering currently focuses on attachments.** Local or pasted images have previews and are sent to compatible `IChatClient` implementations as multimodal content. Arbitrary remote images or image content returned by an assistant are not rendered automatically.
+- **Provider capabilities still apply.** A provider or model may reject a binary attachment format even though TinyChat can load and forward it. Override `ConvertFileAttachment()` when files need extraction, upload, or RAG processing first.
 
-### Not planned
+## 🚀 Quick start
 
-These features are not implemented and I don't plan to implement them. However, I'd be happy to review pull-requests.
-
-- Full formatting support
-  > [Basic formatting is supported since v2.0](https://github.com/awaescher/TinyChat/pull/1) but full formatting spec support will be very hard to do in Winforms. Especially because AI assistants can come up with pretty much every flavor of formatting like HTML, Markdown, RTF, etc.
-- File attachment support
-- Image support
-- everything else you know from chatbots
-
-### Might come
-- Designer support for properties like UI settings like Fonts, Splitter position, ...
-- Select and copy texts
-- Starting new chats
-
-## 🚀 Quick Start
-
-### Basic Usage
-
-The chat control provides a `Messages` property that can be set to provide message history.
-When the user is sending messages, the events `MessageSending` and `MessageSent` gets fired to prevent or react on user messages.
+### Native Windows Forms
 
 ```csharp
 using TinyChat;
 
-var chatControl = new ChatControl();
-chatControl.Dock = DockStyle.Fill;
-Controls.Add(chatControl);
-
-// Set up message handling
-chatControl.MessageSent += (sender, e) =>
+var chatControl = new ChatControl
 {
-    // Handle user messages
-    Console.WriteLine($"User sent: {e.Content}");
-    
-    // Add a response
-    chatControl.AddMessage(
-        new NamedSender("Assistant"), 
-        new StringMessageContent("Hello! How can I help you?")
-    );
+    Dock = DockStyle.Fill
 };
-
+Controls.Add(chatControl);
 ```
 
-### Streaming Messages with IAsyncEnumerable
+For the DevExpress suite, reference `TinyChat.DevExpress` and instantiate `DXChatControl` instead. The remaining API is the same.
 
-Use `AddStreamingMessage()` to pass in a stream of tokens asynchronously. The chat component will take care of updating the user interface from background threads.
+### Basic message handling
+
+The `Messages` property supplies an existing conversation. `MessageSending` can inspect or cancel a user message, while `MessageSent` runs after it was accepted.
 
 ```csharp
-IAsyncEnumerable<string> stream = ...;
+chatControl.MessageSent += (_, e) =>
+{
+    Console.WriteLine($"User sent: {e.Content}");
+
+    chatControl.AddMessage(
+        new NamedSender("Assistant"),
+        new StringMessageContent("Hello! How can I help you?"));
+};
+```
+
+### Starting a new chat
+
+Use `StartNewChat()` instead of assigning an empty message collection. It requests cancellation of an active response and clears the built-in conversation, text draft, pending attachments, selection, and copy UI in one call.
+
+```csharp
+chatControl.NewChatStarted += (_, _) =>
+{
+    // Reset any application-specific session state here.
+};
+
+chatControl.StartNewChat();
+```
+
+Custom input controls can implement `IChatInputDraftControl` so their own draft state is cleared by the same call.
+
+### Designer and appearance settings
+
+The following properties are available in the Windows Forms Designer and work for both control suites:
+
+```csharp
+chatControl.MessageFont = new Font("Segoe UI", 10f);
+chatControl.InputFont = new Font("Segoe UI", 10f);
+chatControl.WelcomeFont = new Font("Segoe UI", 14f);
+chatControl.WelcomeMessage = "How can I help?";
+chatControl.HistoryPadding = new Padding(12);
+chatControl.MessagePadding = new Padding(10);
+chatControl.MessageMargin = new Padding(4);
+chatControl.InputPadding = new Padding(10);
+chatControl.WelcomeTextAlign = ContentAlignment.MiddleCenter;
+chatControl.IsSplitterFixed = true;
+chatControl.SplitterPosition = 90;
+```
+
+`Font`, `ForeColor`, and `BackColor` provide the global appearance for the complete chat and are propagated by both the native Windows Forms and DevExpress suites. `MessageFont` and `InputFont` inherit from `Font` until explicitly changed; resetting them resumes that inheritance. `WelcomeFont` is independent, and resetting it restores the larger default welcome font.
+
+The layout properties have the same meaning and defaults in both suites:
+
+| Property | Scope | Default after reset |
+|---|---|---|
+| `HistoryPadding` | Padding inside the history area, including the welcome surface | `0` on every side |
+| `MessagePadding` | Inner padding of regular, function-call, and reasoning messages | `8` on every side |
+| `MessageMargin` | Outer margin of every message | `3` on every side |
+| `InputPadding` | Inner padding of the complete input area | `8` on every side |
+| `WelcomeTextAlign` | Alignment of the welcome text within the history area | `ContentAlignment.MiddleCenter` |
+| `IsSplitterFixed` | Prevents the user from moving the splitter when enabled | `false` |
+| `SplitterPosition` | Height of the lower input area in pixels | `60` |
+
+Resetting one of these properties in the Designer restores the listed value. The inherited `ChatControl.Padding` property remains the outer padding around the combined chat surface; it is not inherited by the history, messages, or input area.
+
+### Selecting and copying text
+
+Both control suites display regular message bodies permanently in selectable text views. Drag directly over the required text and press <kbd>Ctrl</kbd>+<kbd>C</kbd>; no renderer or selection-mode switch is required. Starting a selection in another message clears the previous selection, so multiple message bodies are never highlighted at the same time.
+
+Function-call arguments and results as well as reasoning details are directly selectable in the same way. To copy the complete content of any message, hover over it and use the copy button. You can also click the sender/header or message background and press <kbd>Ctrl</kbd>+<kbd>C</kbd> to copy the complete message.
+
+### File and image attachments
+
+When `AllowFileAttachments` is enabled (the default), users can:
+
+- drop files anywhere on the chat;
+- paste copied files or a bitmap into the input;
+- remove attachments from the draft before sending;
+- see small image previews and document tiles.
+
+The default per-file limit is 20 MiB and can be changed with `MaximumAttachmentFileSize`. Files can also be supplied in code:
+
+```csharp
+await chatControl.AddFilesToInputAsync(openFileDialog.FileNames);
+
+await chatControl.SendFilesAsync(
+    ["report.pdf", "diagram.png"],
+    "Summarize these files.");
+```
+
+Text attachments are forwarded as named text sections. Images and other binary files are represented as typed `DataContent` for `Microsoft.Extensions.AI`.
+
+### Streaming messages with `IAsyncEnumerable`
+
+Pass a token stream to `AddStreamingMessage()`. TinyChat marshals display updates back to the UI synchronization context.
+
+```csharp
+IAsyncEnumerable<string> stream = GetTokenStream();
 chatControl.AddStreamingMessage(new NamedSender("AI Assistant"), stream);
 ```
 
-### Using IChatClient with Dependency Injection
+### Using `IChatClient` with dependency injection
 
-TinyChat now supports direct integration with `Microsoft.Extensions.AI.IChatClient`, enabling automatic AI responses with minimal boilerplate code.
+TinyChat can resolve and call a `Microsoft.Extensions.AI.IChatClient` automatically.
 
 ```csharp
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using TinyChat;
 
-// Set up dependency injection
 var services = new ServiceCollection();
+services.AddSingleton<IChatClient>(CreateChatClient());
 
-// Register your IChatClient implementation (e.g., OpenAI, Azure OpenAI, Ollama, etc.)
-services.AddSingleton<IChatClient>(/* your IChatClient implementation */);
-
-var serviceProvider = services.BuildServiceProvider();
-
-// Configure the ChatControl
 var chatControl = new ChatControl
 {
-    ServiceProvider = serviceProvider,
-    UseStreaming = true,  // Enable streaming (default)
+    ServiceProvider = services.BuildServiceProvider(),
+    UseStreaming = true,
     AssistantSenderName = "AI Assistant"
 };
-
-// That's it! The ChatControl will automatically call IChatClient when users send messages
-// The entire conversation history is passed to the IChatClient
 ```
 
-**Key Features:**
-- **Automatic Integration**: No need to manually handle `MessageSent` events
-- **Conversation History**: Full message history is automatically passed to the IChatClient
-- **Streaming Support**: Toggle between streaming and non-streaming responses
-- **Keyed Services**: Support for keyed service resolution via `ChatClientServiceKey` property
-- **Cancellation Support**: Long-running operations can be cancelled
-- **Extensible**: Override `ConvertToChatMessages()` or `DetermineChatRole()` for custom behavior
+The complete conversation is converted and passed to the client. Override `ConvertToChatMessages()` or `DetermineChatRole()` when the default sender-to-role mapping does not fit your application. `ChatOptions`, `ChatOptionsRequested`, `IncludeFunctionCalls`, and `IncludeReasoning` customize each request and its visualization.
 
-**Using Keyed Services:**
+Keyed clients are supported as well:
+
 ```csharp
-// Register multiple IChatClient instances with different keys
-services.AddKeyedSingleton<IChatClient>("basic", /* basic model */);
-services.AddKeyedSingleton<IChatClient>("premium", /* premium model */);
+services.AddKeyedSingleton<IChatClient>("basic", CreateBasicClient());
+services.AddKeyedSingleton<IChatClient>("premium", CreatePremiumClient());
 
-// Use a specific keyed service
 chatControl.ChatClientServiceKey = "premium";
 ```
 
 ### Formatting
 
-WinForms controls don't support partial text formatting. To make the WinForms ChatControl usable with AI chatbots, TinyChat will try to remove basic HTML and Markdown formatting. 
+Both suites use a permanently visible message surface so that text can always be selected without changing renderers. `ChatControl` uses a read-only native `TextBox` and `PlainTextMessageFormatter` to remove common HTML and Markdown syntax while keeping the text readable.
 
-The DevExpress Demo goes even further and makes use of the [basic HTML support with DevExpress controls](https://docs.devexpress.com/WindowsForms/4874/common-features/html-text-formatting) and tries to turn HTML or even Markdown input into these basic HTML tags. Tags that are not supported are stripped out to keep the text readable.
+`DXChatControl` uses a permanent DevExpress `HtmlContentControl`. It combines formatted rendering with native DevExpress text selection, automatic height calculation, and stable streaming updates in the same control. `SimplifiedHtmlMessageFormatter` remains the default; its supported bold, italic, underline, strike-through, heading, color, code-font, paragraph, line-break, and link output is converted to a safe HTML/CSS-template subset before rendering. Remote images and unsafe link schemes are not injected into message templates.
 
-![Formatting within the WinForms ChatControl and the DevExpress Demo ChatControl](./docs/Formatting.png)
+Function-call arguments and results as well as reasoning details use the same selectable DevExpress HTML surface, with their plain text HTML-encoded before display.
 
-It's possible to create a custom formatter by implementing `IMessageFormatter` and instantiating it by overriding `ChatControl.CreateDefaultMessageFormatter()`.
+To customize normalization and rendering, implement `IMessageFormatter` and override `CreateDefaultMessageFormatter()`.
 
 ## 🎬 Demos
 
-The repository includes a demo application that demonstrates a basic Windows Forms application with dependency-free standard controls and a DevExpress application that showcases the customizability with skinned DevExpress components.
+`DemoApp` contains both native Windows Forms and DevExpress examples, including direct `IChatClient` integration:
 
 ```bash
 dotnet run --project DemoApp
@@ -146,4 +207,4 @@ dotnet run --project DemoApp
 
 ## Credits
 
-The package icon was made by [Vectors Market](https://www.flaticon.com/authors/vectors-market) and is licensed by the [Flaticons license](https://www.flaticon.com/legal).
+The package icon was made by [Vectors Market](https://www.flaticon.com/authors/vectors-market) and is licensed under the [Flaticon license](https://www.flaticon.com/legal).

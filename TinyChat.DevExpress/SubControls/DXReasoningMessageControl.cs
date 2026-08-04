@@ -8,13 +8,13 @@ namespace TinyChat;
 /// <summary>
 /// Displays a thinking text, click-to-expand bubble.
 /// </summary>
-internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMessageControl
+internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMessageControl, IChatMessageLayoutControl
 {
 	/// <summary>Fixed pixel width reserved for the icon column.</summary>
-	private const int IconColumnWidth = 20;
+	private const int ICON_COLUMN_WIDTH = 20;
 
 	/// <summary>SVG for the think/idea icon.</summary>
-	private const string ThinkSvg = """
+	private const string THINK_SVG = """
 		<svg viewBox="0 0 32 32">
 			<style type="text/css">.Black{fill:#727272;}.Yellow{fill:#FFB115;}</style>
 			<path d="M13,24h6c0.6,0,1-0.5,1-1s-0.4-1-1-1h-6c-0.6,0-1,0.5-1,1S12.4,24,13,24z" class="Black" />
@@ -26,6 +26,7 @@ internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMes
 	/// <summary>The chat message whose <see cref="ReasoningMessageContent"/> is being displayed.</summary>
 	private IChatMessage? _message;
 	private bool _isReceivingStream;
+	private IMessageFormatter _messageFormatter = new PlainTextMessageFormatter();
 
 	/// <summary>
 	/// Indicates whether the detail panel (arguments and result) is currently visible.
@@ -46,17 +47,37 @@ internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMes
 	/// Gets or sets the formatter that converts message content into displayable strings.
 	/// </summary>
 	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-	public required IMessageFormatter MessageFormatter { get; set; }
+	public required IMessageFormatter MessageFormatter
+	{
+		get => _messageFormatter;
+		set
+		{
+			_messageFormatter = value ?? throw new ArgumentNullException(nameof(value));
+			UpdateDisplay();
+		}
+	}
+
+	/// <inheritdoc />
+	[Browsable(false)]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	public Padding ContentPadding
+	{
+		get => Padding;
+		set => Padding = value;
+	}
 
 	/// <summary>
 	/// Initializes a new instance of <see cref="DXReasoningMessageControl"/>, creating and wiring up the
-	/// icon, header and detail labels via the designer-generated <see cref="InitializeComponent"/>.
+	/// icon, header and selectable detail editor via the designer-generated <see cref="InitializeComponent"/>.
 	/// </summary>
 	public DXReasoningMessageControl()
 	{
 		InitializeComponent();
 
-		WireMouseDown(paddingPanel, tableLayout, lblIcon, lblTitle, lblDetail);
+		txtDetail.ContentHeightChanging += SelectableText_ContentHeightChanging;
+		txtDetail.ContentHeightChanged += SelectableText_ContentHeightChanged;
+		WireMouseDown(paddingPanel, tableLayout, lblIcon, lblTitle);
+		ApplyAppearance();
 	}
 
 	private void WireMouseDown(params Control[] controls)
@@ -69,41 +90,27 @@ internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMes
 	/// Gets or sets the chat message to display. The message's <see cref="IChatMessage.Content"/> must be a
 	/// <see cref="ReasoningMessageContent"/> for any content to be rendered.
 	/// </summary>
-	[System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
 	public IChatMessage? Message
 	{
 		get => _message;
 		set
 		{
+			if (_message?.Content is { } previousContent)
+				previousContent.PropertyChanged -= MessageContent_PropertyChanged;
+
 			_message = value;
-			lblSender.Text = _message?.Sender?.Name ?? string.Empty;
+			if (_message?.Content is { } currentContent)
+				currentContent.PropertyChanged += MessageContent_PropertyChanged;
 
-			lblDetail.DataBindings.Clear();
-			lblTitle.DataBindings.Clear();
-			if (Message is not null)
-			{
-				var binding = lblDetail.DataBindings.Add(nameof(lblDetail.Text), Message.Content, nameof(Message.Content.Content));
-				binding.Format += (_, e) => e.Value = MessageFormatter.Format(Message.Content);
-
-				if (Message.Content is ReasoningMessageContent rc)
-				{
-					binding = lblTitle.DataBindings.Add(nameof(lblTitle.Text), Message.Content, nameof(ReasoningMessageContent.IsThinking));
-					binding.Format += (_, e) =>
-					{
-						if (rc.IsThinking)
-							e.Value = "...";
-						else
-							e.Value = "✔";
-					};
-				}
-			}
+			UpdateDisplay();
 		}
 	}
 
 	/// <summary>
 	/// Gets or sets the maximum size of this control.
 	/// Setting this value also propagates the horizontal constraint to the inner
-	/// <see cref="lblTitle"/> and <see cref="lblDetail"/> so that text wraps correctly.
+	/// title and detail controls so that text wraps correctly.
 	/// </summary>
 	public override Size MaximumSize
 	{
@@ -111,14 +118,20 @@ internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMes
 		set
 		{
 			base.MaximumSize = value;
-			lblTitle.MaximumSize = new Size(value.Width - Padding.Horizontal, 0);
-			lblDetail.MaximumSize = new Size(value.Width - Padding.Horizontal, 0);
+			UpdateContentWidthConstraints();
 		}
 	}
 
+	/// <inheritdoc />
+	protected override void OnPaddingChanged(EventArgs e)
+	{
+		base.OnPaddingChanged(e);
+		UpdateContentWidthConstraints();
+		PerformLayout();
+	}
+
 	/// <summary>
-	/// Toggles the expanded/collapsed state of the detail panel when the user clicks
-	/// anywhere on the control.
+	/// Toggles the expanded/collapsed state of the detail panel.
 	/// </summary>
 	/// <param name="sender">The object that raised the click event.</param>
 	/// <param name="e">Event data (not used).</param>
@@ -129,7 +142,7 @@ internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMes
 		tableLayout.SuspendLayout();
 
 		_expanded = !_expanded;
-		lblDetail.Visible = _expanded;
+		txtDetail.Visible = _expanded;
 		UpdateHeader();
 
 		tableLayout.ResumeLayout();
@@ -137,15 +150,62 @@ internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMes
 		AfterLayoutChange?.Invoke(this, EventArgs.Empty);
 	}
 
-	/// <summary>
-	/// Rebuilds the single-line header text that shows the wrench icon, function name, inline argument summary, and the
-	/// expand/collapse arrow indicator. Does nothing if <see cref="Message"/> is <see langword="null"/> or its content is
-	/// not a <see cref="ReasoningMessageContent"/> .
-	/// </summary>
 	private void UpdateHeader()
 	{
-		if (lblTitle.DataBindings.Count > 0)
-			lblTitle.DataBindings[0].ReadValue();
+		if (Message?.Content is ReasoningMessageContent reasoningContent)
+			lblTitle.Text = reasoningContent.IsThinking ? "..." : "\u2714";
+		else
+			lblTitle.Text = string.Empty;
+	}
+
+	private void UpdateDisplay()
+	{
+		BeforeLayoutChange?.Invoke(this, EventArgs.Empty);
+		try
+		{
+			lblSender.Text = Message?.Sender?.Name ?? string.Empty;
+			UpdateHeader();
+
+			if (Message is null)
+			{
+				txtDetail.SetTextPreservingSelection(string.Empty);
+				txtDetail.Visible = false;
+				return;
+			}
+
+			var formattedText = MessageFormatter.Format(Message.Content);
+			txtDetail.SetFormattedTextPreservingSelection(formattedText);
+			txtDetail.Visible = _expanded;
+			txtDetail.UpdateContentHeight();
+		}
+		finally
+		{
+			AfterLayoutChange?.Invoke(this, EventArgs.Empty);
+		}
+	}
+
+	private void MessageContent_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+	{
+		if (IsDisposed || Disposing)
+			return;
+
+		if (InvokeRequired)
+		{
+			if (IsHandleCreated)
+			{
+				try
+				{
+					BeginInvoke(UpdateDisplay);
+				}
+				catch (InvalidOperationException) when (IsDisposed || Disposing || !IsHandleCreated)
+				{
+					// The message was removed while the cross-thread update was being queued.
+				}
+			}
+			return;
+		}
+
+		UpdateDisplay();
 	}
 
 	/// <inheritdoc />
@@ -155,6 +215,27 @@ internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMes
 
 		if (_isReceivingStream)
 			SizeUpdatedWhileStreaming?.Invoke(this, EventArgs.Empty);
+	}
+
+	/// <inheritdoc />
+	protected override void OnFontChanged(EventArgs e)
+	{
+		base.OnFontChanged(e);
+		ApplyAppearance();
+	}
+
+	/// <inheritdoc />
+	protected override void OnForeColorChanged(EventArgs e)
+	{
+		base.OnForeColorChanged(e);
+		ApplyAppearance();
+	}
+
+	/// <inheritdoc />
+	protected override void OnBackColorChanged(EventArgs e)
+	{
+		base.OnBackColorChanged(e);
+		ApplyAppearance();
 	}
 
 	/// <inheritdoc />
@@ -169,6 +250,54 @@ internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMes
 		lblSender.Visible = show;
 	}
 
+	private void ApplyAppearance()
+	{
+		if (lblSender is null)
+			return;
+
+		ApplyLabelAppearance(lblSender, FontStyle.Bold);
+		ApplyLabelAppearance(lblIcon);
+		ApplyLabelAppearance(lblTitle);
+		txtDetail.ApplyTextAppearance(Font, ForeColor, BackColor);
+
+		paddingPanel.BackColor = BackColor;
+		tableLayout.BackColor = BackColor;
+	}
+
+	private void ApplyLabelAppearance(LabelControl label, FontStyle fontStyle = FontStyle.Regular)
+	{
+		label.Appearance.Font = Font;
+		label.Appearance.FontStyleDelta = fontStyle;
+		label.Appearance.ForeColor = ForeColor;
+		label.Appearance.BackColor = BackColor;
+		label.Appearance.Options.UseFont = true;
+		label.Appearance.Options.UseForeColor = true;
+		label.Appearance.Options.UseBackColor = true;
+	}
+
+	private void UpdateContentWidthConstraints()
+	{
+		if (lblTitle is null || txtDetail is null)
+			return;
+
+		var textWidth = MaximumSize.Width == 0
+			? 0
+			: Math.Max(0, MaximumSize.Width - ContentPadding.Horizontal - ICON_COLUMN_WIDTH);
+		lblTitle.MaximumSize = new Size(textWidth, 0);
+		txtDetail.MaximumSize = new Size(textWidth, 0);
+		txtDetail.UpdateContentHeight();
+	}
+
+	private void SelectableText_ContentHeightChanging(object? sender, EventArgs e)
+	{
+		BeforeLayoutChange?.Invoke(this, EventArgs.Empty);
+	}
+
+	private void SelectableText_ContentHeightChanged(object? sender, EventArgs e)
+	{
+		AfterLayoutChange?.Invoke(this, EventArgs.Empty);
+	}
+
 	/// <inheritdoc/>
-	public override string ToString() => lblDetail.Text;
+	public override string ToString() => txtDetail.Text;
 }

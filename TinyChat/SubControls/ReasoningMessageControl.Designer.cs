@@ -1,3 +1,5 @@
+using TinyChat.Messages;
+
 namespace TinyChat.SubControls;
 
 partial class ReasoningMessageControl
@@ -6,6 +8,8 @@ partial class ReasoningMessageControl
 
 	protected override void Dispose(bool disposing)
 	{
+		if (disposing && _message?.Content is ReasoningMessageContent content)
+			content.PropertyChanged -= OnContentPropertyChanged;
 		if (disposing && (components != null))
 			components.Dispose();
 		base.Dispose(disposing);
@@ -16,7 +20,7 @@ partial class ReasoningMessageControl
 		lblSender = new Label();
 		lblIcon = new Label();
 		lblHeader = new Label();
-		lblDetail = new Label();
+		lblDetail = new SelectableMessageTextControl();
 		tableLayout = new TableLayoutPanel();
 		tableLayout.SuspendLayout();
 		SuspendLayout();
@@ -26,7 +30,7 @@ partial class ReasoningMessageControl
 		lblSender.Dock = DockStyle.Top;
 		lblSender.Font = new Font(Font, FontStyle.Bold);
 		lblSender.UseMnemonic = false;
-		lblSender.Padding = new Padding(8, 8, 0, 3);
+		lblSender.Padding = new Padding(0, 0, 0, 3);
 
 		// lblIcon
 		lblIcon.AutoSize = false;
@@ -45,12 +49,8 @@ partial class ReasoningMessageControl
 		lblHeader.TextAlign = ContentAlignment.MiddleLeft;
 
 		// lblDetail
-		lblDetail.AutoSize = true;
-		lblDetail.Cursor = Cursors.Hand;
 		lblDetail.Dock = DockStyle.Fill;
-		lblDetail.Padding = new Padding(0, 2, 0, 6);
-		lblDetail.UseMnemonic = false;
-		lblDetail.TextAlign = ContentAlignment.TopLeft;
+		lblDetail.Margin = new Padding(0, 2, 0, 6);
 		lblDetail.Visible = false;
 
 		// tableLayout
@@ -73,7 +73,7 @@ partial class ReasoningMessageControl
 		tableLayout.Cursor = Cursors.Hand;
 		tableLayout.Dock = DockStyle.Fill;
 		tableLayout.Margin = Padding.Empty;
-		tableLayout.Padding = new Padding(8, 0, 0, 0);
+		tableLayout.Padding = Padding.Empty;
 		tableLayout.RowCount = 2;
 		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -83,7 +83,7 @@ partial class ReasoningMessageControl
 		BorderStyle = BorderStyle.None;
 		Cursor = Cursors.Hand;
 		Margin = new Padding(3);
-		Padding = new Padding(0);
+		Padding = new Padding(8);
 		Controls.Add(lblSender);
 		Controls.Add(tableLayout);
 		tableLayout.BringToFront();
@@ -91,7 +91,6 @@ partial class ReasoningMessageControl
 		tableLayout.Click += Toggle;
 		lblIcon.Click += Toggle;
 		lblHeader.Click += Toggle;
-		lblDetail.Click += Toggle;
 
 		tableLayout.ResumeLayout(false);
 		tableLayout.PerformLayout();
@@ -103,5 +102,5 @@ partial class ReasoningMessageControl
 	private TableLayoutPanel tableLayout;
 	private Label lblIcon;
 	private Label lblHeader;
-	private Label lblDetail;
+	private SelectableMessageTextControl lblDetail;
 }

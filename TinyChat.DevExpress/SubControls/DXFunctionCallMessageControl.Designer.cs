@@ -13,6 +13,8 @@ partial class DXFunctionCallMessageControl
 
 	protected override void Dispose(bool disposing)
 	{
+		if (disposing && _message?.Content is FunctionCallMessageContent content)
+			content.PropertyChanged -= OnContentPropertyChanged;
 		if (disposing && (components != null))
 			components.Dispose();
 		base.Dispose(disposing);
@@ -24,8 +26,8 @@ partial class DXFunctionCallMessageControl
 		lblToolIcon = new LabelControl();
 		lblResultIcon = new LabelControl();
 		lblTitle = new LabelControl();
-		lblArguments = new LabelControl();
-		lblResult = new LabelControl();
+		txtArguments = new DXSelectableMessageTextControl();
+		txtResult = new DXSelectableMessageTextControl();
 		tableLayout = new TableLayoutPanel();
 		paddingPanel = new PanelControl();
 		tableLayout.SuspendLayout();
@@ -42,7 +44,7 @@ partial class DXFunctionCallMessageControl
 		// _callIconLabel
 		lblToolIcon.AutoSize = false;
 		lblToolIcon.Dock = DockStyle.Fill;
-		lblToolIcon.ImageOptions.SvgImage = SvgImage.FromStream(new MemoryStream(Encoding.UTF8.GetBytes(ToolSvg)));
+		lblToolIcon.ImageOptions.SvgImage = SvgImage.FromStream(new MemoryStream(Encoding.UTF8.GetBytes(TOOL_SVG)));
 		lblToolIcon.ImageOptions.SvgImageSize = new System.Drawing.Size(14, 14);
 		lblToolIcon.MaximumSize = new Size(0, 14);
 		lblToolIcon.UseMnemonic = false;
@@ -51,7 +53,7 @@ partial class DXFunctionCallMessageControl
 		// _resultIconLabel
 		lblResultIcon.AutoSize = false;
 		lblResultIcon.Dock = DockStyle.Fill;
-		lblResultIcon.ImageOptions.SvgImage = SvgImage.FromStream(new MemoryStream(Encoding.UTF8.GetBytes(ResultSvg)));
+		lblResultIcon.ImageOptions.SvgImage = SvgImage.FromStream(new MemoryStream(Encoding.UTF8.GetBytes(RESULT_SVG)));
 		lblResultIcon.ImageOptions.SvgImageSize = new System.Drawing.Size(14, 14);
 		lblResultIcon.MaximumSize = new Size(0, 14);
 		lblResultIcon.UseMnemonic = false;
@@ -63,16 +65,14 @@ partial class DXFunctionCallMessageControl
 		lblTitle.AllowHtmlString = true;
 		lblTitle.UseMnemonic = false;
 
-		// _argsLabel
-		lblArguments.AutoSizeMode = LabelAutoSizeMode.Vertical;
-		lblArguments.Padding = new Padding(0, 2, 0, 6);
-		lblArguments.UseMnemonic = false;
-		lblArguments.Visible = false;
+		// txtArguments
+		txtArguments.Dock = DockStyle.Fill;
+		txtArguments.Margin = new Padding(0, 2, 0, 6);
+		txtArguments.Visible = false;
 
-		// _resultLabel
-		lblResult.AutoSizeMode = LabelAutoSizeMode.Vertical;
-		lblResult.UseMnemonic = false;
-		lblResult.Visible = false;
+		// txtResult
+		txtResult.Dock = DockStyle.Fill;
+		txtResult.Visible = false;
 
 		// _table
 		// Col 0: fixed icon width | Col 1: remaining text
@@ -92,9 +92,9 @@ partial class DXFunctionCallMessageControl
 
 		// Row 1, col 0 intentionally left empty - no spacer, so the row fully
 		// collapses when _argsLabel is hidden.
-		tableLayout.Controls.Add(lblArguments, 1, 1);
+		tableLayout.Controls.Add(txtArguments, 1, 1);
 		tableLayout.Controls.Add(lblResultIcon, 0, 2);
-		tableLayout.Controls.Add(lblResult, 1, 2);
+		tableLayout.Controls.Add(txtResult, 1, 2);
 		tableLayout.Dock = DockStyle.Fill;
 		tableLayout.Margin = Padding.Empty;
 		tableLayout.Padding = Padding.Empty;
@@ -119,15 +119,13 @@ partial class DXFunctionCallMessageControl
 		Controls.Add(paddingPanel);
 		paddingPanel.BringToFront();
 		Cursor = Cursors.Hand;
-		Padding = new Padding(3, 0, 0, 0);
+		Padding = new Padding(8);
 		Click += Toggle;
 		paddingPanel.Click += Toggle;
 		tableLayout.Click += Toggle;
 		lblToolIcon.Click += Toggle;
 		lblTitle.Click += Toggle;
-		lblArguments.Click += Toggle;
 		lblResultIcon.Click += Toggle;
-		lblResult.Click += Toggle;
 
 		tableLayout.ResumeLayout(false);
 		tableLayout.PerformLayout();
@@ -141,8 +139,8 @@ partial class DXFunctionCallMessageControl
 	private TableLayoutPanel tableLayout;
 	private LabelControl lblToolIcon;
 	private LabelControl lblTitle;
-	private LabelControl lblArguments;
+	private DXSelectableMessageTextControl txtArguments;
 	private LabelControl lblResultIcon;
 	private PanelControl paddingPanel;
-	private LabelControl lblResult;
+	private DXSelectableMessageTextControl txtResult;
 }

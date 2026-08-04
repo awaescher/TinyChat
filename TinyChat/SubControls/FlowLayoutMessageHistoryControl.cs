@@ -36,6 +36,7 @@ public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHist
 		var control = (Control)messageControl;
 		control.MouseDown += OnMessageControlMouseDown;
 		Controls.Add(control);
+		control.MarginChanged += MessageControlMarginChanged;
 
 		SetSizeConstraints(control);
 		ScrollControlIntoView(control);
@@ -50,7 +51,10 @@ public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHist
 	/// </summary>
 	public void ClearMessageControls()
 	{
-		foreach (var messageControl in Controls.OfType<IChatMessageControl>())
+		_selectedMessageControl = null;
+
+		var messageControls = Controls.OfType<IChatMessageControl>().ToArray();
+		foreach (var messageControl in messageControls)
 		{
 			messageControl.SizeUpdatedWhileStreaming -= MessageControlStreamingSizeUpdate;
 			messageControl.BeforeLayoutChange -= BeforeMessageLayoutChange;
@@ -58,9 +62,15 @@ public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHist
 
 			var control = (Control)messageControl;
 			control.MouseDown -= OnMessageControlMouseDown;
+			control.MarginChanged -= MessageControlMarginChanged;
 		}
 
 		Controls.Clear();
+		foreach (var messageControl in messageControls)
+		{
+			messageControl.Message = null;
+			((Control)messageControl).Dispose();
+		}
 	}
 
 	/// <summary>
@@ -73,8 +83,16 @@ public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHist
 		{
 			var control = (Control)messageControl;
 			messageControl.SizeUpdatedWhileStreaming -= MessageControlStreamingSizeUpdate;
+			messageControl.BeforeLayoutChange -= BeforeMessageLayoutChange;
+			messageControl.AfterLayoutChange -= AfterMessageLayoutChange;
 			control.MouseDown -= OnMessageControlMouseDown;
+			control.MarginChanged -= MessageControlMarginChanged;
 			Controls.Remove(control);
+			messageControl.Message = null;
+			control.Dispose();
+
+			if (ReferenceEquals(_selectedMessageControl, messageControl))
+				_selectedMessageControl = null;
 		}
 	}
 
@@ -97,6 +115,19 @@ public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHist
 		PerformLayout(); // to hide the H-scrollbar that pops up from time to time
 	}
 
+	/// <inheritdoc />
+	protected override void OnPaddingChanged(EventArgs e)
+	{
+		base.OnPaddingChanged(e);
+		ViewportChanged?.Invoke(this, EventArgs.Empty);
+
+		SuspendLayout();
+		foreach (Control control in Controls)
+			SetSizeConstraints(control);
+		ResumeLayout();
+		PerformLayout();
+	}
+
 	/// <summary>
 	/// Sets the minimum and maximum width of a control to the available history width while
 	/// accounting for the vertical scrollbar and control margins.
@@ -106,11 +137,21 @@ public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHist
 	{
 		var availableWidth = Math.Max(
 			0,
-			ClientRectangle.Width - SystemInformation.VerticalScrollBarWidth - control.Margin.Horizontal);
+			ClientRectangle.Width - Padding.Horizontal - SystemInformation.VerticalScrollBarWidth - control.Margin.Horizontal);
 		control.MinimumSize = new Size(availableWidth, 0);
 		control.MaximumSize = new Size(availableWidth, 0);
 	}
 
+	private void MessageControlMarginChanged(object? sender, EventArgs e)
+	{
+		if (sender is not Control control || !Controls.Contains(control))
+			return;
+
+		SuspendLayout();
+		SetSizeConstraints(control);
+		ResumeLayout();
+		PerformLayout();
+	}
 
 	/// <inheritdoc />
 	protected override void OnScroll(ScrollEventArgs se)
@@ -139,16 +180,35 @@ public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHist
 	/// <inheritdoc/>
 	protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
 	{
+		if (keyData == (Keys.Control | Keys.C) && HasFocusedTextEditor(this))
+			return base.ProcessCmdKey(ref msg, keyData);
+
 		if (keyData == (Keys.Control | Keys.C) && _selectedMessageControl is not null)
 		{
 			try
 			{
-				Clipboard.SetText(_selectedMessageControl.ToString());
+				var text = _selectedMessageControl.ToString();
+				if (!string.IsNullOrEmpty(text))
+					Clipboard.SetText(text);
 			}
 			catch { }
 			return true;
 		}
 		return base.ProcessCmdKey(ref msg, keyData);
+	}
+
+	private static bool HasFocusedTextEditor(Control parent)
+	{
+		foreach (Control child in parent.Controls)
+		{
+			if (child is TextBoxBase && child.ContainsFocus)
+				return true;
+
+			if (child.ContainsFocus && HasFocusedTextEditor(child))
+				return true;
+		}
+
+		return false;
 	}
 
 	private void OnMessageControlMouseDown(object? sender, MouseEventArgs e)

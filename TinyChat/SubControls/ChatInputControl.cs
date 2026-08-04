@@ -1,20 +1,25 @@
+using System.ComponentModel;
+
 namespace TinyChat;
 
 /// <summary>
 /// A text input control that allows users to compose messages with optional file attachments.
 /// </summary>
-public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInputControl
+public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInputControl, IChatInputDraftControl, IChatInputLayoutControl
 {
 	private const int ATTACHMENT_DISPLAY_HEIGHT = 60;
+	private const int DEFAULT_CONTENT_PADDING = 8;
 	private const string SEND_CHAR = "\u27A4";
 	private const string STOP_CHAR = "\u25A0";
 
 	private readonly List<ChatFileAttachment> _attachments = [];
 	private readonly FlowLayoutPanel _attachmentPanel;
+	private readonly Panel _contentPanel;
 	private readonly TableLayoutPanel _contentLayout;
 	private readonly PasteAwareTextBox _textBox;
 	private readonly Button _sendButton;
 	private bool _isReceivingStream;
+	private bool _allowCancellation;
 
 	/// <summary>
 	/// Occurs before a message is sent from the text box.
@@ -37,6 +42,20 @@ public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInput
 
 	/// <inheritdoc />
 	public int AttachmentDisplayHeight => ATTACHMENT_DISPLAY_HEIGHT;
+
+	/// <inheritdoc />
+	[Browsable(false)]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	public Padding ContentPadding
+	{
+		get => _contentPanel.Padding;
+		set
+		{
+			_contentPanel.Padding = value;
+			PositionSendButton();
+			PerformLayout();
+		}
+	}
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="ChatInputControl"/> class.
@@ -69,19 +88,19 @@ public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInput
 		_contentLayout.Controls.Add(_attachmentPanel, 0, 0);
 		_contentLayout.Controls.Add(_textBox, 0, 1);
 
-		var panel = new Panel { Padding = new Padding(8), Dock = DockStyle.Fill };
-		Controls.Add(panel);
-		panel.Controls.Add(_contentLayout);
+		_contentPanel = new Panel { Padding = new Padding(DEFAULT_CONTENT_PADDING), Dock = DockStyle.Fill };
+		Controls.Add(_contentPanel);
+		_contentPanel.Controls.Add(_contentLayout);
 
 		var size = new Size(24, 24);
 		_sendButton = new Button { Text = SEND_CHAR, MaximumSize = size, MinimumSize = size, Anchor = AnchorStyles.Bottom | AnchorStyles.Right };
-		_sendButton.Left = ClientRectangle.Width - _sendButton.Width - panel.Padding.Right / 2 * 3;
-		_sendButton.Top = ClientRectangle.Height - _sendButton.Height - panel.Padding.Bottom / 2 * 3;
 		Controls.Add(_sendButton);
 		_sendButton.BringToFront();
+		PositionSendButton();
 
 		_sendButton.Click += (_, _) => SendOrStop();
 		_textBox.KeyPress += TextBox_KeyPress;
+		ApplyAppearance();
 	}
 
 	/// <inheritdoc />
@@ -110,10 +129,59 @@ public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInput
 	}
 
 	/// <inheritdoc />
+	public void ClearDraft()
+	{
+		_textBox.Clear();
+		ClearAttachments();
+	}
+
+	/// <inheritdoc />
 	protected override void OnGotFocus(EventArgs e)
 	{
 		base.OnGotFocus(e);
 		_textBox.Focus();
+	}
+
+	/// <inheritdoc />
+	protected override void OnHandleCreated(EventArgs e)
+	{
+		base.OnHandleCreated(e);
+		ApplyReceivingState();
+	}
+
+	/// <inheritdoc />
+	protected override void OnBackColorChanged(EventArgs e)
+	{
+		base.OnBackColorChanged(e);
+		ApplyColors();
+	}
+
+	/// <inheritdoc />
+	protected override void OnFontChanged(EventArgs e)
+	{
+		base.OnFontChanged(e);
+		ApplyFont();
+	}
+
+	/// <inheritdoc />
+	protected override void OnForeColorChanged(EventArgs e)
+	{
+		base.OnForeColorChanged(e);
+		ApplyColors();
+	}
+
+	/// <inheritdoc />
+	protected override void OnParentBackColorChanged(EventArgs e)
+	{
+		base.OnParentBackColorChanged(e);
+		ApplyColors();
+	}
+
+	/// <inheritdoc />
+	protected override void OnSizeChanged(EventArgs e)
+	{
+		base.OnSizeChanged(e);
+		PositionSendButton();
 	}
 
 	private void TextBox_KeyPress(object? sender, KeyPressEventArgs e)
@@ -149,10 +217,7 @@ public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInput
 		MessageSending?.Invoke(this, sendArgs);
 
 		if (!sendArgs.Cancel)
-		{
-			_textBox.Clear();
-			ClearAttachments();
-		}
+			ClearDraft();
 	}
 
 	private void Stop()
@@ -165,18 +230,24 @@ public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInput
 	void IChatInputControl.SetIsReceivingStream(bool isReceiving, bool allowCancellation)
 	{
 		_isReceivingStream = isReceiving;
+		_allowCancellation = allowCancellation;
 
-		if (IsAvailable())
-		{
-			BeginInvoke(() =>
-			{
-				if (IsAvailable())
-				{
-					_sendButton.Text = isReceiving && allowCancellation ? STOP_CHAR : SEND_CHAR;
-					_sendButton.Enabled = !isReceiving || allowCancellation;
-				}
-			});
-		}
+		if (!IsAvailable() || !IsHandleCreated)
+			return;
+
+		if (InvokeRequired)
+			BeginInvoke(ApplyReceivingState);
+		else
+			ApplyReceivingState();
+	}
+
+	private void ApplyReceivingState()
+	{
+		if (!IsAvailable())
+			return;
+
+		_sendButton.Text = _isReceivingStream && _allowCancellation ? STOP_CHAR : SEND_CHAR;
+		_sendButton.Enabled = !_isReceivingStream || _allowCancellation;
 	}
 
 	private Control CreateAttachmentTile(ChatFileAttachment attachment)
@@ -217,6 +288,7 @@ public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInput
 		}
 
 		tile.Controls.Add(CreateAttachmentIcon(attachment));
+		ApplyAttachmentTileAppearance(tile);
 		return tile;
 	}
 
@@ -257,6 +329,76 @@ public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInput
 		_contentLayout.RowStyles[0].Height = hasAttachments ? ATTACHMENT_DISPLAY_HEIGHT : 0;
 		_attachmentPanel.Visible = hasAttachments;
 		AttachmentsChanged?.Invoke(this, EventArgs.Empty);
+	}
+
+	private void PositionSendButton()
+	{
+		if (_sendButton is null || _contentPanel is null)
+			return;
+
+		_sendButton.Left = Math.Max(0, ClientSize.Width - _sendButton.Width - ContentPadding.Right);
+		_sendButton.Top = Math.Max(0, ClientSize.Height - _sendButton.Height - ContentPadding.Bottom);
+	}
+
+	private void ApplyAppearance()
+	{
+		if (_textBox is null || _contentPanel is null || _contentLayout is null || _attachmentPanel is null)
+			return;
+
+		ApplyFont();
+		ApplyColors();
+	}
+
+	private void ApplyFont()
+	{
+		if (_textBox is null || _attachmentPanel is null)
+			return;
+
+		_textBox.Font = Font;
+		foreach (Control tile in _attachmentPanel.Controls)
+		{
+			foreach (var label in tile.Controls.OfType<Label>())
+				label.Font = Font;
+		}
+	}
+
+	private void ApplyColors()
+	{
+		if (_textBox is null || _contentPanel is null || _contentLayout is null || _attachmentPanel is null)
+			return;
+
+		var backColor = GetOpaqueBackColor();
+		_contentPanel.BackColor = backColor;
+		_contentLayout.BackColor = backColor;
+		_attachmentPanel.BackColor = backColor;
+		_textBox.BackColor = backColor;
+		_textBox.ForeColor = ForeColor;
+
+		foreach (Control tile in _attachmentPanel.Controls)
+			ApplyAttachmentTileAppearance(tile);
+	}
+
+	private void ApplyAttachmentTileAppearance(Control tile)
+	{
+		var backColor = GetOpaqueBackColor();
+		tile.BackColor = backColor;
+		foreach (var label in tile.Controls.OfType<Label>())
+		{
+			label.BackColor = backColor;
+			label.Font = Font;
+			label.ForeColor = ForeColor;
+		}
+	}
+
+	private Color GetOpaqueBackColor()
+	{
+		for (Control? current = this; current is not null; current = current.Parent)
+		{
+			if (current.BackColor.A == byte.MaxValue)
+				return current.BackColor;
+		}
+
+		return SystemColors.Control;
 	}
 
 	private bool IsAvailable() => !(Disposing || IsDisposed);

@@ -17,10 +17,25 @@ public partial class ChatControl : UserControl
 	private const string ROBOT_WELCOME = "●\n┌─┴─┐\n◉‿◉\n└───┘\n\nGreetings human.\nHow can I help you today?";
 
 	private const long DEFAULT_MAXIMUM_ATTACHMENT_FILE_SIZE = 20 * 1024 * 1024;
+	private static readonly Font _defaultWelcomeFont = new("Tahoma", 14f);
+	private static readonly Padding _defaultInputPadding = new(8);
+	private static readonly Padding _defaultMessageMargin = new(3);
+	private static readonly Padding _defaultMessagePadding = new(8);
 
 	private List<IChatMessage> _messages = [];
 	private readonly object _cancellationLock = new();
 	private readonly HashSet<Control> _fileDropTargets = [];
+	private Padding _historyPadding = Padding.Empty;
+	private Padding _inputPadding = _defaultInputPadding;
+	private Padding _messageMargin = _defaultMessageMargin;
+	private Padding _messagePadding = _defaultMessagePadding;
+	private Font? _inputFont;
+	private Font? _messageFont;
+	private Font? _welcomeFont;
+	private ContentAlignment _welcomeTextAlign = ContentAlignment.MiddleCenter;
+	private string _welcomeMessage = ROBOT_WELCOME;
+	private int _splitterPosition = 60;
+	private bool _isSplitterFixed;
 	private CancellationTokenSource? _currentCancellationTokenSource;
 	private Control? _messageCopyButton;
 	private IChatMessageControl? _messageCopyTarget;
@@ -38,6 +53,11 @@ public partial class ChatControl : UserControl
 	/// Occurs when a message has been sent from the user interface.
 	/// </summary>
 	public event EventHandler<MessageSentEventArgs>? MessageSent;
+
+	/// <summary>
+	/// Occurs after the current conversation and input draft have been cleared by <see cref="StartNewChat"/>.
+	/// </summary>
+	public event EventHandler? NewChatStarted;
 
 	/// <summary>
 	/// Occurs before a request is sent to the <see cref="IChatClient"/>, allowing the developer to define or modify <see cref="Microsoft.Extensions.AI.ChatOptions"/>.
@@ -114,24 +134,243 @@ public partial class ChatControl : UserControl
 	[Description("Gets or sets the welcome message displayed when no messages are present in the chat history.")]
 	[DefaultValue(ROBOT_WELCOME)]
 	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
-	public string WelcomeMessage { get; set; } = ROBOT_WELCOME;
+	public string WelcomeMessage
+	{
+		get => _welcomeMessage;
+		set
+		{
+			_welcomeMessage = value ?? string.Empty;
+			ApplyWelcomeControlSettings();
+		}
+	}
+
+	/// <summary>
+	/// Gets or sets the font used to display chat messages.
+	/// When not explicitly set, the inherited <see cref="Control.Font"/> is used.
+	/// </summary>
+	[Category("Chat Appearance")]
+	[Description("Gets or sets the font used to display chat messages. Reset the value to inherit the control font.")]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+	public Font MessageFont
+	{
+		get => _messageFont ?? Font;
+		set
+		{
+			_messageFont = value ?? throw new ArgumentNullException(nameof(value));
+			ApplyMessageFont();
+		}
+	}
+
+	/// <summary>
+	/// Gets or sets the font used by the chat input.
+	/// When not explicitly set, the inherited <see cref="Control.Font"/> is used.
+	/// </summary>
+	[Category("Chat Appearance")]
+	[Description("Gets or sets the font used by the chat input. Reset the value to inherit the control font.")]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+	public Font InputFont
+	{
+		get => _inputFont ?? Font;
+		set
+		{
+			_inputFont = value ?? throw new ArgumentNullException(nameof(value));
+			ApplyInputFont();
+		}
+	}
+
+	/// <summary>
+	/// Gets or sets the font used by the welcome message.
+	/// When not explicitly set, a 14-point Tahoma font is used.
+	/// </summary>
+	[Category("Chat Appearance")]
+	[Description("Gets or sets the font used by the welcome message. Reset the value to restore the default.")]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+	public Font WelcomeFont
+	{
+		get => _welcomeFont ?? _defaultWelcomeFont;
+		set
+		{
+			_welcomeFont = value ?? throw new ArgumentNullException(nameof(value));
+			ApplyWelcomeControlSettings();
+		}
+	}
+
+	/// <summary>
+	/// Gets or sets the padding inside the history area, including the welcome surface.
+	/// </summary>
+	[Category("Chat Layout")]
+	[Description("Gets or sets the padding inside the history area, including the welcome surface.")]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+	public Padding HistoryPadding
+	{
+		get => _historyPadding;
+		set
+		{
+			_historyPadding = ValidatePadding(value, nameof(value));
+			ApplyHistoryLayout();
+		}
+	}
+
+	/// <summary>
+	/// Gets or sets the padding around the visible content of each chat message.
+	/// </summary>
+	[Category("Chat Layout")]
+	[Description("Gets or sets the padding around regular, function-call, and reasoning message content.")]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+	public Padding MessagePadding
+	{
+		get => _messagePadding;
+		set
+		{
+			_messagePadding = ValidatePadding(value, nameof(value));
+			ApplyMessageLayout();
+		}
+	}
+
+	/// <summary>
+	/// Gets or sets the outer margin around each chat message.
+	/// </summary>
+	[Category("Chat Layout")]
+	[Description("Gets or sets the outer margin around each chat message.")]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+	public Padding MessageMargin
+	{
+		get => _messageMargin;
+		set
+		{
+			_messageMargin = ValidatePadding(value, nameof(value));
+			ApplyMessageLayout();
+		}
+	}
+
+	/// <summary>
+	/// Gets or sets the padding between the input surface and its editor content.
+	/// </summary>
+	[Category("Chat Layout")]
+	[Description("Gets or sets the padding between the input surface and its editor content.")]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+	public Padding InputPadding
+	{
+		get => _inputPadding;
+		set
+		{
+			_inputPadding = ValidatePadding(value, nameof(value));
+			ApplyInputLayout();
+		}
+	}
+
+	/// <summary>
+	/// Gets or sets the alignment of the welcome text.
+	/// </summary>
+	[Category("Chat Layout")]
+	[Description("Gets or sets the horizontal and vertical alignment of the welcome text.")]
+	[DefaultValue(ContentAlignment.MiddleCenter)]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+	public ContentAlignment WelcomeTextAlign
+	{
+		get => _welcomeTextAlign;
+		set
+		{
+			if (!Enum.IsDefined(value))
+				throw new InvalidEnumArgumentException(nameof(value), (int)value, typeof(ContentAlignment));
+
+			_welcomeTextAlign = value;
+			ApplyWelcomeControlSettings();
+		}
+	}
+
+	/// <summary>
+	/// Gets or sets whether the splitter between the history and input areas can be moved by the user.
+	/// </summary>
+	[Category("Chat Layout")]
+	[Description("Gets or sets whether the splitter between the history and input areas can be moved by the user.")]
+	[DefaultValue(false)]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+	public bool IsSplitterFixed
+	{
+		get => _isSplitterFixed;
+		set
+		{
+			_isSplitterFixed = value;
+			ApplySplitContainerLayout();
+		}
+	}
 
 	/// <summary>
 	/// Gets or sets the splitter position dividing the chat message history from the chat input box below.
 	/// </summary>
-	[Category("Chat")]
+	[Category("Chat Layout")]
 	[DefaultValue(60)]
 	[Description("Gets or sets the splitter position dividing the chat message history from the chat input box below.")]
 	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
 	public int SplitterPosition
 	{
-		get => (SplitContainerControl as ISplitContainerControl)?.SplitterPosition ?? 0;
+		get => (SplitContainerControl as ISplitContainerControl)?.SplitterPosition ?? _splitterPosition;
 		set
 		{
 			if (SplitContainerControl is ISplitContainerControl splitContainer)
+			{
 				splitContainer.SplitterPosition = value;
+				_splitterPosition = splitContainer.SplitterPosition;
+			}
+			else
+			{
+				_splitterPosition = value;
+			}
 		}
 	}
+
+	private void ResetMessageFont()
+	{
+		_messageFont = null;
+		ApplyMessageFont();
+	}
+
+	private bool ShouldSerializeMessageFont() => _messageFont is not null;
+
+	private void ResetInputFont()
+	{
+		_inputFont = null;
+		ApplyInputFont();
+	}
+
+	private bool ShouldSerializeInputFont() => _inputFont is not null;
+
+	private void ResetWelcomeFont()
+	{
+		_welcomeFont = null;
+		ApplyWelcomeControlSettings();
+	}
+
+	private bool ShouldSerializeWelcomeFont() => _welcomeFont is not null;
+
+	private void ResetHistoryPadding()
+	{
+		HistoryPadding = Padding.Empty;
+	}
+
+	private bool ShouldSerializeHistoryPadding() => HistoryPadding != Padding.Empty;
+
+	private void ResetMessagePadding()
+	{
+		MessagePadding = _defaultMessagePadding;
+	}
+
+	private bool ShouldSerializeMessagePadding() => MessagePadding != _defaultMessagePadding;
+
+	private void ResetMessageMargin()
+	{
+		MessageMargin = _defaultMessageMargin;
+	}
+
+	private bool ShouldSerializeMessageMargin() => MessageMargin != _defaultMessageMargin;
+
+	private void ResetInputPadding()
+	{
+		InputPadding = _defaultInputPadding;
+	}
+
+	private bool ShouldSerializeInputPadding() => InputPadding != _defaultInputPadding;
 
 	/// <summary>
 	/// Gets or sets whether the user is allowed to expand function call messages by clicking on them.
@@ -273,10 +512,253 @@ public partial class ChatControl : UserControl
 			WelcomeControl.Visible = ShouldShowWelcomeControl();
 	}
 
+	private void ApplyWelcomeControlSettings()
+	{
+		if (WelcomeControl is not null)
+			ApplyWelcomeControlSettings(WelcomeControl);
+	}
+
+	/// <summary>
+	/// Applies the current welcome text and font to a welcome control.
+	/// </summary>
+	/// <param name="control">The welcome control to update.</param>
+	protected virtual void ApplyWelcomeControlSettings(Control control)
+	{
+		control.Font = WelcomeFont;
+		control.ForeColor = ForeColor;
+		control.BackColor = BackColor;
+
+		var contentControl = control.Controls.Count == 1
+			? control.Controls[0]
+			: control;
+		contentControl.Font = WelcomeFont;
+		contentControl.ForeColor = ForeColor;
+		contentControl.BackColor = BackColor;
+		contentControl.Text = WelcomeMessage;
+		ApplyWelcomeTextAlignment(contentControl);
+	}
+
+	/// <summary>
+	/// Applies the configured welcome text alignment to the control that renders the text.
+	/// </summary>
+	/// <param name="control">The welcome content control to update.</param>
+	protected virtual void ApplyWelcomeTextAlignment(Control control)
+	{
+		if (control is Label label)
+			label.TextAlign = WelcomeTextAlign;
+	}
+
+	private void ApplyMessageFont()
+	{
+		if (MessageHistoryControl is null)
+			return;
+
+		foreach (var control in EnumerateDescendantControls(MessageHistoryControl))
+		{
+			if (control is IChatMessageControl)
+				ApplyMessageFont(control);
+		}
+	}
+
+	private void ApplyInputFont()
+	{
+		if (InputControl is not null)
+			ApplyInputFont(InputControl);
+	}
+
+	/// <summary>
+	/// Applies the configured message font to a message control.
+	/// </summary>
+	/// <param name="control">The message control to update.</param>
+	protected virtual void ApplyMessageFont(Control control) => control.Font = MessageFont;
+
+	/// <summary>
+	/// Applies the configured input font to the input control.
+	/// </summary>
+	/// <param name="control">The input control to update.</param>
+	protected virtual void ApplyInputFont(Control control) => control.Font = InputFont;
+
+	private void ApplyHistoryColors()
+	{
+		if (SplitContainerControl is ISplitContainerControl { HistoryPanel: { } historyPanel })
+		{
+			historyPanel.ForeColor = ForeColor;
+			historyPanel.BackColor = BackColor;
+		}
+
+		if (MessageHistoryControl is not null)
+			ApplyHistoryColors(MessageHistoryControl);
+	}
+
+	/// <summary>
+	/// Applies the global chat colors to the history control.
+	/// </summary>
+	/// <param name="control">The history control to update.</param>
+	protected virtual void ApplyHistoryColors(Control control)
+	{
+		control.ForeColor = ForeColor;
+		control.BackColor = BackColor;
+	}
+
+	private void ApplyMessageColors()
+	{
+		if (MessageHistoryControl is null)
+			return;
+
+		foreach (var control in EnumerateDescendantControls(MessageHistoryControl))
+		{
+			if (control is IChatMessageControl)
+				ApplyMessageColors(control);
+		}
+	}
+
+	/// <summary>
+	/// Applies the global chat colors to a message control.
+	/// </summary>
+	/// <param name="control">The message control to update.</param>
+	protected virtual void ApplyMessageColors(Control control)
+	{
+		control.ForeColor = ForeColor;
+		control.BackColor = BackColor;
+	}
+
+	private void ApplyInputColors()
+	{
+		if (SplitContainerControl is ISplitContainerControl { ChatInputPanel: { } inputPanel })
+		{
+			inputPanel.ForeColor = ForeColor;
+			inputPanel.BackColor = BackColor;
+		}
+
+		if (InputControl is not null)
+			ApplyInputColors(InputControl);
+	}
+
+	/// <summary>
+	/// Applies the global chat colors to the input control.
+	/// </summary>
+	/// <param name="control">The input control to update.</param>
+	protected virtual void ApplyInputColors(Control control)
+	{
+		control.ForeColor = ForeColor;
+		control.BackColor = BackColor;
+	}
+
+	private void ApplyHistoryLayout()
+	{
+		if (SplitContainerControl is ISplitContainerControl { HistoryPanel: { } historyPanel })
+		{
+			historyPanel.Padding = HistoryPadding;
+			return;
+		}
+
+		if (MessageHistoryControl is not null)
+			MessageHistoryControl.Padding = HistoryPadding;
+	}
+
+	private void ApplyMessageLayout()
+	{
+		if (MessageHistoryControl is null)
+			return;
+
+		foreach (var control in EnumerateDescendantControls(MessageHistoryControl))
+		{
+			if (control is IChatMessageControl)
+				ApplyMessageLayout(control);
+		}
+	}
+
+	/// <summary>
+	/// Applies the configured content padding and outer margin to a message control.
+	/// </summary>
+	/// <param name="control">The message control to update.</param>
+	protected virtual void ApplyMessageLayout(Control control)
+	{
+		if (control is IChatMessageLayoutControl layoutControl)
+		{
+			control.Margin = MessageMargin;
+			layoutControl.ContentPadding = MessagePadding;
+		}
+	}
+
+	private void ApplyInputLayout()
+	{
+		if (InputControl is not null)
+			ApplyInputLayout(InputControl);
+	}
+
+	/// <summary>
+	/// Applies the configured content padding to the input control.
+	/// </summary>
+	/// <param name="control">The input control to update.</param>
+	protected virtual void ApplyInputLayout(Control control)
+	{
+		if (control is IChatInputLayoutControl layoutControl)
+			layoutControl.ContentPadding = InputPadding;
+	}
+
+	private void ApplySplitContainerLayout()
+	{
+		if (SplitContainerControl is IChatSplitContainerLayoutControl layoutControl)
+			layoutControl.IsSplitterFixed = IsSplitterFixed;
+	}
+
+	private static IEnumerable<Control> EnumerateDescendantControls(Control parent)
+	{
+		foreach (Control control in parent.Controls)
+		{
+			yield return control;
+
+			foreach (var descendant in EnumerateDescendantControls(control))
+				yield return descendant;
+		}
+	}
+
+	private static Padding ValidatePadding(Padding value, string parameterName)
+	{
+		if (value.Left < 0 || value.Top < 0 || value.Right < 0 || value.Bottom < 0)
+			throw new ArgumentOutOfRangeException(parameterName, value, "Padding values cannot be negative.");
+
+		return value;
+	}
+
 	/// <summary>
 	/// Determines whether the welcome control should be displayed based on the current message history.
 	/// </summary>
 	protected virtual bool ShouldShowWelcomeControl() => _messages.Count == 0;
+
+	/// <inheritdoc />
+	protected override void OnFontChanged(EventArgs e)
+	{
+		base.OnFontChanged(e);
+
+		if (_messageFont is null)
+			ApplyMessageFont();
+		if (_inputFont is null)
+			ApplyInputFont();
+		if (_welcomeFont is null)
+			ApplyWelcomeControlSettings();
+	}
+
+	/// <inheritdoc />
+	protected override void OnForeColorChanged(EventArgs e)
+	{
+		base.OnForeColorChanged(e);
+		ApplyHistoryColors();
+		ApplyMessageColors();
+		ApplyInputColors();
+		ApplyWelcomeControlSettings();
+	}
+
+	/// <inheritdoc />
+	protected override void OnBackColorChanged(EventArgs e)
+	{
+		base.OnBackColorChanged(e);
+		ApplyHistoryColors();
+		ApplyMessageColors();
+		ApplyInputColors();
+		ApplyWelcomeControlSettings();
+	}
 
 
 	/// <inheritdoc/>
@@ -380,14 +862,12 @@ public partial class ChatControl : UserControl
 			{
 				try
 				{
-					if (ownsCurrentOperation)
+					if (ownsCurrentOperation && ClearCancellationSource(cancellationSource))
 						inputControl?.SetIsReceivingStream(false, allowCancellation: false);
 					messageControl.SetIsReceivingStream(false);
 				}
 				finally
 				{
-					if (ownsCurrentOperation)
-						ClearCancellationSource(cancellationSource);
 					cancellationSource.Dispose();
 				}
 			}
@@ -445,6 +925,27 @@ public partial class ChatControl : UserControl
 	}
 
 	/// <summary>
+	/// Starts a new conversation by cancelling the current operation and clearing the
+	/// message history, input draft, and transient copy state.
+	/// </summary>
+	public virtual void StartNewChat()
+	{
+		CancelCurrentOperation();
+		(InputControl as IChatInputControl)?.SetIsReceivingStream(false, allowCancellation: false);
+		_suppressMessageCopyButton = false;
+		HideMessageCopyButton(clearTarget: true);
+
+		_messages.Clear();
+		PopulateMessages();
+
+		if (InputControl is IChatInputDraftControl draftControl)
+			draftControl.ClearDraft();
+
+		_attachmentDraftVisible = false;
+		NewChatStarted?.Invoke(this, EventArgs.Empty);
+	}
+
+	/// <summary>
 	/// Raises the <see cref="Control.CreateControl"/> event and initializes the chat control layout.
 	/// </summary>
 	protected override void OnCreateControl()
@@ -455,12 +956,16 @@ public partial class ChatControl : UserControl
 		SplitContainerControl = (Control)splitContainer;
 		Controls.Add(SplitContainerControl);
 		LayoutSplitContainerControl(SplitContainerControl);
+		ApplySplitContainerLayout();
 
 		MessageHistoryControl = (Control)CreateMessageHistoryControl();
 		splitContainer?.HistoryPanel?.Controls.Add(MessageHistoryControl);
 		LayoutMessageHistoryControl(MessageHistoryControl);
+		ApplyHistoryColors();
+		ApplyHistoryLayout();
 
 		WelcomeControl = CreateWelcomeControl();
+		ApplyWelcomeControlSettings(WelcomeControl);
 		splitContainer?.HistoryPanel?.Controls.Add(WelcomeControl);
 		LayoutWelcomeControl(WelcomeControl);
 
@@ -473,6 +978,9 @@ public partial class ChatControl : UserControl
 			attachmentInputControl.AttachmentsChanged += AttachmentInputControl_AttachmentsChanged;
 		}
 		InputControl = (Control)inputControl;
+		ApplyInputFont(InputControl);
+		ApplyInputColors();
+		ApplyInputLayout(InputControl);
 
 		splitContainer?.ChatInputPanel?.Controls.Add(InputControl);
 		LayoutChatInputControl(InputControl);
@@ -488,6 +996,7 @@ public partial class ChatControl : UserControl
 	private void PopulateMessages()
 	{
 		_functionCallMessageControls.Clear();
+		HideMessageCopyButton(clearTarget: true);
 
 		if (MessageHistoryControl is IChatMessageHistoryControl casted)
 			casted.ClearMessageControls();
@@ -527,6 +1036,9 @@ public partial class ChatControl : UserControl
 			messageControl.ShowSenderHeader(false);
 
 		var control = (Control)messageControl;
+		ApplyMessageFont(control);
+		ApplyMessageColors(control);
+		ApplyMessageLayout(control);
 
 		if (MessageHistoryControl is IChatMessageHistoryControl casted)
 		{
@@ -578,7 +1090,7 @@ public partial class ChatControl : UserControl
 	/// <returns>A <see cref="Control"/> that serves as the messages container.</returns>
 	protected virtual Control CreateWelcomeControl()
 	{
-		var label = new Label { Text = WelcomeMessage, TextAlign = ContentAlignment.MiddleCenter, Dock = DockStyle.Fill, Font = new Font("Tahoma", 14f), UseMnemonic = false };
+		var label = new Label { Text = WelcomeMessage, TextAlign = ContentAlignment.MiddleCenter, Dock = DockStyle.Fill, Font = WelcomeFont, UseMnemonic = false };
 		var panel = new Panel();
 		panel.Controls.Add(label);
 		return panel;
@@ -656,7 +1168,7 @@ public partial class ChatControl : UserControl
 	protected virtual void LayoutSplitContainerControl(Control splitter)
 	{
 		splitter.Dock = DockStyle.Fill;
-		((ISplitContainerControl)splitter).SplitterPosition = 60;
+		((ISplitContainerControl)splitter).SplitterPosition = _splitterPosition;
 	}
 
 	/// <summary>
@@ -863,12 +1375,15 @@ public partial class ChatControl : UserControl
 		return true;
 	}
 
-	private void ClearCancellationSource(CancellationTokenSource cancellationSource)
+	private bool ClearCancellationSource(CancellationTokenSource cancellationSource)
 	{
 		lock (_cancellationLock)
 		{
-			if (ReferenceEquals(_currentCancellationTokenSource, cancellationSource))
-				_currentCancellationTokenSource = null;
+			if (!ReferenceEquals(_currentCancellationTokenSource, cancellationSource))
+				return false;
+
+			_currentCancellationTokenSource = null;
+			return true;
 		}
 	}
 
@@ -1266,20 +1781,23 @@ public partial class ChatControl : UserControl
 			}
 			catch (Exception ex)
 			{
-				var errorArgs = new Helper.ChatErrorEventArgs(ex);
-				ErrorOccurred?.Invoke(this, errorArgs);
-				if (!errorArgs.Handled)
-					AddMessage(new NamedSender("System"), new StringMessageContent($"Error: {ex.Message}"));
+				if (!cancellationSource.IsCancellationRequested)
+				{
+					var errorArgs = new Helper.ChatErrorEventArgs(ex);
+					ErrorOccurred?.Invoke(this, errorArgs);
+					if (!errorArgs.Handled)
+						AddMessage(new NamedSender("System"), new StringMessageContent($"Error: {ex.Message}"));
+				}
 			}
 			finally
 			{
 				try
 				{
-					inputControl?.SetIsReceivingStream(false, allowCancellation: false);
+					if (ClearCancellationSource(cancellationSource))
+						inputControl?.SetIsReceivingStream(false, allowCancellation: false);
 				}
 				finally
 				{
-					ClearCancellationSource(cancellationSource);
 					cancellationSource.Dispose();
 				}
 			}
