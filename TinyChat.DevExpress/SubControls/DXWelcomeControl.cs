@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Net;
 using DevExpress.Utils;
 using DevExpress.XtraEditors;
 
@@ -9,6 +10,9 @@ namespace TinyChat;
 /// </summary>
 internal sealed class DXWelcomeControl : PanelControl
 {
+	private const string ROBOT_ART = "●\n┌─┴─┐\n◉‿◉\n└───┘";
+	private const string ROBOT_FONT_NAME = "Segoe UI Symbol";
+
 	private readonly LabelControl _label;
 	private ContentAlignment _textAlign = ContentAlignment.MiddleCenter;
 
@@ -38,6 +42,7 @@ internal sealed class DXWelcomeControl : PanelControl
 		BorderStyle = DevExpress.XtraEditors.Controls.BorderStyles.NoBorder;
 		_label = new LabelControl
 		{
+			AllowHtmlString = true,
 			AutoSizeMode = LabelAutoSizeMode.None,
 			Dock = DockStyle.Fill,
 			UseMnemonic = false
@@ -47,6 +52,17 @@ internal sealed class DXWelcomeControl : PanelControl
 		Controls.Add(_label);
 		ApplyTextAlignment();
 		ApplyAppearance();
+	}
+
+	/// <summary>
+	/// Sets plain welcome text and uses a symbol font only for the built-in robot artwork.
+	/// </summary>
+	/// <param name="text">The unformatted welcome text.</param>
+	internal void SetWelcomeText(string text)
+	{
+		var plainText = text ?? string.Empty;
+		_label.AccessibleDescription = plainText;
+		_label.Text = FormatWelcomeText(plainText);
 	}
 
 	/// <inheritdoc />
@@ -103,5 +119,15 @@ internal sealed class DXWelcomeControl : PanelControl
 			_ => throw new InvalidEnumArgumentException(nameof(TextAlign), (int)TextAlign, typeof(ContentAlignment))
 		};
 		_label.Appearance.Options.UseTextOptions = true;
+	}
+
+	private static string FormatWelcomeText(string text)
+	{
+		if (!text.StartsWith(ROBOT_ART, StringComparison.Ordinal))
+			return WebUtility.HtmlEncode(text);
+
+		var encodedRobot = WebUtility.HtmlEncode(ROBOT_ART);
+		var encodedMessage = WebUtility.HtmlEncode(text[ROBOT_ART.Length..]);
+		return $"<font=\"{ROBOT_FONT_NAME}\">{encodedRobot}</font>{encodedMessage}";
 	}
 }

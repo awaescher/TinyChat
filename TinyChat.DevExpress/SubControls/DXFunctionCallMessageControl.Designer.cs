@@ -43,22 +43,26 @@ partial class DXFunctionCallMessageControl
 
 		// _callIconLabel
 		lblToolIcon.AutoSize = false;
-		lblToolIcon.Dock = DockStyle.Fill;
+		lblToolIcon.AutoSizeMode = LabelAutoSizeMode.None;
+		lblToolIcon.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+		lblToolIcon.Dock = DockStyle.None;
 		lblToolIcon.ImageOptions.SvgImage = SvgImage.FromStream(new MemoryStream(Encoding.UTF8.GetBytes(TOOL_SVG)));
-		lblToolIcon.ImageOptions.SvgImageSize = new System.Drawing.Size(14, 14);
-		lblToolIcon.MaximumSize = new Size(0, 14);
+		lblToolIcon.ImageOptions.SvgImageSize = new Size(ICON_SIZE, ICON_SIZE);
+		lblToolIcon.Margin = Padding.Empty;
+		lblToolIcon.Size = new Size(ICON_WIDTH, ICON_SIZE);
 		lblToolIcon.UseMnemonic = false;
-		lblToolIcon.Width = ICON_WIDTH;
 
 		// _resultIconLabel
 		lblResultIcon.AutoSize = false;
-		lblResultIcon.Dock = DockStyle.Fill;
+		lblResultIcon.AutoSizeMode = LabelAutoSizeMode.None;
+		lblResultIcon.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+		lblResultIcon.Dock = DockStyle.None;
 		lblResultIcon.ImageOptions.SvgImage = SvgImage.FromStream(new MemoryStream(Encoding.UTF8.GetBytes(RESULT_SVG)));
-		lblResultIcon.ImageOptions.SvgImageSize = new System.Drawing.Size(14, 14);
-		lblResultIcon.MaximumSize = new Size(0, 14);
+		lblResultIcon.ImageOptions.SvgImageSize = new Size(ICON_SIZE, ICON_SIZE);
+		lblResultIcon.Margin = Padding.Empty;
+		lblResultIcon.Size = new Size(ICON_WIDTH, ICON_SIZE);
 		lblResultIcon.UseMnemonic = false;
 		lblResultIcon.Visible = false;
-		lblResultIcon.Width = ICON_WIDTH;
 
 		// _callTitleLabel
 		lblTitle.AutoSizeMode = LabelAutoSizeMode.Vertical;

@@ -12,7 +12,7 @@ A minimalistic but extensible chat control library for Windows Forms.
 - **Streaming support**: real-time message streaming for AI assistants and live conversations
 - **Microsoft.Extensions.AI integration**: use any registered `IChatClient`, including keyed services, with streaming, cancellation, chat options, reasoning, and function calls
 - **File and image attachments**: add files through drag and drop, clipboard paste, or the public API; images are shown as previews
-- **Selectable and copyable content**: directly select regular message text, function-call arguments and results, or reasoning details, or copy any complete message with its hover button
+- **Selectable and copyable content**: directly select regular message text, function-call arguments and results, or reasoning details and copy it with standard keyboard shortcuts
 - **Designer-friendly appearance**: configure fonts, colors, history, message and input spacing, welcome alignment, the splitter, and behavioral options in the Windows Forms Designer
 - **New-chat lifecycle**: cancel the active response and clear the conversation and input draft in one call
 - **Readable message rendering**: native controls use cleaned plain text, while the DevExpress suite keeps its safe HTML/CSS formatting in a permanently selectable message surface
@@ -73,7 +73,7 @@ chatControl.MessageSent += (_, e) =>
 
 ### Starting a new chat
 
-Use `StartNewChat()` instead of assigning an empty message collection. It requests cancellation of an active response and clears the built-in conversation, text draft, pending attachments, selection, and copy UI in one call.
+Use `StartNewChat()` instead of assigning an empty message collection. It requests cancellation of an active response and clears the built-in conversation, text draft, pending attachments, and selection in one call.
 
 ```csharp
 chatControl.NewChatStarted += (_, _) =>
@@ -93,6 +93,10 @@ The following properties are available in the Windows Forms Designer and work fo
 ```csharp
 chatControl.MessageFont = new Font("Segoe UI", 10f);
 chatControl.InputFont = new Font("Segoe UI", 10f);
+chatControl.InputEditorBackColor = Color.Empty; // native/skin default
+chatControl.InputEditorForeColor = Color.Empty; // native/skin default
+chatControl.InputEditorBorderStyle = BorderStyle.Fixed3D;
+chatControl.InputPlaceholderText = "Ask TinyChat";
 chatControl.WelcomeFont = new Font("Segoe UI", 14f);
 chatControl.WelcomeMessage = "How can I help?";
 chatControl.HistoryPadding = new Padding(12);
@@ -102,11 +106,16 @@ chatControl.InputPadding = new Padding(10);
 chatControl.WelcomeTextAlign = ContentAlignment.MiddleCenter;
 chatControl.IsSplitterFixed = true;
 chatControl.SplitterPosition = 90;
+chatControl.AllowExpandFunctionCalls = true;
+chatControl.AllowExpandReasoning = true;
+chatControl.IncludeFunctionCalls = false;
+chatControl.IncludeReasoning = false;
+chatControl.AssistantSenderName = "AI Assistant";
 ```
 
-`Font`, `ForeColor`, and `BackColor` provide the global appearance for the complete chat and are propagated by both the native Windows Forms and DevExpress suites. `MessageFont` and `InputFont` inherit from `Font` until explicitly changed; resetting them resumes that inheritance. `WelcomeFont` is independent, and resetting it restores the larger default welcome font.
+`Font`, `ForeColor`, and `BackColor` provide the global appearance for the chat surface and are propagated by both the native Windows Forms and DevExpress suites. The editable input surface deliberately keeps its native Windows or active DevExpress skin colours so that it remains visually distinct and does not look read-only. Set `InputEditorBackColor` or `InputEditorForeColor` to override those defaults; reset either property to `Color.Empty` to resume platform/skin rendering. `MessageFont` and `InputFont` inherit from `Font` until explicitly changed; resetting them resumes that inheritance. `WelcomeFont` is independent, and resetting it restores the larger default welcome font.
 
-The layout properties have the same meaning and defaults in both suites:
+The layout and input appearance properties have the same meaning and defaults in both suites:
 
 | Property | Scope | Default after reset |
 |---|---|---|
@@ -114,17 +123,28 @@ The layout properties have the same meaning and defaults in both suites:
 | `MessagePadding` | Inner padding of regular, function-call, and reasoning messages | `8` on every side |
 | `MessageMargin` | Outer margin of every message | `3` on every side |
 | `InputPadding` | Inner padding of the complete input area | `8` on every side |
+| `InputEditorBackColor` | Background of the editable text surface | `Color.Empty` (platform/skin default) |
+| `InputEditorForeColor` | Text colour of the editable text surface | `Color.Empty` (platform/skin default) |
+| `InputEditorBorderStyle` | Native border or mapped DevExpress skin border | `BorderStyle.Fixed3D` |
+| `InputPlaceholderText` | Prompt shown while the input is empty | Empty |
 | `WelcomeTextAlign` | Alignment of the welcome text within the history area | `ContentAlignment.MiddleCenter` |
 | `IsSplitterFixed` | Prevents the user from moving the splitter when enabled | `false` |
 | `SplitterPosition` | Height of the lower input area in pixels | `60` |
+| `AllowExpandFunctionCalls` | Allows function-call details to be expanded | `true` |
+| `AllowExpandReasoning` | Allows reasoning details to be expanded | `true` |
+| `IncludeFunctionCalls` | Shows function calls captured from `IChatClient` responses | `false` |
+| `IncludeReasoning` | Shows reasoning captured from `IChatClient` responses | `false` |
+| `AssistantSenderName` | Name shown for automatic `IChatClient` responses | `Assistant` |
 
 Resetting one of these properties in the Designer restores the listed value. The inherited `ChatControl.Padding` property remains the outer padding around the combined chat surface; it is not inherited by the history, messages, or input area.
+
+These settings also apply retrospectively. Changing the assistant name, formatter, content filters, or expand permissions updates the existing message controls in place instead of rebuilding the history. Hidden function calls and reasoning continue to be captured, so enabling their filters later reveals the original controls without interrupting active streaming. Hiding a selected message intentionally clears that selection. Messages added explicitly through `AddMessage` keep their own sender identity and remain visible independently of the `IChatClient` visualization filters.
 
 ### Selecting and copying text
 
 Both control suites display regular message bodies permanently in selectable text views. Drag directly over the required text and press <kbd>Ctrl</kbd>+<kbd>C</kbd>; no renderer or selection-mode switch is required. Starting a selection in another message clears the previous selection, so multiple message bodies are never highlighted at the same time.
 
-Function-call arguments and results as well as reasoning details are directly selectable in the same way. To copy the complete content of any message, hover over it and use the copy button. You can also click the sender/header or message background and press <kbd>Ctrl</kbd>+<kbd>C</kbd> to copy the complete message.
+Function-call arguments and results as well as reasoning details are directly selectable in the same way. You can also click the sender/header or message background and press <kbd>Ctrl</kbd>+<kbd>C</kbd> to copy the complete message.
 
 ### File and image attachments
 
@@ -176,7 +196,7 @@ var chatControl = new ChatControl
 };
 ```
 
-The complete conversation is converted and passed to the client. Override `ConvertToChatMessages()` or `DetermineChatRole()` when the default sender-to-role mapping does not fit your application. `ChatOptions`, `ChatOptionsRequested`, `IncludeFunctionCalls`, and `IncludeReasoning` customize each request and its visualization.
+The complete conversation is converted and passed to the client. Override `ConvertToChatMessages()` or `DetermineChatRole()` when the default sender-to-role mapping does not fit your application. `ChatOptions` and `ChatOptionsRequested` customize each request; `IncludeFunctionCalls` and `IncludeReasoning` control whether the corresponding captured response details are visible.
 
 Keyed clients are supported as well:
 
@@ -192,6 +212,8 @@ chatControl.ChatClientServiceKey = "premium";
 Both suites use a permanently visible message surface so that text can always be selected without changing renderers. `ChatControl` uses a read-only native `TextBox` and `PlainTextMessageFormatter` to remove common HTML and Markdown syntax while keeping the text readable.
 
 `DXChatControl` uses a permanent DevExpress `HtmlContentControl`. It combines formatted rendering with native DevExpress text selection, automatic height calculation, and stable streaming updates in the same control. `SimplifiedHtmlMessageFormatter` remains the default; its supported bold, italic, underline, strike-through, heading, color, code-font, paragraph, line-break, and link output is converted to a safe HTML/CSS-template subset before rendering. Remote images and unsafe link schemes are not injected into message templates.
+
+Both suites preserve Unicode emoji, including multi-code-point sequences. Their exact colour and glyph style still depend on the installed Windows fonts and the active renderer; native Windows Forms commonly displays monochrome glyphs.
 
 Function-call arguments and results as well as reasoning details use the same selectable DevExpress HTML surface, with their plain text HTML-encoded before display.
 

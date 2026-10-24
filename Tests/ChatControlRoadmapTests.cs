@@ -42,6 +42,10 @@ public class ChatControlRoadmapTests
 			{
 				nameof(ChatControl.MessageFont),
 				nameof(ChatControl.InputFont),
+				nameof(ChatControl.InputEditorBackColor),
+				nameof(ChatControl.InputEditorForeColor),
+				nameof(ChatControl.InputEditorBorderStyle),
+				nameof(ChatControl.InputPlaceholderText),
 				nameof(ChatControl.WelcomeFont),
 				nameof(ChatControl.WelcomeMessage),
 				nameof(ChatControl.HistoryPadding),
@@ -57,6 +61,36 @@ public class ChatControlRoadmapTests
 				property.ShouldNotBeNull();
 				property.IsBrowsable.ShouldBeTrue();
 				property.SerializationVisibility.ShouldBe(DesignerSerializationVisibility.Visible);
+			}
+		}
+
+		[Test]
+		public void Resets_Input_Editor_Appearance_To_The_Platform_Defaults()
+		{
+			using var control = new ChatControl();
+			var properties = TypeDescriptor.GetProperties(control);
+			var cases = new (string PropertyName, object CustomValue, object DefaultValue)[]
+			{
+				(nameof(ChatControl.InputEditorBackColor), Color.LemonChiffon, Color.Empty),
+				(nameof(ChatControl.InputEditorForeColor), Color.DarkRed, Color.Empty),
+				(nameof(ChatControl.InputEditorBorderStyle), BorderStyle.None, BorderStyle.Fixed3D),
+				(nameof(ChatControl.InputPlaceholderText), "Ask TinyChat", string.Empty)
+			};
+
+			foreach (var (propertyName, customValue, defaultValue) in cases)
+			{
+				var property = properties[propertyName]!;
+				property.ShouldSerializeValue(control).ShouldBeFalse(propertyName);
+
+				property.SetValue(control, customValue);
+
+				property.ShouldSerializeValue(control).ShouldBeTrue(propertyName);
+				property.CanResetValue(control).ShouldBeTrue(propertyName);
+
+				property.ResetValue(control);
+
+				property.GetValue(control).ShouldBe(defaultValue, propertyName);
+				property.ShouldSerializeValue(control).ShouldBeFalse(propertyName);
 			}
 		}
 
@@ -201,6 +235,36 @@ public class ChatControlRoadmapTests
 			DescendantsAndSelf(control.WelcomeControl).ShouldContain(child => child.Text == "Updated welcome");
 		}
 
+		[Test]
+		public void Uses_A_Symbol_Font_For_The_Default_DevExpress_Robot()
+		{
+			using var control = CreateChatControl(useDevExpress: true);
+			var welcomeLabel = DescendantsAndSelf(control.WelcomeControl!)
+				.OfType<LabelControl>()
+				.Single();
+
+			welcomeLabel.AllowHtmlString.ShouldBeTrue();
+			welcomeLabel.Text.ShouldStartWith("""<font="Segoe UI Symbol">●""");
+			welcomeLabel.Text.ShouldContain("◉‿◉");
+			welcomeLabel.Text.ShouldContain("</font>\n\nGreetings human.");
+			welcomeLabel.PlainText.ShouldContain("◉‿◉");
+			welcomeLabel.PlainText.ShouldContain("How can I help you today?");
+		}
+
+		[Test]
+		public void Html_Encodes_Custom_DevExpress_Welcome_Text()
+		{
+			using var control = CreateChatControl(useDevExpress: true);
+
+			control.WelcomeMessage = "<b>Wide awake</b> & ready";
+
+			var welcomeLabel = DescendantsAndSelf(control.WelcomeControl!)
+				.OfType<LabelControl>()
+				.Single();
+			welcomeLabel.Text.ShouldBe("&lt;b&gt;Wide awake&lt;/b&gt; &amp; ready");
+			welcomeLabel.PlainText.ShouldBe("<b>Wide awake</b> & ready");
+		}
+
 		[TestCase(false)]
 		[TestCase(true)]
 		public void Applies_Layout_And_Global_Colors_To_All_Built_In_Control_Types(bool useDevExpress)
@@ -231,8 +295,7 @@ public class ChatControlRoadmapTests
 			inputControl.ForeColor.ShouldBe(initialForeColor);
 			inputControl.BackColor.ShouldBe(initialBackColor);
 			var inputEditor = GetInputEditor(inputControl, useDevExpress);
-			inputEditor.ForeColor.ShouldBe(initialForeColor);
-			inputEditor.BackColor.ShouldBe(initialBackColor);
+			AssertInputEditorUsesEditableDefaults(inputEditor, useDevExpress);
 			AssertWelcomeAlignment(control.WelcomeControl!, useDevExpress, ContentAlignment.BottomRight);
 
 			var messageControls = new[]
@@ -278,8 +341,7 @@ public class ChatControlRoadmapTests
 			splitContainer.HistoryPanel.Padding.ShouldBe(new Padding(3, 4, 5, 6));
 			((IChatSplitContainerLayoutControl)splitContainerControl).IsSplitterFixed.ShouldBeFalse();
 			((IChatInputLayoutControl)inputControl).ContentPadding.ShouldBe(new Padding(5));
-			inputEditor.ForeColor.ShouldBe(updatedForeColor);
-			inputEditor.BackColor.ShouldBe(updatedBackColor);
+			AssertInputEditorUsesEditableDefaults(inputEditor, useDevExpress);
 			AssertWelcomeAlignment(control.WelcomeControl!, useDevExpress, ContentAlignment.TopLeft);
 			foreach (var messageControl in messageControls)
 			{
@@ -288,6 +350,58 @@ public class ChatControlRoadmapTests
 				messageControl.ForeColor.ShouldBe(updatedForeColor);
 				messageControl.BackColor.ShouldBe(updatedBackColor);
 			}
+		}
+
+		[TestCase(false)]
+		[TestCase(true)]
+		public void Applies_Input_Editor_Appearance_Before_Creation_And_Live(bool useDevExpress)
+		{
+			using var control = CreateChatControl(useDevExpress, createControl: false);
+			control.InputEditorBackColor = Color.LemonChiffon;
+			control.InputEditorForeColor = Color.DarkRed;
+			control.InputEditorBorderStyle = BorderStyle.FixedSingle;
+			control.InputPlaceholderText = "Ask TinyChat";
+
+			InitializeControl(control);
+
+			var inputEditor = GetInputEditor(control.InputControl!, useDevExpress);
+			AssertInputEditorAppearance(
+				inputEditor,
+				useDevExpress,
+				Color.LemonChiffon,
+				Color.DarkRed,
+				BorderStyle.FixedSingle,
+				"Ask TinyChat");
+
+			control.InputEditorBackColor = Color.Azure;
+			control.InputEditorForeColor = Color.DarkGreen;
+			control.InputEditorBorderStyle = BorderStyle.None;
+			control.InputPlaceholderText = "Continue";
+
+			AssertInputEditorAppearance(
+				inputEditor,
+				useDevExpress,
+				Color.Azure,
+				Color.DarkGreen,
+				BorderStyle.None,
+				"Continue");
+		}
+
+		[Test]
+		public void Uses_A_Custom_Cue_Text_For_The_Native_Multiline_Editor()
+		{
+			using var control = CreateChatControl(useDevExpress: false, createControl: false);
+			control.InputPlaceholderText = "Ask TinyChat";
+
+			InitializeControl(control);
+
+			var inputEditor = (TextBox)GetInputEditor(control.InputControl!, useDevExpress: false);
+			inputEditor.Multiline.ShouldBeTrue();
+			inputEditor.PlaceholderText.ShouldBe("Ask TinyChat");
+			inputEditor.GetType()
+				.GetProperty("CueText", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
+				.GetValue(inputEditor)
+				.ShouldBe("Ask TinyChat");
 		}
 	}
 
@@ -392,6 +506,46 @@ public class ChatControlRoadmapTests
 	public class SelectableDevExpressMessageText
 	{
 		[Test]
+		public void Preserves_Supplementary_Unicode_Characters_In_The_Html_Dom()
+		{
+			const string text = "Emoji 😀 🔍 👩🏽‍💻 🏳️‍🌈 🇩🇪 �";
+			using var control = new DXChatMessageControl
+			{
+				MessageFormatter = new PlainTextMessageFormatter(),
+				Message = new ChatMessage(
+					new NamedSender("Assistant"),
+					new StringMessageContent(text))
+			};
+			control.CreateControl();
+			var editor = control.Controls.OfType<HtmlContentControl>().Single();
+			_ = editor.GetContentSize();
+			var contentElement = editor.FindElementById("message-content");
+			contentElement.ShouldNotBeNull();
+
+			var renderedText = string.Concat(
+				DescendantHtmlNodes(contentElement)
+					.OfType<DxHtmlTextElementBase>()
+					.Select(element => element.Text));
+
+			editor.Text.ShouldBe(text);
+			renderedText.ShouldBe(text);
+			SelectHtmlText(editor, "👩🏽‍💻");
+			editor.SelectedText.ShouldBe("👩🏽‍💻");
+
+			typeof(Control)
+				.GetMethod("RecreateHandle", BindingFlags.Instance | BindingFlags.NonPublic)!
+				.Invoke(editor, null);
+			_ = editor.GetContentSize();
+			var recreatedContentElement = editor.FindElementById("message-content");
+			recreatedContentElement.ShouldNotBeNull();
+			var recreatedText = string.Concat(
+				DescendantHtmlNodes(recreatedContentElement)
+					.OfType<DxHtmlTextElementBase>()
+					.Select(element => element.Text));
+			recreatedText.ShouldBe(text);
+		}
+
+		[Test]
 		public void Uses_A_Permanently_Visible_DevExpress_Html_Control_And_Selects_A_Substring()
 		{
 			using var control = new DXChatMessageControl
@@ -458,6 +612,28 @@ public class ChatControlRoadmapTests
 		}
 
 		[Test]
+		public void Preserves_An_Emoji_Selection_While_Streaming()
+		{
+			var builder = new NotifyingStringBuilder().Append("Started 🔍");
+			using var control = new DXChatMessageControl
+			{
+				MessageFormatter = new PlainTextMessageFormatter(),
+				Message = new ChatMessage(
+					new NamedSender("Assistant"),
+					new ChangingMessageContent(builder))
+			};
+			control.CreateControl();
+			var editor = control.Controls.OfType<HtmlContentControl>().Single();
+			SelectHtmlText(editor, "🔍");
+
+			builder.Append(" and continued");
+			_ = editor.GetContentSize();
+
+			editor.Text.ShouldBe("Started 🔍 and continued");
+			editor.SelectedText.ShouldBe("🔍");
+		}
+
+		[Test]
 		public void Preserves_Formatted_Line_Breaks_In_Selectable_Copy_Text()
 		{
 			using var control = new DXChatMessageControl
@@ -481,7 +657,7 @@ public class ChatControlRoadmapTests
 				MessageFormatter = new SimplifiedHtmlMessageFormatter("b", "i", "font", "color", "size"),
 				Message = new ChatMessage(
 					new NamedSender("Assistant"),
-					new StringMessageContent("**Bold** *italic* `code` <color=red>red</color> <size=+2>large</size>"))
+					new StringMessageContent("**Bold 🔍** *italic* `code` <color=red>red</color> <size=+2>large</size>"))
 			};
 			control.CreateControl();
 			var editor = control.Controls.OfType<HtmlContentControl>().Single();
@@ -492,7 +668,13 @@ public class ChatControlRoadmapTests
 			editor.FindElementsByTag("span").Count().ShouldBeGreaterThanOrEqualTo(3);
 			editor.HtmlTemplate.Template.ShouldNotContain("<color=");
 			editor.HtmlTemplate.Template.ShouldNotContain("<font=");
-			editor.Text.ShouldBe("Bold italic code red large");
+			editor.Text.ShouldBe("Bold 🔍 italic code red large");
+			var boldText = string.Concat(
+				editor.FindElementsByTag("b")
+					.SelectMany(DescendantHtmlNodes)
+					.OfType<DxHtmlTextElementBase>()
+					.Select(element => element.Text));
+			boldText.ShouldBe("Bold 🔍");
 		}
 
 		[Test]
@@ -633,7 +815,6 @@ public class ChatControlRoadmapTests
 	private static ChatControl CreateChatControl(bool useDevExpress, bool createControl = true)
 	{
 		var control = useDevExpress ? (ChatControl)new DXChatControl() : new ChatControl();
-		control.ShowCopyButton = false;
 		control.Size = new Size(400, 420);
 		if (createControl)
 			InitializeControl(control);
@@ -663,6 +844,70 @@ public class ChatControlRoadmapTests
 		return useDevExpress
 			? DescendantsAndSelf(inputControl).OfType<MemoEdit>().Single()
 			: DescendantsAndSelf(inputControl).OfType<TextBox>().Single();
+	}
+
+	private static void AssertInputEditorUsesEditableDefaults(Control inputEditor, bool useDevExpress)
+	{
+		if (!useDevExpress)
+		{
+			inputEditor.ShouldBeAssignableTo<TextBox>();
+			var textBox = (TextBox)inputEditor;
+			textBox.ReadOnly.ShouldBeFalse();
+			textBox.BackColor.ShouldBe(SystemColors.Window);
+			textBox.ForeColor.ShouldBe(SystemColors.WindowText);
+			textBox.BorderStyle.ShouldBe(BorderStyle.Fixed3D);
+			return;
+		}
+
+		inputEditor.ShouldBeAssignableTo<MemoEdit>();
+		var memoEdit = (MemoEdit)inputEditor;
+		memoEdit.Properties.ReadOnly.ShouldBeFalse();
+		memoEdit.Properties.BorderStyle.ShouldBe(DevExpress.XtraEditors.Controls.BorderStyles.Default);
+		memoEdit.Properties.Appearance.Options.UseBackColor.ShouldBeFalse();
+		memoEdit.Properties.Appearance.Options.UseForeColor.ShouldBeFalse();
+		memoEdit.Properties.AppearanceFocused.Options.UseBackColor.ShouldBeFalse();
+		memoEdit.Properties.AppearanceFocused.Options.UseForeColor.ShouldBeFalse();
+	}
+
+	private static void AssertInputEditorAppearance(
+		Control inputEditor,
+		bool useDevExpress,
+		Color backColor,
+		Color foreColor,
+		BorderStyle borderStyle,
+		string placeholderText)
+	{
+		if (!useDevExpress)
+		{
+			inputEditor.ShouldBeAssignableTo<TextBox>();
+			var textBox = (TextBox)inputEditor;
+			textBox.ReadOnly.ShouldBeFalse();
+			textBox.BackColor.ShouldBe(backColor);
+			textBox.ForeColor.ShouldBe(foreColor);
+			textBox.BorderStyle.ShouldBe(borderStyle);
+			textBox.PlaceholderText.ShouldBe(placeholderText);
+			return;
+		}
+
+		inputEditor.ShouldBeAssignableTo<MemoEdit>();
+		var memoEdit = (MemoEdit)inputEditor;
+		var expectedBorderStyle = borderStyle switch
+		{
+			BorderStyle.None => DevExpress.XtraEditors.Controls.BorderStyles.NoBorder,
+			BorderStyle.FixedSingle => DevExpress.XtraEditors.Controls.BorderStyles.Simple,
+			_ => DevExpress.XtraEditors.Controls.BorderStyles.Default
+		};
+		memoEdit.Properties.ReadOnly.ShouldBeFalse();
+		memoEdit.Properties.BorderStyle.ShouldBe(expectedBorderStyle);
+		memoEdit.Properties.NullValuePrompt.ShouldBe(placeholderText);
+		memoEdit.Properties.Appearance.BackColor.ShouldBe(backColor);
+		memoEdit.Properties.Appearance.ForeColor.ShouldBe(foreColor);
+		memoEdit.Properties.Appearance.Options.UseBackColor.ShouldBeTrue();
+		memoEdit.Properties.Appearance.Options.UseForeColor.ShouldBeTrue();
+		memoEdit.Properties.AppearanceFocused.BackColor.ShouldBe(backColor);
+		memoEdit.Properties.AppearanceFocused.ForeColor.ShouldBe(foreColor);
+		memoEdit.Properties.AppearanceFocused.Options.UseBackColor.ShouldBeTrue();
+		memoEdit.Properties.AppearanceFocused.Options.UseForeColor.ShouldBeTrue();
 	}
 
 	private static Control GetSelectableMessageEditor(Control messageControl)
@@ -880,11 +1125,6 @@ public class ChatControlRoadmapTests
 
 	private sealed class NonOptInLayoutChatControl : ChatControl
 	{
-		public NonOptInLayoutChatControl()
-		{
-			ShowCopyButton = false;
-		}
-
 		protected override IChatInputControl CreateChatInputControl() => new NonOptInInputControl
 		{
 			Padding = new Padding(5)

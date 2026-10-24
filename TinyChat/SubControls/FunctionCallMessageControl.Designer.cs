@@ -1,5 +1,3 @@
-using System.Reflection.Metadata.Ecma335;
-
 namespace TinyChat;
 
 partial class FunctionCallMessageControl
@@ -36,7 +34,10 @@ partial class FunctionCallMessageControl
 
 		// lblIcon
 		lblIcon.AutoSize = false;
-		lblIcon.Dock = DockStyle.Fill;
+		lblIcon.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+		lblIcon.Dock = DockStyle.None;
+		lblIcon.Height = Font.Height;
+		lblIcon.Margin = Padding.Empty;
 		lblIcon.Text = TOOL_CALL_ICON;
 		lblIcon.TextAlign = ContentAlignment.MiddleCenter;
 		lblIcon.UseMnemonic = false;
@@ -44,10 +45,12 @@ partial class FunctionCallMessageControl
 
 		// lblResultIcon
 		lblResultIcon.AutoSize = false;
-		lblResultIcon.Dock = DockStyle.Fill;
+		lblResultIcon.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+		lblResultIcon.Dock = DockStyle.None;
+		lblResultIcon.Height = Font.Height;
+		lblResultIcon.Margin = Padding.Empty;
 		lblResultIcon.Text = RESULT_ICON;
 		lblResultIcon.TextAlign = ContentAlignment.MiddleCenter;
-		lblResultIcon.MaximumSize = new Size(0, ICON_WIDTH);
 		lblResultIcon.UseMnemonic = false;
 		lblResultIcon.Visible = false;
 		lblResultIcon.Width = ICON_WIDTH;
@@ -59,12 +62,14 @@ partial class FunctionCallMessageControl
 		lblTitle.TextAlign = ContentAlignment.MiddleLeft;
 
 		// lblArgs
-		lblArgs.Dock = DockStyle.Fill;
+		lblArgs.AutoSize = true;
+		lblArgs.Dock = DockStyle.Top;
 		lblArgs.Margin = new Padding(0, 2, 0, 6);
 		lblArgs.Visible = false;
 
 		// lblResult
-		lblResult.Dock = DockStyle.Fill;
+		lblResult.AutoSize = true;
+		lblResult.Dock = DockStyle.Top;
 		lblResult.Visible = false;
 
 		// _table
@@ -76,6 +81,7 @@ partial class FunctionCallMessageControl
 		// IMPORTANT: do NOT put any always-visible control in rows 1 or 2;
 		// a hidden control contributes 0 height, so the row collapses automatically.
 		tableLayout.AutoSize = true;
+		tableLayout.AutoSizeMode = AutoSizeMode.GrowAndShrink;
 		tableLayout.CellBorderStyle = TableLayoutPanelCellBorderStyle.None;
 		tableLayout.ColumnCount = 2;
 		tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, ICON_WIDTH));
@@ -98,6 +104,7 @@ partial class FunctionCallMessageControl
 
 		// FunctionCallMessageControl
 		AutoSize = true;
+		AutoSizeMode = AutoSizeMode.GrowAndShrink;
 		BorderStyle = BorderStyle.None;
 		Cursor = Cursors.Hand;
 		Margin = new Padding(3);

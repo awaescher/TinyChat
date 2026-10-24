@@ -7,7 +7,7 @@ namespace TinyChat.SubControls;
 /// <summary>
 /// Displays a thinking text, click-to-expand bubble.
 /// </summary>
-internal partial class ReasoningMessageControl : Panel, IChatMessageControl, IChatMessageLayoutControl
+internal partial class ReasoningMessageControl : Panel, IChatMessageFormattingControl, IChatMessageLayoutControl, IChatMessageRefreshControl, IReasoningMessageControl
 {
 	/// <summary>Icon glyph rendered in the left icon column.</summary>
 	private const string IconGlyph = "💭";
@@ -18,6 +18,10 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageControl, ICh
 	/// <summary>The chat message whose <see cref="ReasoningMessageContent"/> is being displayed.</summary>
 	private IChatMessage? _message;
 	private bool _isReceivingStream;
+	private bool _allowExpand = true;
+	private bool _detailTextDirty = true;
+	private IMessageFormatter _messageFormatter = new PlainTextMessageFormatter();
+	private readonly CoalescedUiUpdate _streamingDisplayUpdate;
 	private Font? _senderFont;
 
 	/// <summary>
@@ -39,7 +43,43 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageControl, ICh
 	/// Gets or sets the formatter that converts message content into displayable strings.
 	/// </summary>
 	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-	public required IMessageFormatter MessageFormatter { get; set; }
+	public required IMessageFormatter MessageFormatter
+	{
+		get => _messageFormatter;
+		set
+		{
+			ArgumentNullException.ThrowIfNull(value);
+			if (ReferenceEquals(_messageFormatter, value))
+				return;
+
+			_messageFormatter = value;
+			_detailTextDirty = true;
+			if (Message is not null)
+				UpdateDisplay();
+		}
+	}
+
+	/// <inheritdoc />
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+	[Category("Chat")]
+	public bool AllowExpand
+	{
+		get => _allowExpand;
+		set
+		{
+			if (_allowExpand == value)
+				return;
+
+			_allowExpand = value;
+			UpdateExpandCursor();
+
+			if (!_allowExpand && _expanded)
+			{
+				_expanded = false;
+				ApplyVisibility();
+			}
+		}
+	}
 
 	/// <summary>
 	/// Initializes a new instance of <see cref="ReasoningMessageControl"/>, creating and wiring up the
@@ -47,18 +87,23 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageControl, ICh
 	/// </summary>
 	public ReasoningMessageControl()
 	{
+		_streamingDisplayUpdate = new CoalescedUiUpdate(this, UpdateDisplay);
 		InitializeComponent();
 
+		lblDetail.ContentHeightChanging += SelectableText_ContentHeightChanging;
+		lblDetail.ContentHeightChanged += SelectableText_ContentHeightChanged;
 		lblIcon.Font = new Font("Arial", 11);
 		ApplyTextFont();
 		ApplyColors();
 		Disposed += (_, _) =>
 		{
+			_streamingDisplayUpdate.Cancel();
 			_senderFont?.Dispose();
 			_senderFont = null;
 		};
 
 		WireMouseDown(tableLayout, lblIcon, lblHeader);
+		UpdateExpandCursor();
 	}
 
 	/// <inheritdoc />
@@ -147,7 +192,7 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageControl, ICh
 				oldReasoningContent.PropertyChanged -= OnContentPropertyChanged;
 
 			_message = value;
-			lblSender.Text = _message?.Sender?.Name ?? string.Empty;
+			_detailTextDirty = true;
 
 			if (_message?.Content is ReasoningMessageContent newReasoningContent)
 				newReasoningContent.PropertyChanged += OnContentPropertyChanged;
@@ -160,6 +205,12 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageControl, ICh
 	{
 		if (IsDisposed || Disposing)
 			return;
+		_detailTextDirty = true;
+		if (_isReceivingStream)
+		{
+			_streamingDisplayUpdate.Queue();
+			return;
+		}
 
 		if (InvokeRequired)
 		{
@@ -190,6 +241,9 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageControl, ICh
 		get => base.MaximumSize;
 		set
 		{
+			if (base.MaximumSize == value)
+				return;
+
 			base.MaximumSize = value;
 			UpdateContentWidthConstraints();
 		}
@@ -203,17 +257,30 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageControl, ICh
 	/// <param name="e">Event data (not used).</param>
 	private void Toggle(object? sender, EventArgs e)
 	{
-		BeforeLayoutChange?.Invoke(this, EventArgs.Empty);
-		SuspendLayout();
-		tableLayout.SuspendLayout();
+		if (!AllowExpand)
+			return;
 
 		_expanded = !_expanded;
-		lblDetail.Visible = _expanded;
-		UpdateHeader();
+		ApplyVisibility();
+	}
 
-		tableLayout.ResumeLayout();
-		ResumeLayout();
-		AfterLayoutChange?.Invoke(this, EventArgs.Empty);
+	private void ApplyVisibility()
+	{
+		ApplyLayoutUpdate(() =>
+		{
+			if (_expanded)
+				EnsureDetailTextCurrent();
+			lblDetail.Visible = _expanded;
+		});
+	}
+
+	private void UpdateExpandCursor()
+	{
+		var cursor = AllowExpand ? Cursors.Hand : Cursors.Default;
+		Cursor = cursor;
+		tableLayout.Cursor = cursor;
+		lblIcon.Cursor = cursor;
+		lblHeader.Cursor = cursor;
 	}
 
 	/// <summary>
@@ -221,23 +288,85 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageControl, ICh
 	/// expand/collapse arrow indicator. Does nothing if <see cref="Message"/> is <see langword="null"/> or its content is
 	/// not a <see cref="ReasoningMessageContent"/> .
 	/// </summary>
-	private void UpdateHeader()
-	{
-		if (_message?.Content is ReasoningMessageContent reasoningContent)
-			lblHeader.Text = reasoningContent.IsThinking ? "..." : "✔";
-	}
-
 	private void UpdateDisplay()
 	{
-		if (_message?.Content is not ReasoningMessageContent reasoningContent)
-		{
-			UpdateDetailText(string.Empty);
-			lblHeader.Text = string.Empty;
+		var senderText = Message?.Sender?.Name ?? string.Empty;
+		var headerText = GetHeaderText();
+		var metadataChanged =
+			!string.Equals(lblSender.Text, senderText, StringComparison.Ordinal) ||
+			!string.Equals(lblHeader.Text, headerText, StringComparison.Ordinal);
+		if (!lblDetail.Visible && !metadataChanged)
 			return;
-		}
 
-		UpdateDetailText(MessageFormatter.Format(reasoningContent));
-		UpdateHeader();
+		ApplyLayoutUpdate(() =>
+		{
+			lblSender.Text = senderText;
+			lblHeader.Text = headerText;
+			if (lblDetail.Visible)
+				EnsureDetailTextCurrent();
+		});
+	}
+
+	private string GetHeaderText()
+	{
+		return _message?.Content is ReasoningMessageContent reasoningContent
+			? reasoningContent.IsThinking ? "..." : "✔"
+			: string.Empty;
+	}
+
+	private void EnsureDetailTextCurrent()
+	{
+		if (!_detailTextDirty)
+			return;
+
+		var text = _message?.Content is ReasoningMessageContent reasoningContent
+			? MessageFormatter.Format(reasoningContent)
+			: string.Empty;
+		UpdateDetailText(text);
+		_detailTextDirty = false;
+	}
+
+	private void ApplyLayoutUpdate(Action updateControls)
+	{
+		BeforeLayoutChange?.Invoke(this, EventArgs.Empty);
+		SuspendLayout();
+		tableLayout.SuspendLayout();
+		try
+		{
+			updateControls();
+		}
+		finally
+		{
+			tableLayout.ResumeLayout(performLayout: false);
+			ResumeLayout(performLayout: false);
+			tableLayout.PerformLayout();
+			PerformLayout();
+
+			if (lblDetail.Visible)
+				lblDetail.RefreshContentHeight();
+
+			tableLayout.PerformLayout();
+			PerformLayout();
+
+			try
+			{
+				AfterLayoutChange?.Invoke(this, EventArgs.Empty);
+			}
+			finally
+			{
+				Parent?.PerformLayout(this, nameof(PreferredSize));
+			}
+		}
+	}
+
+	private void SelectableText_ContentHeightChanging(object? sender, EventArgs e)
+	{
+		BeforeLayoutChange?.Invoke(this, EventArgs.Empty);
+	}
+
+	private void SelectableText_ContentHeightChanged(object? sender, EventArgs e)
+	{
+		AfterLayoutChange?.Invoke(this, EventArgs.Empty);
 	}
 
 	private void UpdateDetailText(string text)
@@ -245,11 +374,13 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageControl, ICh
 		if (lblDetail.Text == text)
 			return;
 
-		var selectionStart = lblDetail.IsHandleCreated ? lblDetail.SelectionStart : 0;
-		var selectionLength = lblDetail.IsHandleCreated ? lblDetail.SelectionLength : 0;
+		var preserveSelection = lblDetail.IsHandleCreated &&
+			(lblDetail.ContainsFocus || lblDetail.SelectionLength > 0);
+		var selectionStart = preserveSelection ? lblDetail.SelectionStart : 0;
+		var selectionLength = preserveSelection ? lblDetail.SelectionLength : 0;
 		lblDetail.Text = text;
 
-		if (!lblDetail.IsHandleCreated)
+		if (!preserveSelection)
 			return;
 
 		selectionStart = Math.Min(selectionStart, text.Length);
@@ -267,15 +398,51 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageControl, ICh
 	}
 
 	/// <inheritdoc />
+	protected override void OnLayout(LayoutEventArgs levent)
+	{
+		// Compute the width the detail text will occupy (client width minus padding and the icon
+		// column) and re-measure its height *before* the base layout positions the table rows. This
+		// keeps the rows stacked with the correct height in a single pass; measuring afterwards would
+		// re-flow re-entrantly and leave the rows overlapping until another layout pass.
+		if (lblDetail.Visible)
+		{
+			var contentWidth = Math.Max(0, ClientSize.Width - ContentPadding.Horizontal);
+			var textWidth = Math.Max(0, contentWidth - IconColumnWidth);
+			lblDetail.EnsureContentHeightForWidth(textWidth);
+		}
+
+		base.OnLayout(levent);
+	}
+
+	/// <inheritdoc />
 	void IChatMessageControl.SetIsReceivingStream(bool isReceiving)
 	{
-		_isReceivingStream = isReceiving;
+		if (isReceiving)
+		{
+			_isReceivingStream = true;
+			return;
+		}
+
+		try
+		{
+			_streamingDisplayUpdate.Flush();
+		}
+		finally
+		{
+			_isReceivingStream = false;
+		}
 	}
 
 	/// <inheritdoc/>
 	void IChatMessageControl.ShowSenderHeader(bool show)
 	{
 		lblSender.Visible = show;
+	}
+
+	/// <inheritdoc />
+	void IChatMessageRefreshControl.RefreshMessageDisplay()
+	{
+		UpdateDisplay();
 	}
 
 	private void UpdateContentWidthConstraints()
@@ -318,5 +485,9 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageControl, ICh
 	}
 
 	/// <inheritdoc/>
-	public override string ToString() => lblDetail.Text;
+	public override string ToString()
+	{
+		EnsureDetailTextCurrent();
+		return lblDetail.Text;
+	}
 }

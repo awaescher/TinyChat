@@ -124,8 +124,7 @@ internal sealed class DemoChatClient : IChatClient
 
 	private static IEnumerable<string> ChunkText(string text, int chunkSize = 4)
 	{
-		for (var i = 0; i < text.Length; i += chunkSize)
-			yield return text.Substring(i, Math.Min(chunkSize, text.Length - i));
+		return DemoTextChunker.Chunk(text, chunkSize);
 	}
 
 	private static ChatResponseUpdate CreateTextUpdate(string text)

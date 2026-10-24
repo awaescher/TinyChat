@@ -50,9 +50,14 @@ internal sealed class DXSelectableMessageTextControl : HtmlContentControl
 	private static WeakReference<DXSelectableMessageTextControl>? _activeSelectionOwner;
 
 	private bool _adjustingHeight;
+	private bool _applyingTextAppearance;
+	private bool _contentNeedsMaterialization;
+	private int _contentRevision;
 	private int _lastMeasuredWidth = -1;
+	private int _lastMeasuredRevision = -1;
 	private int _preferredContentHeight;
 	private string _displayHtml = string.Empty;
+	private IReadOnlyList<DXHtmlTextReplacement> _textReplacements = [];
 
 	/// <summary>
 	/// Raised immediately before the control changes its height.
@@ -110,17 +115,31 @@ internal sealed class DXSelectableMessageTextControl : HtmlContentControl
 	/// </summary>
 	internal void ApplyTextAppearance(Font font, Color foreColor, Color backColor)
 	{
-		Font = font;
-		ForeColor = foreColor;
-		BackColor = backColor;
+		var fontChanged = !Equals(Font, font) || !Equals(Appearance.Font, font);
+		_applyingTextAppearance = true;
+		try
+		{
+			Font = font;
+			ForeColor = foreColor;
+			BackColor = backColor;
 
-		Appearance.Font = font;
-		Appearance.ForeColor = foreColor;
-		Appearance.BackColor = backColor;
-		Appearance.Options.UseFont = true;
-		Appearance.Options.UseForeColor = true;
-		Appearance.Options.UseBackColor = true;
-		UpdateContentHeight();
+			Appearance.Font = font;
+			Appearance.ForeColor = foreColor;
+			Appearance.BackColor = backColor;
+			Appearance.Options.UseFont = true;
+			Appearance.Options.UseForeColor = true;
+			Appearance.Options.UseBackColor = true;
+		}
+		finally
+		{
+			_applyingTextAppearance = false;
+		}
+
+		if (fontChanged)
+		{
+			_contentRevision++;
+			UpdateContentHeight();
+		}
 	}
 
 	/// <summary>
@@ -130,6 +149,11 @@ internal sealed class DXSelectableMessageTextControl : HtmlContentControl
 	{
 		if (_adjustingHeight)
 			return;
+		if (!Visible)
+		{
+			_lastMeasuredWidth = -1;
+			return;
+		}
 
 		var availableWidth = ClientSize.Width;
 		if (availableWidth <= 0)
@@ -138,10 +162,21 @@ internal sealed class DXSelectableMessageTextControl : HtmlContentControl
 			availableWidth = Width;
 		if (availableWidth <= 0)
 			return;
+		if (_lastMeasuredWidth == availableWidth && _lastMeasuredRevision == _contentRevision)
+		{
+			SetContentHeight(_preferredContentHeight);
+			return;
+		}
 
 		_lastMeasuredWidth = availableWidth;
+		_lastMeasuredRevision = _contentRevision;
 		var requiredHeight = Math.Max(Font.Height + CONTENT_PADDING, ViewInfo.CalcBestSize(availableWidth).Height);
 		_preferredContentHeight = requiredHeight;
+		SetContentHeight(requiredHeight);
+	}
+
+	private void SetContentHeight(int requiredHeight)
+	{
 		if (Height == requiredHeight)
 			return;
 
@@ -203,6 +238,10 @@ internal sealed class DXSelectableMessageTextControl : HtmlContentControl
 	protected override void OnFontChanged(EventArgs e)
 	{
 		base.OnFontChanged(e);
+		if (_applyingTextAppearance)
+			return;
+
+		_contentRevision++;
 		UpdateContentHeight();
 	}
 
@@ -210,7 +249,9 @@ internal sealed class DXSelectableMessageTextControl : HtmlContentControl
 	protected override void OnHandleCreated(EventArgs e)
 	{
 		base.OnHandleCreated(e);
-		EnsureContentElement();
+		_contentRevision++;
+		if (Visible)
+			MaterializeContent();
 		UpdateContentHeight();
 	}
 
@@ -245,6 +286,20 @@ internal sealed class DXSelectableMessageTextControl : HtmlContentControl
 	}
 
 	/// <inheritdoc />
+	protected override void OnVisibleChanged(EventArgs e)
+	{
+		base.OnVisibleChanged(e);
+		if (!Visible)
+		{
+			_lastMeasuredWidth = -1;
+			return;
+		}
+
+		MaterializeContent();
+		UpdateContentHeight();
+	}
+
+	/// <inheritdoc />
 	protected override void Dispose(bool disposing)
 	{
 		if (disposing)
@@ -253,24 +308,31 @@ internal sealed class DXSelectableMessageTextControl : HtmlContentControl
 		base.Dispose(disposing);
 	}
 
-	private void SetContent(string html, string plainText)
+	private void SetContent(DXFormattedTextContent content, string plainText)
 	{
-		if (string.Equals(_displayHtml, html, StringComparison.Ordinal) &&
+		if (string.Equals(_displayHtml, content.Html, StringComparison.Ordinal) &&
 			string.Equals(Text, plainText, StringComparison.Ordinal))
 		{
 			return;
 		}
 
-		_ = EnsureContentElement();
-		var previousSelection = (IDxHtmlSelection?)ViewInfo.Element?.Selection;
+		if (Visible)
+			MaterializeContent();
+		var previousSelection = Visible ? (IDxHtmlSelection?)ViewInfo.Element?.Selection : null;
 		var previousRange = previousSelection?.Current ?? DxHtmlSelectionRange.Empty;
 		var hadSelection = previousSelection is { IsEmpty: false };
 		previousSelection?.Clear();
 
-		var renderedHtml = string.IsNullOrWhiteSpace(html) ? EMPTY_HTML : html;
+		var renderedHtml = string.IsNullOrWhiteSpace(content.Html) ? EMPTY_HTML : content.Html;
 		HtmlTemplate.Set($"""<div id="{CONTENT_ELEMENT_ID}">{renderedHtml}</div>""", STYLES);
-		_displayHtml = html;
+		_displayHtml = content.Html;
+		_textReplacements = content.TextReplacements;
 		Text = plainText;
+		_contentRevision++;
+		_contentNeedsMaterialization = true;
+		if (Visible)
+			MaterializeContent();
+		UpdateContentHeight();
 
 		if (hadSelection)
 		{
@@ -279,8 +341,28 @@ internal sealed class DXSelectableMessageTextControl : HtmlContentControl
 			TryRestoreSelection(currentSelection, previousRange);
 		}
 
-		UpdateContentHeight();
-		Invalidate();
+		if (Visible)
+			Invalidate();
+	}
+
+	private void MaterializeContent()
+	{
+		if (!_contentNeedsMaterialization)
+			return;
+
+		_ = EnsureContentElement();
+		ApplyTextReplacements(_textReplacements);
+		_contentNeedsMaterialization = false;
+	}
+
+	private void ApplyTextReplacements(IReadOnlyList<DXHtmlTextReplacement> replacements)
+	{
+		foreach (var replacement in replacements)
+		{
+			var element = FindElementById(replacement.ElementId)
+				?? throw new InvalidOperationException($"The message text element '{replacement.ElementId}' could not be created.");
+			element.SetInnerText(replacement.Text);
+		}
 	}
 
 	private DxHtmlElement EnsureContentElement()
@@ -382,32 +464,34 @@ internal static class DXFormattedTextConverter
 	/// <summary>
 	/// Converts sanitized formatter output, including the legacy DevExpress tag dialect, to template HTML.
 	/// </summary>
-	internal static string ToHtmlTemplate(string formattedText)
+	internal static DXFormattedTextContent ToHtmlTemplate(string formattedText)
 	{
 		if (string.IsNullOrEmpty(formattedText))
-			return string.Empty;
+			return DXFormattedTextContent.Empty;
 
 		var result = new StringBuilder(formattedText.Length);
+		var replacements = new List<DXHtmlTextReplacement>();
 		var offset = 0;
 		foreach (Match match in _htmlTagRegex.Matches(formattedText))
 		{
-			AppendEncodedText(result, formattedText.AsSpan(offset, match.Index - offset));
-			result.Append(ConvertTag(match));
+			AppendEncodedText(result, formattedText.AsSpan(offset, match.Index - offset), replacements);
+			result.Append(ConvertTag(match, replacements));
 			offset = match.Index + match.Length;
 		}
 
-		AppendEncodedText(result, formattedText.AsSpan(offset));
-		return result.ToString();
+		AppendEncodedText(result, formattedText.AsSpan(offset), replacements);
+		return new DXFormattedTextContent(result.ToString(), replacements);
 	}
 
 	/// <summary>
 	/// Encodes plain text for the HTML template renderer.
 	/// </summary>
-	internal static string PlainTextToHtmlTemplate(string plainText)
+	internal static DXFormattedTextContent PlainTextToHtmlTemplate(string plainText)
 	{
 		var result = new StringBuilder(plainText.Length);
-		AppendEncodedText(result, plainText.AsSpan());
-		return result.ToString();
+		var replacements = new List<DXHtmlTextReplacement>();
+		AppendEncodedText(result, plainText.AsSpan(), replacements);
+		return new DXFormattedTextContent(result.ToString(), replacements);
 	}
 
 	/// <summary>
@@ -428,7 +512,7 @@ internal static class DXFormattedTextConverter
 		return WebUtility.HtmlDecode(_plainTextFormatter.Format(textWithLineBreaks)).TrimEnd();
 	}
 
-	private static string ConvertTag(Match match)
+	private static string ConvertTag(Match match, List<DXHtmlTextReplacement> replacements)
 	{
 		var closing = match.Groups["closing"].Success;
 		var tag = match.Groups["tag"].Value.ToLowerInvariant();
@@ -437,9 +521,14 @@ internal static class DXFormattedTextConverter
 		if (tag == "br")
 			return closing ? string.Empty : "<br>";
 		if (tag == "nbsp")
-			return closing ? string.Empty : "&nbsp;";
+		{
+			if (closing)
+				return string.Empty;
+
+			return CreateTextReplacement("\u00a0", replacements);
+		}
 		if (tag == "img")
-			return closing ? string.Empty : EncodeImageAltText(attributes);
+			return closing ? string.Empty : EncodeImageAltText(attributes, replacements);
 
 		if (tag is "color" or "backcolor" or "font" or "size" or "sub" or "sup")
 			return ConvertLegacyFormattingTag(tag, attributes, closing);
@@ -597,14 +686,14 @@ internal static class DXFormattedTextConverter
 			: string.Empty;
 	}
 
-	private static string EncodeImageAltText(string attributes)
+	private static string EncodeImageAltText(string attributes, List<DXHtmlTextReplacement> replacements)
 	{
 		var altText = ExtractAttribute(attributes, "alt");
 		if (string.IsNullOrEmpty(altText))
 			return string.Empty;
 
 		var result = new StringBuilder(altText.Length);
-		AppendEncodedText(result, altText.AsSpan());
+		AppendEncodedText(result, altText.AsSpan(), replacements);
 		return result.ToString();
 	}
 
@@ -676,13 +765,51 @@ internal static class DXFormattedTextConverter
 		return WebUtility.HtmlEncode(value).Replace("$", "&#36;", StringComparison.Ordinal);
 	}
 
-	private static void AppendEncodedText(StringBuilder result, ReadOnlySpan<char> text)
+	private static void AppendEncodedText(
+		StringBuilder result,
+		ReadOnlySpan<char> text,
+		List<DXHtmlTextReplacement> replacements)
 	{
 		if (text.IsEmpty)
 			return;
 
 		var decoded = WebUtility.HtmlDecode(text.ToString());
-		var encoded = WebUtility.HtmlEncode(decoded).Replace("$", "&#36;", StringComparison.Ordinal);
+		var encoded = WebUtility.HtmlEncode(decoded);
+		if (ContainsSupplementaryCharacter(decoded) ||
+			!string.Equals(encoded, decoded, StringComparison.Ordinal) ||
+			decoded.Contains('$', StringComparison.Ordinal))
+		{
+			result.Append(CreateTextReplacement(decoded, replacements));
+			return;
+		}
+
 		result.Append(encoded);
 	}
+
+	private static string CreateTextReplacement(string text, List<DXHtmlTextReplacement> replacements)
+	{
+		var elementId = $"message-text-{replacements.Count}";
+		replacements.Add(new DXHtmlTextReplacement(elementId, text));
+		return $"""<span id="{elementId}">&#8203;</span>""";
+	}
+
+	private static bool ContainsSupplementaryCharacter(string text)
+	{
+		foreach (var rune in text.EnumerateRunes())
+		{
+			if (rune.Value > char.MaxValue)
+				return true;
+		}
+
+		return false;
+	}
 }
+
+internal sealed record DXFormattedTextContent(
+	string Html,
+	IReadOnlyList<DXHtmlTextReplacement> TextReplacements)
+{
+	internal static DXFormattedTextContent Empty { get; } = new(string.Empty, []);
+}
+
+internal sealed record DXHtmlTextReplacement(string ElementId, string Text);

@@ -37,6 +37,9 @@ public class NotifyingStringBuilder : INotifyPropertyChanged
 		get => _inner[index];
 		set
 		{
+			if (_inner[index] == value)
+				return;
+
 			_inner[index] = value;
 			OnPropertyChanged();
 		}
@@ -47,6 +50,9 @@ public class NotifyingStringBuilder : INotifyPropertyChanged
 	/// </summary>
 	public NotifyingStringBuilder Append(string? value)
 	{
+		if (string.IsNullOrEmpty(value))
+			return this;
+
 		_inner.Append(value);
 		OnPropertyChanged();
 		return this;
@@ -67,6 +73,9 @@ public class NotifyingStringBuilder : INotifyPropertyChanged
 	/// </summary>
 	public NotifyingStringBuilder Append(object? value)
 	{
+		if (value is null)
+			return this;
+
 		_inner.Append(value);
 		OnPropertyChanged();
 		return this;
@@ -98,7 +107,8 @@ public class NotifyingStringBuilder : INotifyPropertyChanged
 	public NotifyingStringBuilder Insert(int index, string? value)
 	{
 		_inner.Insert(index, value);
-		OnPropertyChanged();
+		if (!string.IsNullOrEmpty(value))
+			OnPropertyChanged();
 		return this;
 	}
 
@@ -108,7 +118,8 @@ public class NotifyingStringBuilder : INotifyPropertyChanged
 	public NotifyingStringBuilder Remove(int startIndex, int length)
 	{
 		_inner.Remove(startIndex, length);
-		OnPropertyChanged();
+		if (length > 0)
+			OnPropertyChanged();
 		return this;
 	}
 
@@ -117,6 +128,9 @@ public class NotifyingStringBuilder : INotifyPropertyChanged
 	/// </summary>
 	public NotifyingStringBuilder Clear()
 	{
+		if (_inner.Length == 0)
+			return this;
+
 		_inner.Clear();
 		OnPropertyChanged();
 		return this;

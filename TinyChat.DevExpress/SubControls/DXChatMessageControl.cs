@@ -8,12 +8,13 @@ namespace TinyChat;
 /// A DevExpress-based chat message control that displays a chat message with sender and content.
 /// Implements the IChatMessageControl interface and inherits from PanelControl.
 /// </summary>
-public class DXChatMessageControl : PanelControl, IChatMessageControl, IChatMessageLayoutControl
+public class DXChatMessageControl : PanelControl, IChatMessageControl, IChatMessageFormattingControl, IChatMessageLayoutControl, IChatMessageRefreshControl
 {
 	private IChatMessage? _message;
 	private bool _isReceivingStream;
 	private readonly LabelControl _senderLabel;
 	private readonly DXSelectableMessageTextControl _messageEditor;
+	private readonly CoalescedUiUpdate _streamingDisplayUpdate;
 	private FileAttachmentPreviewPanel? _attachmentPreviewPanel;
 	private IMessageFormatter _messageFormatter = new PlainTextMessageFormatter();
 
@@ -35,8 +36,13 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl, IChatMess
 		get => _messageFormatter;
 		set
 		{
-			_messageFormatter = value ?? throw new ArgumentNullException(nameof(value));
-			UpdateMessageDisplay();
+			ArgumentNullException.ThrowIfNull(value);
+			if (ReferenceEquals(_messageFormatter, value))
+				return;
+
+			_messageFormatter = value;
+			if (Message is not null)
+				UpdateMessageDisplay();
 		}
 	}
 
@@ -55,6 +61,7 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl, IChatMess
 	/// </summary>
 	public DXChatMessageControl()
 	{
+		_streamingDisplayUpdate = new CoalescedUiUpdate(this, UpdateMessageDisplay);
 		BorderStyle = DevExpress.XtraEditors.Controls.BorderStyles.NoBorder;
 		AutoSize = true;
 
@@ -123,6 +130,9 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl, IChatMess
 		get => base.MaximumSize;
 		set
 		{
+			if (base.MaximumSize == value)
+				return;
+
 			base.MaximumSize = value;
 			UpdateContentWidthConstraints();
 		}
@@ -170,13 +180,32 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl, IChatMess
 	/// <inheritdoc />
 	void IChatMessageControl.SetIsReceivingStream(bool isReceiving)
 	{
-		_isReceivingStream = isReceiving;
+		if (isReceiving)
+		{
+			_isReceivingStream = true;
+			return;
+		}
+
+		try
+		{
+			_streamingDisplayUpdate.Flush();
+		}
+		finally
+		{
+			_isReceivingStream = false;
+		}
 	}
 
 	/// <inheritdoc />
 	void IChatMessageControl.ShowSenderHeader(bool show)
 	{
 		_senderLabel.Visible = show;
+	}
+
+	/// <inheritdoc />
+	void IChatMessageRefreshControl.RefreshMessageDisplay()
+	{
+		UpdateMessageDisplay();
 	}
 
 	/// <inheritdoc/>
@@ -187,43 +216,48 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl, IChatMess
 	{
 		if (disposing && _message?.Content is { } content)
 			content.PropertyChanged -= MessageContent_PropertyChanged;
+		if (disposing)
+			_streamingDisplayUpdate.Cancel();
 
 		base.Dispose(disposing);
 	}
 
 	private void UpdateMessageDisplay()
 	{
-		BeforeLayoutChange?.Invoke(this, EventArgs.Empty);
+		var senderText = Message?.Sender?.Name ?? string.Empty;
+		string formattedText;
+		var messageVisible = false;
+		if (Message is null)
+		{
+			formattedText = string.Empty;
+		}
+		else if (Message.Content is FileAttachmentMessageContent attachmentContent)
+		{
+			formattedText = MessageFormatter.Format(new StringMessageContent(attachmentContent.Text));
+			messageVisible = !string.IsNullOrWhiteSpace(formattedText);
+		}
+		else
+		{
+			var sourceText = Message.Content.Content?.ToString() ?? string.Empty;
+			formattedText = MessageFormatter.Format(sourceText);
+			messageVisible = true;
+		}
+
+		var layoutMetadataChanged =
+			!string.Equals(_senderLabel.Text, senderText, StringComparison.Ordinal) ||
+			_messageEditor.Visible != messageVisible;
+		if (layoutMetadataChanged)
+			BeforeLayoutChange?.Invoke(this, EventArgs.Empty);
 		try
 		{
-			_senderLabel.Text = Message?.Sender?.Name ?? string.Empty;
-			if (Message is null)
-			{
-				_messageEditor.SetTextPreservingSelection(string.Empty);
-				_messageEditor.Visible = false;
-				return;
-			}
-
-			string formattedText;
-			var hideEmptyFormattedText = false;
-			if (Message.Content is FileAttachmentMessageContent attachmentContent)
-			{
-				formattedText = MessageFormatter.Format(new StringMessageContent(attachmentContent.Text));
-				hideEmptyFormattedText = true;
-			}
-			else
-			{
-				var sourceText = Message.Content.Content?.ToString() ?? string.Empty;
-				formattedText = MessageFormatter.Format(sourceText);
-			}
-
+			_senderLabel.Text = senderText;
 			_messageEditor.SetFormattedTextPreservingSelection(formattedText);
-			_messageEditor.Visible = !hideEmptyFormattedText || !string.IsNullOrWhiteSpace(_messageEditor.Text);
-			_messageEditor.UpdateContentHeight();
+			_messageEditor.Visible = messageVisible;
 		}
 		finally
 		{
-			AfterLayoutChange?.Invoke(this, EventArgs.Empty);
+			if (layoutMetadataChanged)
+				AfterLayoutChange?.Invoke(this, EventArgs.Empty);
 		}
 	}
 
@@ -231,6 +265,11 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl, IChatMess
 	{
 		if (IsDisposed || Disposing)
 			return;
+		if (_isReceivingStream)
+		{
+			_streamingDisplayUpdate.Queue();
+			return;
+		}
 
 		if (InvokeRequired)
 		{

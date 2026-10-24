@@ -19,7 +19,10 @@ public class DXChatControl : ChatControl
 	{
 		base.ApplyWelcomeControlSettings(control);
 		if (control is DXWelcomeControl welcomeControl)
+		{
+			welcomeControl.SetWelcomeText(WelcomeMessage);
 			welcomeControl.TextAlign = WelcomeTextAlign;
+		}
 
 		ApplyDevExpressRootFont(control, WelcomeFont);
 	}
@@ -35,19 +38,10 @@ public class DXChatControl : ChatControl
 	protected override IChatMessageControl CreateMessageControl(IChatMessage message) => new DXChatMessageControl { MessageFormatter = MessageFormatter, Message = message };
 
 	/// <inheritdoc />
-	protected override Control CreateMessageCopyButton() => new SimpleButton
-	{
-		Cursor = Cursors.Hand,
-		Size = new Size(26, 26),
-		TabStop = false,
-		Text = "⧉"
-	};
-
-	/// <inheritdoc />
 	protected override IFunctionCallMessageControl CreateFunctionCallMessageControl(IChatMessage message) => new DXFunctionCallMessageControl { Message = message, AllowExpand = AllowExpandFunctionCalls };
 
 	/// <inheritdoc />
-	protected override IChatMessageControl CreateReasoningMessageControl(IChatMessage message) => new DXReasoningMessageControl { MessageFormatter = MessageFormatter, Message = message };
+	protected override IChatMessageControl CreateReasoningMessageControl(IChatMessage message) => new DXReasoningMessageControl { MessageFormatter = MessageFormatter, Message = message, AllowExpand = AllowExpandReasoning };
 
 	/// <inheritdoc />
 	protected override IChatInputControl CreateChatInputControl() => new DXChatInputControl();

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using TinyChat;
 using TinyChat.Messages;
@@ -68,12 +67,12 @@ public class DemoData
 			? "The weather in Amsterdam is 6\u00b0C and partly cloudy today."
 			: GetRandomAnswer(isDevExpress);
 
-		for (var i = 0; i < answer.Length; i += 4)
+		foreach (var chunk in DemoTextChunker.Chunk(answer))
 		{
 			if (cancellationToken.IsCancellationRequested)
 				yield break;
 
-			yield return new StringMessageContent(answer.Substring(i, Math.Min(4, answer.Length - i)));
+			yield return new StringMessageContent(chunk);
 			await Task.Delay(75, cancellationToken).ConfigureAwait(false);
 		}
 	}
@@ -82,12 +81,11 @@ public class DemoData
 	{
 		var answer = GetRandomAnswer(isDevExpress);
 
-		for (var i = 0; i < answer.Length; i += 4)
+		foreach (var chunk in DemoTextChunker.Chunk(answer))
 		{
 			if (cancellationToken.IsCancellationRequested)
 				yield break;
 
-			var chunk = answer.Substring(i, Math.Min(4, answer.Length - i));
 			yield return chunk;
 			await Task.Delay(75).ConfigureAwait(false);
 		}

@@ -6,12 +6,13 @@ namespace TinyChat;
 /// <summary>
 /// A panel control that displays a chat message with sender name and content.
 /// </summary>
-public class ChatMessageControl : Panel, IChatMessageControl, IChatMessageLayoutControl
+public class ChatMessageControl : Panel, IChatMessageControl, IChatMessageFormattingControl, IChatMessageLayoutControl, IChatMessageRefreshControl
 {
 	private IChatMessage? _message;
 	private bool _isReceivingStream;
 	private readonly Label _senderLabel;
 	private readonly SelectableMessageTextControl _messageTextControl;
+	private readonly CoalescedUiUpdate _streamingDisplayUpdate;
 	private FileAttachmentPreviewPanel? _attachmentPreviewPanel;
 	private IMessageFormatter _messageFormatter = new PlainTextMessageFormatter();
 	private Font? _senderFont;
@@ -34,8 +35,13 @@ public class ChatMessageControl : Panel, IChatMessageControl, IChatMessageLayout
 		get => _messageFormatter;
 		set
 		{
-			_messageFormatter = value ?? throw new ArgumentNullException(nameof(value));
-			UpdateMessageDisplay();
+			ArgumentNullException.ThrowIfNull(value);
+			if (ReferenceEquals(_messageFormatter, value))
+				return;
+
+			_messageFormatter = value;
+			if (Message is not null)
+				UpdateMessageDisplay();
 		}
 	}
 
@@ -44,14 +50,18 @@ public class ChatMessageControl : Panel, IChatMessageControl, IChatMessageLayout
 	/// </summary>
 	public ChatMessageControl()
 	{
+		_streamingDisplayUpdate = new CoalescedUiUpdate(this, UpdateMessageDisplay);
 		_senderLabel = new Label() { Dock = DockStyle.Top, AutoSize = true, UseMnemonic = false, Padding = new Padding(0, 0, 0, 3) };
 		_messageTextControl = new SelectableMessageTextControl { Dock = DockStyle.Top };
+		_messageTextControl.ContentHeightChanging += (_, _) => BeforeLayoutChange?.Invoke(this, EventArgs.Empty);
+		_messageTextControl.ContentHeightChanged += (_, _) => AfterLayoutChange?.Invoke(this, EventArgs.Empty);
 		Controls.Add(_senderLabel);
 		Controls.Add(_messageTextControl);
 
 		_messageTextControl.BringToFront();
 
 		AutoSize = true;
+		AutoSizeMode = AutoSizeMode.GrowAndShrink;
 		Padding = new Padding(8);
 
 		ApplyAppearance();
@@ -106,6 +116,9 @@ public class ChatMessageControl : Panel, IChatMessageControl, IChatMessageLayout
 		get => base.MaximumSize;
 		set
 		{
+			if (base.MaximumSize == value)
+				return;
+
 			base.MaximumSize = value;
 			UpdateContentWidthConstraints();
 		}
@@ -165,15 +178,48 @@ public class ChatMessageControl : Panel, IChatMessageControl, IChatMessageLayout
 	}
 
 	/// <inheritdoc />
+	protected override void OnLayout(LayoutEventArgs levent)
+	{
+		// A docked-top text control receives its width from this panel's client area. We compute that
+		// width up front and re-measure the content height *before* the base layout positions the
+		// docked children, so the siblings below are stacked using the correct height in a single
+		// pass. Doing this after base.OnLayout would change the height re-entrantly and leave the
+		// already-positioned siblings overlapping until another (often missing) layout pass.
+		var availableWidth = ClientSize.Width - Padding.Horizontal;
+		_messageTextControl.EnsureContentHeightForWidth(availableWidth);
+
+		base.OnLayout(levent);
+	}
+
+	/// <inheritdoc />
 	void IChatMessageControl.SetIsReceivingStream(bool isReceiving)
 	{
-		_isReceivingStream = isReceiving;
+		if (isReceiving)
+		{
+			_isReceivingStream = true;
+			return;
+		}
+
+		try
+		{
+			_streamingDisplayUpdate.Flush();
+		}
+		finally
+		{
+			_isReceivingStream = false;
+		}
 	}
 
 	/// <inheritdoc />
 	void IChatMessageControl.ShowSenderHeader(bool show)
 	{
 		_senderLabel.Visible = show;
+	}
+
+	/// <inheritdoc />
+	void IChatMessageRefreshControl.RefreshMessageDisplay()
+	{
+		UpdateMessageDisplay();
 	}
 
 	/// <inheritdoc/>
@@ -184,6 +230,8 @@ public class ChatMessageControl : Panel, IChatMessageControl, IChatMessageLayout
 	{
 		if (disposing && _message?.Content is { } content)
 			content.PropertyChanged -= MessageContent_PropertyChanged;
+		if (disposing)
+			_streamingDisplayUpdate.Cancel();
 
 		var senderFont = disposing ? _senderFont : null;
 		_senderFont = null;
@@ -193,31 +241,40 @@ public class ChatMessageControl : Panel, IChatMessageControl, IChatMessageLayout
 
 	private void UpdateMessageDisplay()
 	{
-		BeforeLayoutChange?.Invoke(this, EventArgs.Empty);
+		var senderText = Message?.Sender?.Name ?? string.Empty;
+		string messageText;
+		bool messageTextVisible;
+		if (Message is null)
+		{
+			messageText = string.Empty;
+			messageTextVisible = false;
+		}
+		else if (Message.Content is FileAttachmentMessageContent attachmentContent)
+		{
+			messageText = MessageFormatter.Format(new StringMessageContent(attachmentContent.Text));
+			messageTextVisible = !string.IsNullOrWhiteSpace(messageText);
+		}
+		else
+		{
+			var text = Message.Content.Content?.ToString() ?? string.Empty;
+			messageText = MessageFormatter.Format(new StringMessageContent(text));
+			messageTextVisible = true;
+		}
+
+		var layoutMetadataChanged =
+			!string.Equals(_senderLabel.Text, senderText, StringComparison.Ordinal) ||
+			_messageTextControl.Visible != messageTextVisible;
+		if (layoutMetadataChanged)
+			BeforeLayoutChange?.Invoke(this, EventArgs.Empty);
 		try
 		{
-			_senderLabel.Text = Message?.Sender?.Name ?? string.Empty;
-
-			if (Message is null)
-			{
-				UpdateMessageText(string.Empty, visible: false);
-				return;
-			}
-
-			if (Message.Content is FileAttachmentMessageContent attachmentContent)
-			{
-				var text = MessageFormatter.Format(new StringMessageContent(attachmentContent.Text));
-				UpdateMessageText(text, !string.IsNullOrWhiteSpace(text));
-			}
-			else
-			{
-				var text = Message.Content.Content?.ToString() ?? string.Empty;
-				UpdateMessageText(MessageFormatter.Format(new StringMessageContent(text)), visible: true);
-			}
+			_senderLabel.Text = senderText;
+			UpdateMessageText(messageText, messageTextVisible);
 		}
 		finally
 		{
-			AfterLayoutChange?.Invoke(this, EventArgs.Empty);
+			if (layoutMetadataChanged)
+				AfterLayoutChange?.Invoke(this, EventArgs.Empty);
 		}
 	}
 
@@ -225,7 +282,8 @@ public class ChatMessageControl : Panel, IChatMessageControl, IChatMessageLayout
 	{
 		if (!string.Equals(_messageTextControl.Text, text, StringComparison.Ordinal))
 		{
-			var preserveSelection = _messageTextControl.IsHandleCreated;
+			var preserveSelection = _messageTextControl.IsHandleCreated &&
+				(_messageTextControl.ContainsFocus || _messageTextControl.SelectionLength > 0);
 			var selectionStart = preserveSelection ? _messageTextControl.SelectionStart : 0;
 			var selectionLength = preserveSelection ? _messageTextControl.SelectionLength : 0;
 
@@ -246,6 +304,11 @@ public class ChatMessageControl : Panel, IChatMessageControl, IChatMessageLayout
 	{
 		if (IsDisposed || Disposing)
 			return;
+		if (_isReceivingStream)
+		{
+			_streamingDisplayUpdate.Queue();
+			return;
+		}
 
 		if (InvokeRequired)
 		{

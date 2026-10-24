@@ -9,7 +9,7 @@ namespace TinyChat;
 /// Clicking the header or icon areas toggles the detail rows (arguments + result).
 /// The detail text controls remain dedicated to text selection.
 /// </summary>
-internal sealed partial class FunctionCallMessageControl : Panel, IFunctionCallMessageControl, IChatMessageLayoutControl
+internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLayoutControl, IChatMessageRefreshControl, IFunctionCallMessageControl
 {
 	/// <summary>
 	/// Icon used to mark the function-call row.
@@ -27,6 +27,8 @@ internal sealed partial class FunctionCallMessageControl : Panel, IFunctionCallM
 	/// <summary>The chat message whose <see cref="FunctionCallMessageContent"/> is being displayed.</summary>
 	private IChatMessage? _message;
 	private Font? _senderFont;
+	private Font? _iconFont;
+	private int _iconColumnWidth = ICON_WIDTH;
 
 	/// <summary>
 	/// Whether the detail panel (arguments + result) is currently visible.
@@ -62,17 +64,22 @@ internal sealed partial class FunctionCallMessageControl : Panel, IFunctionCallM
 	{
 		InitializeComponent();
 
-		lblIcon.Font = new Font("Arial", 11);
-		lblResultIcon.Font = lblIcon.Font;
+		lblArgs.ContentHeightChanging += SelectableText_ContentHeightChanging;
+		lblArgs.ContentHeightChanged += SelectableText_ContentHeightChanged;
+		lblResult.ContentHeightChanging += SelectableText_ContentHeightChanging;
+		lblResult.ContentHeightChanged += SelectableText_ContentHeightChanged;
 		ApplyTextFont();
 		ApplyColors();
 		Disposed += (_, _) =>
 		{
 			_senderFont?.Dispose();
 			_senderFont = null;
+			_iconFont?.Dispose();
+			_iconFont = null;
 		};
 
 		WireMouseDown(tableLayout, lblIcon, lblTitle, lblResultIcon);
+		UpdateExpandCursor();
 	}
 
 	/// <inheritdoc />
@@ -133,12 +140,25 @@ internal sealed partial class FunctionCallMessageControl : Panel, IFunctionCallM
 	private void ApplyTextFont()
 	{
 		var oldSenderFont = _senderFont;
+		var oldIconFont = _iconFont;
 		_senderFont = new Font(Font, Font.Style | FontStyle.Bold);
+		_iconFont = new Font("Arial", Math.Max(1f, Math.Min(Font.SizeInPoints, 9f)), FontStyle.Regular, GraphicsUnit.Point);
 		lblSender.Font = _senderFont;
 		lblTitle.Font = Font;
 		lblArgs.Font = Font;
 		lblResult.Font = Font;
+		lblIcon.Font = _iconFont;
+		lblResultIcon.Font = _iconFont;
+		UpdateIconLayout();
 		oldSenderFont?.Dispose();
+		oldIconFont?.Dispose();
+	}
+
+	/// <inheritdoc />
+	protected override void OnDpiChangedAfterParent(EventArgs e)
+	{
+		base.OnDpiChangedAfterParent(e);
+		UpdateIconLayout();
 	}
 
 	/// <inheritdoc/>
@@ -149,12 +169,17 @@ internal sealed partial class FunctionCallMessageControl : Panel, IFunctionCallM
 		get => _allowExpand;
 		set
 		{
-			_allowExpand = value;
+			if (_allowExpand == value)
+				return;
 
-			var cursor = _allowExpand ? Cursors.Hand : Cursors.Default;
-			tableLayout.Cursor = cursor;
-			lblTitle.Cursor = cursor;
-			lblIcon.Cursor = cursor;
+			_allowExpand = value;
+			UpdateExpandCursor();
+
+			if (!_allowExpand && _expanded)
+			{
+				_expanded = false;
+				ApplyVisibility();
+			}
 		}
 	}
 
@@ -192,10 +217,28 @@ internal sealed partial class FunctionCallMessageControl : Panel, IFunctionCallM
 	/// </summary>
 	private void OnContentPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
 	{
+		if (IsDisposed || Disposing)
+			return;
+		if (e.PropertyName == nameof(FunctionCallMessageContent.IsFunctionExecuting))
+			return;
+
 		if (InvokeRequired)
-			BeginInvoke(UpdateDisplay);
-		else
-			UpdateDisplay();
+		{
+			if (IsHandleCreated)
+			{
+				try
+				{
+					BeginInvoke(UpdateDisplay);
+				}
+				catch (InvalidOperationException) when (IsDisposed || Disposing || !IsHandleCreated)
+				{
+					// The message was removed while the cross-thread update was being queued.
+				}
+			}
+			return;
+		}
+
+		UpdateDisplay();
 	}
 
 	/// <summary>
@@ -207,6 +250,9 @@ internal sealed partial class FunctionCallMessageControl : Panel, IFunctionCallM
 		get => base.MaximumSize;
 		set
 		{
+			if (base.MaximumSize == value)
+				return;
+
 			base.MaximumSize = value;
 			UpdateContentWidthConstraints();
 		}
@@ -231,23 +277,54 @@ internal sealed partial class FunctionCallMessageControl : Panel, IFunctionCallM
 	/// </summary>
 	private void UpdateDisplay()
 	{
-		if (_message?.Content is not FunctionCallMessageContent fc)
+		if (CanUpdateCollapsedContentWithoutLayout())
+		{
+			UpdateDisplayCore();
 			return;
+		}
+
+		ApplyLayoutUpdate(UpdateDisplayCore);
+	}
+
+	private bool CanUpdateCollapsedContentWithoutLayout()
+	{
+		return !_expanded &&
+			!lblArgs.Visible &&
+			!lblResultIcon.Visible &&
+			!lblResult.Visible &&
+			_message?.Content is FunctionCallMessageContent functionCall &&
+			string.Equals(lblSender.Text, Message?.Sender?.Name ?? string.Empty, StringComparison.Ordinal) &&
+			lblTitle.Text.StartsWith(functionCall.Name, StringComparison.Ordinal);
+	}
+
+	private void UpdateDisplayCore()
+	{
+		lblSender.Text = Message?.Sender?.Name ?? string.Empty;
+
+		if (_message?.Content is not FunctionCallMessageContent fc)
+		{
+			lblTitle.Text = string.Empty;
+			lblArgs.Text = string.Empty;
+			lblResult.Text = string.Empty;
+			_expanded = false;
+			ApplyVisibilityCore();
+			return;
+		}
 
 		lblTitle.Text = fc.IsFunctionExecuting
 			? fc.Name + " ..."
 			: fc.Name + " ✔";
 
+		var argumentsText = string.Empty;
 		if (fc.Arguments?.Count > 0)
 		{
 			var maxKeyLen = fc.Arguments.Keys.Max(k => k.Length);
-			lblArgs.Text = string.Join(Environment.NewLine, fc.Arguments.Select(kv => $"{(kv.Key + ":").PadRight(maxKeyLen + 1)} {kv.Value}"));
+			argumentsText = string.Join(Environment.NewLine, fc.Arguments.Select(kv => $"{(kv.Key + ":").PadRight(maxKeyLen + 1)} {kv.Value}"));
 		}
+		lblArgs.Text = argumentsText;
 
-		if (fc.Result is not null)
-			lblResult.Text = fc.Result.ToString() + " ";
-
-		ApplyVisibility();
+		lblResult.Text = fc.Result is null ? string.Empty : fc.Result + " ";
+		ApplyVisibilityCore();
 	}
 
 	/// <summary>
@@ -256,23 +333,82 @@ internal sealed partial class FunctionCallMessageControl : Panel, IFunctionCallM
 	/// </summary>
 	private void ApplyVisibility()
 	{
-		if (_message?.Content is not FunctionCallMessageContent fc)
-			return;
+		ApplyLayoutUpdate(ApplyVisibilityCore);
+	}
 
-		BeforeLayoutChange?.Invoke(this, EventArgs.Empty);
-		SuspendLayout();
-		tableLayout.SuspendLayout();
-
-		var hasArgs = fc.Arguments?.Count > 0;
-		var hasResult = fc.Result is not null;
+	private void ApplyVisibilityCore()
+	{
+		var hasArgs = _message?.Content is FunctionCallMessageContent { Arguments.Count: > 0 };
+		var hasResult = _message?.Content is FunctionCallMessageContent { Result: not null };
 
 		lblArgs.Visible = _expanded && hasArgs;
 		lblResultIcon.Visible = _expanded && hasResult;
-
 		lblResult.Visible = _expanded && hasResult;
+	}
 
-		tableLayout.ResumeLayout();
-		ResumeLayout();
+	private void ApplyLayoutUpdate(Action updateControls)
+	{
+		BeforeLayoutChange?.Invoke(this, EventArgs.Empty);
+		SuspendLayout();
+		tableLayout.SuspendLayout();
+		try
+		{
+			updateControls();
+		}
+		finally
+		{
+			tableLayout.ResumeLayout(performLayout: false);
+			ResumeLayout(performLayout: false);
+			tableLayout.PerformLayout();
+			PerformLayout();
+
+			if (lblArgs.Visible)
+				lblArgs.RefreshContentHeight();
+			if (lblResult.Visible)
+				lblResult.RefreshContentHeight();
+
+			tableLayout.PerformLayout();
+			PerformLayout();
+			if (lblArgs.Visible)
+				lblArgs.Invalidate();
+			if (lblResult.Visible)
+				lblResult.Invalidate();
+
+			try
+			{
+				AfterLayoutChange?.Invoke(this, EventArgs.Empty);
+			}
+			finally
+			{
+				Parent?.PerformLayout(this, nameof(PreferredSize));
+			}
+		}
+	}
+
+	/// <inheritdoc />
+	protected override void OnLayout(LayoutEventArgs levent)
+	{
+		// Compute the width the argument/result text will occupy (client width minus padding and the
+		// icon column) and re-measure their heights *before* the base layout positions the table rows.
+		// This keeps the rows stacked with the correct height in a single pass; measuring afterwards
+		// would re-flow re-entrantly and leave the rows overlapping until another layout pass.
+		var contentWidth = Math.Max(0, ClientSize.Width - ContentPadding.Horizontal);
+		var textWidth = Math.Max(0, contentWidth - _iconColumnWidth);
+		if (lblArgs.Visible)
+			lblArgs.EnsureContentHeightForWidth(textWidth);
+		if (lblResult.Visible)
+			lblResult.EnsureContentHeightForWidth(textWidth);
+
+		base.OnLayout(levent);
+	}
+
+	private void SelectableText_ContentHeightChanging(object? sender, EventArgs e)
+	{
+		BeforeLayoutChange?.Invoke(this, EventArgs.Empty);
+	}
+
+	private void SelectableText_ContentHeightChanged(object? sender, EventArgs e)
+	{
 		AfterLayoutChange?.Invoke(this, EventArgs.Empty);
 	}
 
@@ -280,6 +416,47 @@ internal sealed partial class FunctionCallMessageControl : Panel, IFunctionCallM
 	{
 		foreach (var c in controls)
 			c.MouseDown += (_, e) => OnMouseDown(e);
+	}
+
+	private void UpdateExpandCursor()
+	{
+		var cursor = AllowExpand ? Cursors.Hand : Cursors.Default;
+		Cursor = cursor;
+		tableLayout.Cursor = cursor;
+		lblTitle.Cursor = cursor;
+		lblIcon.Cursor = cursor;
+		lblResultIcon.Cursor = cursor;
+	}
+
+	private void UpdateIconLayout()
+	{
+		if (lblIcon is null || lblResultIcon is null || lblTitle is null || lblResult is null)
+			return;
+
+		_iconColumnWidth = ScaleLogicalPixels(ICON_WIDTH, DeviceDpi);
+		if (tableLayout.ColumnStyles.Count > 0)
+			tableLayout.ColumnStyles[0].Width = _iconColumnWidth;
+		lblIcon.Width = _iconColumnWidth;
+		lblResultIcon.Width = _iconColumnWidth;
+		ApplyIconLayout(lblIcon, lblTitle);
+		ApplyIconLayout(lblResultIcon, lblResult);
+		UpdateContentWidthConstraints();
+		tableLayout.PerformLayout();
+		PerformLayout();
+	}
+
+	private static void ApplyIconLayout(Label icon, Control textControl)
+	{
+		icon.Margin = new Padding(0, textControl.Margin.Top, 0, textControl.Margin.Bottom);
+		icon.Height = Math.Max(
+			1,
+			(int)Math.Ceiling(textControl.Font.GetHeight(textControl.DeviceDpi)));
+		icon.TextAlign = ContentAlignment.MiddleCenter;
+	}
+
+	private static int ScaleLogicalPixels(int logicalPixels, int deviceDpi)
+	{
+		return Math.Max(1, (int)Math.Round(logicalPixels * deviceDpi / 96f));
 	}
 
 	private void UpdateContentWidthConstraints()
@@ -290,7 +467,7 @@ internal sealed partial class FunctionCallMessageControl : Panel, IFunctionCallM
 		var contentWidth = MaximumSize.Width == 0
 			? 0
 			: Math.Max(0, MaximumSize.Width - ContentPadding.Horizontal);
-		var textWidth = contentWidth == 0 ? 0 : Math.Max(0, contentWidth - ICON_WIDTH);
+		var textWidth = contentWidth == 0 ? 0 : Math.Max(0, contentWidth - _iconColumnWidth);
 		lblSender.MaximumSize = new Size(contentWidth, 0);
 		lblTitle.MaximumSize = new Size(textWidth, 0);
 		lblArgs.MaximumSize = new Size(textWidth, 0);
@@ -309,6 +486,12 @@ internal sealed partial class FunctionCallMessageControl : Panel, IFunctionCallM
 			label.BackColor = backColor;
 			label.ForeColor = ForeColor;
 		}
+	}
+
+	/// <inheritdoc />
+	void IChatMessageRefreshControl.RefreshMessageDisplay()
+	{
+		UpdateDisplay();
 	}
 
 	private Color GetOpaqueBackColor()

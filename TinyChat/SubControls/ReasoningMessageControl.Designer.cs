@@ -49,6 +49,7 @@ partial class ReasoningMessageControl
 		lblHeader.TextAlign = ContentAlignment.MiddleLeft;
 
 		// lblDetail
+		lblDetail.AutoSize = true;
 		lblDetail.Dock = DockStyle.Fill;
 		lblDetail.Margin = new Padding(0, 2, 0, 6);
 		lblDetail.Visible = false;
@@ -61,6 +62,7 @@ partial class ReasoningMessageControl
 		// IMPORTANT: do NOT put any always-visible control in row 1;
 		// a hidden control contributes 0 height, so the row collapses automatically.
 		tableLayout.AutoSize = true;
+		tableLayout.AutoSizeMode = AutoSizeMode.GrowAndShrink;
 		tableLayout.CellBorderStyle = TableLayoutPanelCellBorderStyle.None;
 		tableLayout.ColumnCount = 2;
 		tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, IconColumnWidth));
@@ -71,7 +73,7 @@ partial class ReasoningMessageControl
 		// collapses when _detailLabel is hidden.
 		tableLayout.Controls.Add(lblDetail, 1, 1);
 		tableLayout.Cursor = Cursors.Hand;
-		tableLayout.Dock = DockStyle.Fill;
+		tableLayout.Dock = DockStyle.Top;
 		tableLayout.Margin = Padding.Empty;
 		tableLayout.Padding = Padding.Empty;
 		tableLayout.RowCount = 2;
@@ -80,6 +82,7 @@ partial class ReasoningMessageControl
 
 		// ReasoningMessageControl
 		AutoSize = true;
+		AutoSizeMode = AutoSizeMode.GrowAndShrink;
 		BorderStyle = BorderStyle.None;
 		Cursor = Cursors.Hand;
 		Margin = new Padding(3);

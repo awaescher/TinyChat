@@ -213,94 +213,6 @@ public class ChatControlAttachmentAndCancellationTests
 			previewPanel.Controls.OfType<PictureBox>().Count().ShouldBe(2);
 		}
 
-		[TestCase(false)]
-		[TestCase(true)]
-		public void Keeps_Copy_Button_Outside_Of_Message_Layout(bool useDevExpress)
-		{
-			using var chatControl = useDevExpress ? (ChatControl)new DXChatControl() : new ChatControl();
-			using var historyControl = useDevExpress ? (Control)new StackPanelMessageHistoryControl() : new FlowLayoutMessageHistoryControl();
-			using var messageControl = useDevExpress
-				? (Control)new DXChatMessageControl { MessageFormatter = new PlainTextMessageFormatter() }
-				: new ChatMessageControl { MessageFormatter = new PlainTextMessageFormatter() };
-
-			try
-			{
-				InitializeCopyButton(chatControl, historyControl);
-				AttachCopyButton(chatControl, (IChatMessageControl)messageControl);
-
-				messageControl.Controls.Cast<Control>()
-					.ShouldNotContain(control => control is Button || control.GetType().Name == "SimpleButton");
-				var copyButton = FindCopyButton(chatControl);
-				copyButton.Parent.ShouldBe(chatControl);
-			}
-			finally
-			{
-				DisposeCopyButton(chatControl);
-			}
-		}
-
-		[TestCase(false)]
-		[TestCase(true)]
-		public void Hides_Copy_Button_Immediately_When_History_Scrolls(bool useDevExpress)
-		{
-			using var chatControl = useDevExpress ? (ChatControl)new DXChatControl() : new ChatControl();
-			using var historyControl = useDevExpress ? (Control)new StackPanelMessageHistoryControl() : new FlowLayoutMessageHistoryControl();
-
-			try
-			{
-				InitializeCopyButton(chatControl, historyControl);
-				var copyButton = FindCopyButton(chatControl);
-				copyButton.Visible = true;
-
-				RaiseScroll(historyControl);
-
-				copyButton.Visible.ShouldBeFalse();
-			}
-			finally
-			{
-				DisposeCopyButton(chatControl);
-			}
-		}
-
-		private static Control FindCopyButton(ChatControl chatControl) => chatControl.Controls
-			.Cast<Control>()
-			.Single(control => control is Button || control.GetType().Name == "SimpleButton");
-
-		private static void InitializeCopyButton(ChatControl chatControl, Control historyControl)
-		{
-			typeof(ChatControl).GetProperty(nameof(ChatControl.MessageHistoryControl))!.SetValue(chatControl, historyControl);
-			typeof(ChatControl).GetMethod("EnsureMessageCopyButton", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(chatControl, null);
-		}
-
-		private static void AttachCopyButton(ChatControl chatControl, IChatMessageControl messageControl)
-		{
-			typeof(ChatControl).GetMethod("AttachCopyButton", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(chatControl, [messageControl]);
-		}
-
-		private static void DisposeCopyButton(ChatControl chatControl)
-		{
-			typeof(ChatControl).GetMethod("DisposeMessageCopyButton", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(chatControl, null);
-		}
-
-		private static void RaiseScroll(Control historyControl)
-		{
-			if (historyControl is FlowLayoutMessageHistoryControl)
-			{
-				var method = typeof(FlowLayoutMessageHistoryControl).GetMethod("OnScroll", BindingFlags.Instance | BindingFlags.NonPublic)!;
-				var args = new ScrollEventArgs(ScrollEventType.ThumbTrack, 0, 1, System.Windows.Forms.ScrollOrientation.VerticalScroll);
-				method.Invoke(historyControl, [args]);
-				return;
-			}
-
-			var devExpressMethod = typeof(StackPanelMessageHistoryControl).GetMethod(
-				"OnScroll",
-				BindingFlags.Instance | BindingFlags.NonPublic,
-				null,
-				[typeof(object), typeof(XtraScrollEventArgs)],
-				null)!;
-			var devExpressArgs = new XtraScrollEventArgs(ScrollEventType.ThumbTrack, 0, 1, DevExpress.XtraEditors.ScrollOrientation.VerticalScroll);
-			devExpressMethod.Invoke(historyControl, [historyControl, devExpressArgs]);
-		}
 	}
 
 	public class AttachmentDrafts
@@ -494,6 +406,10 @@ public class ChatControlAttachmentAndCancellationTests
 
 			await chatClient.Completed.Task.WaitAsync(TimeSpan.FromSeconds(2));
 			chatClient.RequestToken.IsCancellationRequested.ShouldBeTrue();
+
+			// Wait for the send operation to fully unwind so no background continuation is left to
+			// resume on the test synchronization context after it is torn down.
+			await control.ChatClientSendCompletion.WaitAsync(TimeSpan.FromSeconds(2));
 		}
 	}
 
@@ -516,11 +432,6 @@ public class ChatControlAttachmentAndCancellationTests
 
 	private sealed class TestChatControl : ChatControl
 	{
-		public TestChatControl()
-		{
-			ShowCopyButton = false;
-		}
-
 		public void AddForConversion(ISender sender, IChatMessageContent content) => AddChatMessage(sender, content);
 
 		public List<Microsoft.Extensions.AI.ChatMessage> ConvertMessages() => ConvertToChatMessages();
