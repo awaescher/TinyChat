@@ -28,8 +28,12 @@ partial class DXFunctionCallMessageControl
 		lblTitle = new LabelControl();
 		txtArguments = new DXSelectableMessageTextControl();
 		txtResult = new DXSelectableMessageTextControl();
+		approvalPanel = new FlowLayoutPanel();
+		btnApprove = new SimpleButton();
+		btnReject = new SimpleButton();
 		tableLayout = new TableLayoutPanel();
 		paddingPanel = new PanelControl();
+		approvalPanel.SuspendLayout();
 		tableLayout.SuspendLayout();
 		paddingPanel.SuspendLayout();
 		SuspendLayout();
@@ -46,7 +50,7 @@ partial class DXFunctionCallMessageControl
 		lblToolIcon.AutoSizeMode = LabelAutoSizeMode.None;
 		lblToolIcon.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
 		lblToolIcon.Dock = DockStyle.None;
-		lblToolIcon.ImageOptions.SvgImage = SvgImage.FromStream(new MemoryStream(Encoding.UTF8.GetBytes(TOOL_SVG)));
+		lblToolIcon.ImageOptions.SvgImage = FluentIcons.Tool;
 		lblToolIcon.ImageOptions.SvgImageSize = new Size(ICON_SIZE, ICON_SIZE);
 		lblToolIcon.Margin = Padding.Empty;
 		lblToolIcon.Size = new Size(ICON_WIDTH, ICON_SIZE);
@@ -57,7 +61,7 @@ partial class DXFunctionCallMessageControl
 		lblResultIcon.AutoSizeMode = LabelAutoSizeMode.None;
 		lblResultIcon.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
 		lblResultIcon.Dock = DockStyle.None;
-		lblResultIcon.ImageOptions.SvgImage = SvgImage.FromStream(new MemoryStream(Encoding.UTF8.GetBytes(RESULT_SVG)));
+		lblResultIcon.ImageOptions.SvgImage = FluentIcons.Result;
 		lblResultIcon.ImageOptions.SvgImageSize = new Size(ICON_SIZE, ICON_SIZE);
 		lblResultIcon.Margin = Padding.Empty;
 		lblResultIcon.Size = new Size(ICON_WIDTH, ICON_SIZE);
@@ -77,6 +81,33 @@ partial class DXFunctionCallMessageControl
 		// txtResult
 		txtResult.Dock = DockStyle.Fill;
 		txtResult.Visible = false;
+
+		// btnApprove
+		btnApprove.AutoSize = true;
+		btnApprove.Cursor = Cursors.Default;
+		btnApprove.Margin = new Padding(0, 4, 6, 0);
+		btnApprove.Text = FunctionCallDisplay.APPROVE_GLYPH;
+		btnApprove.Click += BtnApprove_Click;
+
+		// btnReject
+		btnReject.AutoSize = true;
+		btnReject.Cursor = Cursors.Default;
+		btnReject.Margin = new Padding(0, 4, 0, 0);
+		btnReject.Text = FunctionCallDisplay.REJECT_GLYPH;
+		btnReject.Click += BtnReject_Click;
+
+		// approvalPanel
+		approvalPanel.AutoSize = true;
+		approvalPanel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+		approvalPanel.Controls.Add(btnApprove);
+		approvalPanel.Controls.Add(btnReject);
+		approvalPanel.Cursor = Cursors.Default;
+		approvalPanel.Dock = DockStyle.Top;
+		approvalPanel.FlowDirection = FlowDirection.LeftToRight;
+		approvalPanel.Margin = Padding.Empty;
+		approvalPanel.Padding = Padding.Empty;
+		approvalPanel.Visible = false;
+		approvalPanel.WrapContents = false;
 
 		// _table
 		// Col 0: fixed icon width | Col 1: remaining text
@@ -99,10 +130,13 @@ partial class DXFunctionCallMessageControl
 		tableLayout.Controls.Add(txtArguments, 1, 1);
 		tableLayout.Controls.Add(lblResultIcon, 0, 2);
 		tableLayout.Controls.Add(txtResult, 1, 2);
+		// Row 3: approval buttons, only visible while an approval is pending.
+		tableLayout.Controls.Add(approvalPanel, 1, 3);
 		tableLayout.Dock = DockStyle.Fill;
 		tableLayout.Margin = Padding.Empty;
 		tableLayout.Padding = Padding.Empty;
-		tableLayout.RowCount = 3;
+		tableLayout.RowCount = 4;
+		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -131,6 +165,8 @@ partial class DXFunctionCallMessageControl
 		lblTitle.Click += Toggle;
 		lblResultIcon.Click += Toggle;
 
+		approvalPanel.ResumeLayout(false);
+		approvalPanel.PerformLayout();
 		tableLayout.ResumeLayout(false);
 		tableLayout.PerformLayout();
 		paddingPanel.ResumeLayout(false);
@@ -147,4 +183,7 @@ partial class DXFunctionCallMessageControl
 	private LabelControl lblResultIcon;
 	private PanelControl paddingPanel;
 	private DXSelectableMessageTextControl txtResult;
+	private FlowLayoutPanel approvalPanel;
+	private SimpleButton btnApprove;
+	private SimpleButton btnReject;
 }

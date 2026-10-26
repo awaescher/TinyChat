@@ -48,6 +48,7 @@ public partial class ChatControl : UserControl
 	private bool _allowExpandFunctionCalls = true;
 	private bool _allowExpandReasoning = true;
 	private bool _includeFunctionCalls;
+	private bool _includeSkillCalls = true;
 
 	private bool _includeReasoning;
 	private bool _allowFileAttachments = true;
@@ -84,6 +85,13 @@ public partial class ChatControl : UserControl
 	/// "System" error message and any pending re-throw.
 	/// </summary>
 	public event EventHandler<Helper.ChatErrorEventArgs>? ErrorOccurred;
+
+	/// <summary>
+	/// Occurs when the <see cref="IChatClient"/> asks for approval before executing a function.
+	/// The request is shown in the chat; handlers can also decide by calling
+	/// <see cref="FunctionCallMessageContent.Approve"/> or <see cref="FunctionCallMessageContent.Reject"/>.
+	/// </summary>
+	public event EventHandler<ToolApprovalRequestedEventArgs>? ToolApprovalRequested;
 
 	/// <summary>
 	/// Gets the control that manages and displays the chat message history.
@@ -586,6 +594,44 @@ public partial class ChatControl : UserControl
 			ApplyMessageVisibilityAndHeaders();
 		}
 	}
+
+	/// <summary>
+	/// Gets or sets whether skill accesses recognized by <see cref="SkillCallRecognizer"/> should be displayed.
+	/// Skill accesses are shown independently from <see cref="IncludeFunctionCalls"/>.
+	/// </summary>
+	[Category("Chat")]
+	[Description("Gets or sets whether recognized skill accesses should be displayed.")]
+	[DefaultValue(true)]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+	public bool IncludeSkillCalls
+	{
+		get => _includeSkillCalls;
+		set
+		{
+			if (_includeSkillCalls == value)
+				return;
+
+			_includeSkillCalls = value;
+			ApplyMessageVisibilityAndHeaders();
+		}
+	}
+
+	/// <summary>
+	/// Gets or sets whether function calls are checked by <see cref="SkillCallRecognizer"/> and displayed as skill accesses.
+	/// When disabled, skill tools are shown as regular function calls.
+	/// </summary>
+	[Category("Chat")]
+	[Description("Gets or sets whether skill tools such as load_skill are recognized and displayed as skill accesses.")]
+	[DefaultValue(true)]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+	public bool RecognizeSkillCalls { get; set; } = true;
+
+	/// <summary>
+	/// Gets or sets the recognizer that decides whether a function call is a skill access.
+	/// Set to <see langword="null"/> to display all calls as regular function calls.
+	/// </summary>
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	public ISkillCallRecognizer? SkillCallRecognizer { get; set; } = new DefaultSkillCallRecognizer();
 
 	/// <summary>
 	/// Gets or sets whether reasoning content should be included in the streaming visualization.
@@ -1410,7 +1456,14 @@ public partial class ChatControl : UserControl
 	protected virtual bool ShouldDisplayMessage(IChatMessage message)
 	{
 		if (_functionCallVisualizationMessages.Contains(message))
-			return IncludeFunctionCalls;
+		{
+			if (message.Content is FunctionCallMessageContent { ApprovalState: not ToolApprovalState.None })
+				return true;
+
+			return message.Content is FunctionCallMessageContent { Skill: not null }
+				? IncludeSkillCalls
+				: IncludeFunctionCalls;
+		}
 
 		if (_reasoningVisualizationMessages.Contains(message))
 			return IncludeReasoning;
@@ -1697,6 +1750,7 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 			cancellationSource = _currentCancellationTokenSource;
 
 		TryCancel(cancellationSource);
+		RejectPendingApprovals();
 	}
 
 	private bool RegisterCancellationSource(CancellationTokenSource cancellationSource, CancellationToken parentToken = default)
@@ -1907,26 +1961,38 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 			{
 				inputControl?.SetIsReceivingStream(true, allowCancellation: true);
 
-				var chatMessages = ConvertToChatMessages();
-
-				var chatOptionsArgs = new ChatOptionsRequestedEventArgs(ChatOptions);
-				ChatOptionsRequested?.Invoke(this, chatOptionsArgs);
-				var chatOptions = chatOptionsArgs.ChatOptions;
-
-				if (UseStreaming)
+				// Approval requests end a turn; the decisions are sent back in a follow-up request.
+				while (true)
 				{
-					// Use streaming response
-					var streamingResponse = chatClient.GetStreamingResponseAsync(chatMessages, chatOptions, cancellationToken: cancellationSource.Token);
-					await HandleStreamingResponseAsync(_assistantSender, streamingResponse, cancellationSource.Token).ConfigureAwait(true);
-				}
-				else
-				{
-					// Use non-streaming response
-					var response = await chatClient
-						.GetResponseAsync(chatMessages, chatOptions, cancellationToken: cancellationSource.Token)
-						.WaitAsync(cancellationSource.Token)
-						.ConfigureAwait(true);
-					HandleNonStreamingResponse(_assistantSender, response);
+					var chatMessages = ConvertToChatMessages();
+
+					var chatOptionsArgs = new ChatOptionsRequestedEventArgs(ChatOptions);
+					ChatOptionsRequested?.Invoke(this, chatOptionsArgs);
+					var chatOptions = chatOptionsArgs.ChatOptions;
+					var approvalRequests = new List<FunctionCallMessageContent>();
+
+					if (UseStreaming)
+					{
+						// Use streaming response
+						var streamingResponse = chatClient.GetStreamingResponseAsync(chatMessages, chatOptions, cancellationToken: cancellationSource.Token);
+						await HandleStreamingResponseAsync(_assistantSender, streamingResponse, approvalRequests, cancellationSource.Token).ConfigureAwait(true);
+					}
+					else
+					{
+						// Use non-streaming response
+						var response = await chatClient
+							.GetResponseAsync(chatMessages, chatOptions, cancellationToken: cancellationSource.Token)
+							.WaitAsync(cancellationSource.Token)
+							.ConfigureAwait(true);
+						HandleNonStreamingResponse(_assistantSender, response, approvalRequests);
+					}
+
+					if (approvalRequests.Count == 0 || cancellationSource.IsCancellationRequested)
+						break;
+
+					await WaitForApprovalsAsync(approvalRequests, cancellationSource.Token).ConfigureAwait(true);
+					if (cancellationSource.IsCancellationRequested)
+						break;
 				}
 			}
 			catch (OperationCanceledException)
@@ -2031,11 +2097,27 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 				IDictionary<string, object?>? arguments = funcCallContent.Arguments is not null
 					? new Dictionary<string, object?>(funcCallContent.Arguments)
 					: null;
+				var functionCall = new FunctionCallContent(funcCallContent.CallId, funcCallContent.Name, arguments);
+
+				// Decided approvals without a result yet are sent back so the client can execute or reject the call.
+				if (funcCallContent.Result is null && funcCallContent.ApprovalRequestId is { } requestId)
+				{
+					if (funcCallContent.ApprovalState is ToolApprovalState.Approved or ToolApprovalState.Rejected)
+					{
+						var approvalRequest = new ToolApprovalRequestContent(requestId, functionCall);
+						result.Add(new Microsoft.Extensions.AI.ChatMessage(ChatRole.Assistant, [approvalRequest]));
+						result.Add(new Microsoft.Extensions.AI.ChatMessage(
+							ChatRole.User,
+							[approvalRequest.CreateResponse(funcCallContent.ApprovalState == ToolApprovalState.Approved)]));
+					}
+
+					continue;
+				}
 
 				// Add the function call from the assistant
 				var functionCallMessage = new Microsoft.Extensions.AI.ChatMessage(
 					ChatRole.Assistant,
-					[new FunctionCallContent(funcCallContent.CallId, funcCallContent.Name, arguments)]
+					[functionCall]
 				);
 				result.Add(functionCallMessage);
 
@@ -2141,7 +2223,7 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 	/// Handles a streaming response from the IChatClient.
 	/// Function calls are added as separate messages before the text response stream starts.
 	/// </summary>
-	private async Task HandleStreamingResponseAsync(ISender sender, IAsyncEnumerable<ChatResponseUpdate> stream, CancellationToken cancellationToken)
+	private async Task HandleStreamingResponseAsync(ISender sender, IAsyncEnumerable<ChatResponseUpdate> stream, List<FunctionCallMessageContent> approvalRequests, CancellationToken cancellationToken)
 	{
 		var pendingCalls = new Dictionary<string, FunctionCallMessageContent>();
 		var textChannel = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = true });
@@ -2173,27 +2255,10 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 					if (cancellationToken.IsCancellationRequested)
 						break;
 
-					if (item is FunctionCallContent funcCall)
+					if (item is FunctionCallContent or FunctionResultContent or ToolApprovalRequestContent)
 					{
-						var content = new FunctionCallMessageContent(funcCall.CallId, funcCall.Name ?? string.Empty, funcCall.Arguments) { IsFunctionExecuting = true };
-						AddStreamingVisualizationMessage(sender, content, _functionCallVisualizationMessages);
-
-						pendingCalls[funcCall.CallId] = content;
-
-						hadNonTextContentSinceLastText = true;
-
-						// reset the reasoning to be able to start a new control
-						CompleteReasoningMessage();
-					}
-					else if (item is FunctionResultContent funcResult)
-					{
-						if (pendingCalls.TryGetValue(funcResult.CallId, out var content))
-						{
-							pendingCalls.Remove(funcResult.CallId);
-							content.SetResult(funcResult.Result);
-						}
-
-						hadNonTextContentSinceLastText = true;
+						if (ProcessToolContent(sender, item, pendingCalls, approvalRequests))
+							hadNonTextContentSinceLastText = true;
 
 						// reset the reasoning to be able to start a new control
 						CompleteReasoningMessage();
@@ -2284,7 +2349,7 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 	/// <summary>
 	/// Handles a non-streaming response from the IChatClient.
 	/// </summary>
-	private void HandleNonStreamingResponse(ISender sender, ChatResponse response)
+	private void HandleNonStreamingResponse(ISender sender, ChatResponse response, List<FunctionCallMessageContent> approvalRequests)
 	{
 		var pendingCalls = new Dictionary<string, FunctionCallMessageContent>();
 		ReasoningMessageContent? reasoningMessageContent = null;
@@ -2294,29 +2359,12 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 		{
 			foreach (var item in responseMessage.Contents)
 			{
-				if (item is FunctionCallContent functionCall)
+				if (item is FunctionCallContent or FunctionResultContent or ToolApprovalRequestContent)
 				{
 					reasoningMessageContent?.SetDone();
 					reasoningMessageContent = null;
 
-					var functionCallContent = new FunctionCallMessageContent(
-						functionCall.CallId,
-						functionCall.Name ?? string.Empty,
-						functionCall.Arguments)
-					{
-						IsFunctionExecuting = true
-					};
-					AddStreamingVisualizationMessage(sender, functionCallContent, _functionCallVisualizationMessages);
-					pendingCalls[functionCall.CallId] = functionCallContent;
-					addedContent = true;
-				}
-				else if (item is FunctionResultContent functionResult)
-				{
-					reasoningMessageContent?.SetDone();
-					reasoningMessageContent = null;
-
-					if (pendingCalls.Remove(functionResult.CallId, out var functionCallContent))
-						functionCallContent.SetResult(functionResult.Result);
+					ProcessToolContent(sender, item, pendingCalls, approvalRequests);
 					addedContent = true;
 				}
 				else if (item is TextReasoningContent reasoningContent &&
@@ -2348,6 +2396,184 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 
 		if (!addedContent)
 			AddMessage(sender, new StringMessageContent(response.Text ?? string.Empty));
+	}
+
+	/// <summary>
+	/// Displays a function call, its result or an approval request. Calls that are re-sent by the
+	/// <see cref="IChatClient"/> after an approval update the existing message instead of adding a new one.
+	/// </summary>
+	/// <returns><see langword="true"/> when a message was added or updated.</returns>
+	private bool ProcessToolContent(
+		ISender sender,
+		AIContent item,
+		Dictionary<string, FunctionCallMessageContent> pendingCalls,
+		List<FunctionCallMessageContent> approvalRequests)
+	{
+		switch (item)
+		{
+			case ToolApprovalRequestContent { ToolCall: FunctionCallContent approvalCall } approvalRequest:
+				{
+					var content = FindFunctionCallContent(approvalCall.CallId);
+					var isNew = content is null;
+					content ??= CreateFunctionCallMessageContent(approvalCall);
+					content.RequireApproval(approvalRequest.RequestId);
+					if (isNew)
+						AddStreamingVisualizationMessage(sender, content, _functionCallVisualizationMessages);
+					else
+						ApplyMessageVisibilityAndHeaders();
+
+					approvalRequests.Add(content);
+					ScrollMessageIntoView(content);
+					ToolApprovalRequested?.Invoke(this, new ToolApprovalRequestedEventArgs(content));
+					return true;
+				}
+
+			case FunctionCallContent functionCall:
+				{
+					if (FindFunctionCallContent(functionCall.CallId) is { } existing)
+					{
+						pendingCalls[functionCall.CallId] = existing;
+						return false;
+					}
+
+					var content = CreateFunctionCallMessageContent(functionCall);
+					content.IsFunctionExecuting = true;
+					AddStreamingVisualizationMessage(sender, content, _functionCallVisualizationMessages);
+					pendingCalls[functionCall.CallId] = content;
+					return true;
+				}
+
+			case FunctionResultContent functionResult:
+				{
+					if (!pendingCalls.Remove(functionResult.CallId, out var content))
+						content = FindFunctionCallContent(functionResult.CallId);
+
+					if (content is null)
+						return false;
+
+					content.SetResult(functionResult.Result, IsErrorResult(content, functionResult));
+					return true;
+				}
+		}
+
+		return false;
+	}
+
+	private FunctionCallMessageContent CreateFunctionCallMessageContent(FunctionCallContent functionCall)
+	{
+		var content = new FunctionCallMessageContent(functionCall.CallId, functionCall.Name ?? string.Empty, functionCall.Arguments);
+		content.Skill = RecognizeSkillCalls ? SkillCallRecognizer?.Recognize(content.Name, content.Arguments) : null;
+		return content;
+	}
+
+	/// <summary>
+	/// Scrolls a message into view once its layout has settled, so the approval buttons are not cut off.
+	/// </summary>
+	private void ScrollMessageIntoView(IChatMessageContent content)
+	{
+		if (MessageHistoryControl is not ScrollableControl history || !history.IsHandleCreated)
+			return;
+
+		if (_messageControls.FirstOrDefault(messageControl => ReferenceEquals(messageControl.Message?.Content, content)) is not Control control)
+			return;
+
+		void ScrollToBottom()
+		{
+			if (history.IsDisposed || control.IsDisposed || !control.Visible)
+				return;
+
+			(control as IChatMessageRefreshControl)?.RefreshMessageDisplay();
+			history.PerformLayout();
+			history.ScrollControlIntoView(control);
+			if (history.VerticalScroll.Visible)
+				history.AutoScrollPosition = new Point(0, history.DisplayRectangle.Height);
+		}
+
+		// The detail rows measure their height asynchronously, so keep following the control until it is decided.
+		void OnSizeChanged(object? sender, EventArgs e)
+		{
+			if (content is FunctionCallMessageContent { ApprovalState: not ToolApprovalState.Pending })
+			{
+				control.SizeChanged -= OnSizeChanged;
+				return;
+			}
+
+			history.BeginInvoke(ScrollToBottom);
+		}
+
+		control.SizeChanged += OnSizeChanged;
+		history.BeginInvoke(ScrollToBottom);
+	}
+
+	private FunctionCallMessageContent? FindFunctionCallContent(string callId)
+	{
+		for (var index = _messages.Count - 1; index >= 0; index--)
+		{
+			if (_messages[index].Content is FunctionCallMessageContent content &&
+				string.Equals(content.CallId, callId, StringComparison.Ordinal))
+			{
+				return content;
+			}
+		}
+
+		return null;
+	}
+
+	private static bool IsErrorResult(FunctionCallMessageContent content, FunctionResultContent result)
+	{
+		if (result.Exception is not null)
+			return true;
+
+		// Skill providers report failures as text results instead of exceptions.
+		return content.Skill is not null &&
+			result.Result?.ToString() is { } text &&
+			text.StartsWith("Error:", StringComparison.Ordinal);
+	}
+
+	/// <summary>
+	/// Waits until the user decided on every approval request of the current turn.
+	/// Requests still open when the operation is cancelled are rejected.
+	/// </summary>
+	private static async Task WaitForApprovalsAsync(
+		IReadOnlyList<FunctionCallMessageContent> approvalRequests,
+		CancellationToken cancellationToken)
+	{
+		var decided = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+		void CheckDecided(object? sender, PropertyChangedEventArgs e)
+		{
+			if (approvalRequests.All(request => request.ApprovalState != ToolApprovalState.Pending))
+				decided.TrySetResult();
+		}
+
+		foreach (var request in approvalRequests)
+			request.PropertyChanged += CheckDecided;
+
+		try
+		{
+			CheckDecided(null, new PropertyChangedEventArgs(nameof(FunctionCallMessageContent.ApprovalState)));
+			await decided.Task.WaitAsync(cancellationToken).ConfigureAwait(true);
+		}
+		catch (OperationCanceledException)
+		{
+			foreach (var request in approvalRequests)
+				request.Reject();
+			throw;
+		}
+		finally
+		{
+			foreach (var request in approvalRequests)
+				request.PropertyChanged -= CheckDecided;
+		}
+	}
+
+	private void RejectPendingApprovals()
+	{
+		foreach (var message in _messages)
+		{
+			if (message.Content is FunctionCallMessageContent { ApprovalState: ToolApprovalState.Pending } content)
+				content.Reject();
+		}
 	}
 
 	private static IAsyncEnumerable<T> EnumerateWithCancellation<T>(

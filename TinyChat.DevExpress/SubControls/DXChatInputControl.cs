@@ -13,20 +13,6 @@ public class DXChatInputControl : Control, IChatInputControl, IChatAttachmentInp
 	private const int ATTACHMENT_DISPLAY_HEIGHT = 60;
 	private const int SEND_BUTTON_INSET = 6;
 
-	private const string SEND_SVG = """
-		<svg viewBox="0 0 32 32">
-			<style type="text/css">.Black{fill:#727272;}</style>
-			<path d="M16,2C8.3,2,2,8.3,2,16s6.3,14,14,14s14-6.3,14-14S23.7,2,16,2z M18,24h-4v-8H8l8-8l8,8h-6V24z" class="Black" />
-		</svg>
-		""";
-
-	private const string STOP_SVG = """
-		<svg viewBox="0 0 32 32">
-			<style type="text/css">.Black{fill:#727272;}</style>
-			<path d="M25,26H7c-0.6,0-1-0.5-1-1V7c0-0.6,0.4-1,1-1h18c0.5,0,1,0.4,1,1v18C26,25.5,25.5,26,25,26z" class="Black" />
-		</svg>
-		""";
-
 	private readonly List<ChatFileAttachment> _attachments = [];
 	private readonly FlowLayoutPanel _attachmentPanel;
 	private readonly PanelControl _contentPanel;
@@ -134,9 +120,9 @@ public class DXChatInputControl : Control, IChatInputControl, IChatAttachmentInp
 		}
 	}
 
-	private SvgImage SendImage { get; } = SvgImage.FromStream(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(SEND_SVG)));
+	private SvgImage SendImage { get; } = FluentIcons.Send;
 
-	private SvgImage StopImage { get; } = SvgImage.FromStream(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(STOP_SVG)));
+	private SvgImage StopImage { get; } = FluentIcons.Stop;
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="DXChatInputControl"/> class.
@@ -179,10 +165,12 @@ public class DXChatInputControl : Control, IChatInputControl, IChatAttachmentInp
 		_contentPanel.Controls.Add(_contentLayout);
 
 		var size = new Size(24, 24);
-		_sendButton = new SimpleButton { MaximumSize = size, MinimumSize = size, Anchor = AnchorStyles.Bottom | AnchorStyles.Right };
+		_sendButton = new SimpleButton { MaximumSize = size, MinimumSize = size, Anchor = AnchorStyles.Bottom | AnchorStyles.Right, AllowFocus = false, ShowFocusRectangle = DevExpress.Utils.DefaultBoolean.False };
 		_sendButton.ImageOptions.SvgImage = SendImage;
-		_sendButton.ImageOptions.SvgImageSize = new Size(18, 18);
-		_sendButton.ImageOptions.ImageToTextAlignment = ImageAlignToText.TopCenter;
+		_sendButton.ImageOptions.SvgImageSize = new Size(16, 16);
+
+		_sendButton.ImageOptions.Location = ImageLocation.MiddleCenter;
+		_sendButton.Padding = Padding.Empty;
 		Controls.Add(_sendButton);
 		PositionSendButton();
 		_sendButton.BringToFront();

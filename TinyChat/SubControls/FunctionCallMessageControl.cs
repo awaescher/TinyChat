@@ -4,23 +4,13 @@ namespace TinyChat;
 
 /// <summary>
 /// Displays a function call and its result in a structured two-column layout.
-/// The left column shows icon glyphs from Segoe MDL2 Assets; the right column shows
+/// The left column shows icon glyphs (see <see cref="ChatIcons"/>); the right column shows
 /// the function name (bold), the arguments, and the result.
 /// Clicking the header or icon areas toggles the detail rows (arguments + result).
 /// The detail text controls remain dedicated to text selection.
 /// </summary>
 internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLayoutControl, IChatMessageRefreshControl, IFunctionCallMessageControl
 {
-	/// <summary>
-	/// Icon used to mark the function-call row.
-	/// </summary>
-	private const string TOOL_CALL_ICON = "\U0001f9f0";
-
-	/// <summary>
-	/// Icon glyph used to mark the result row.
-	/// </summary>
-	private const string RESULT_ICON = "🡪";
-
 	/// <summary>Fixed pixel width reserved for the icon column.</summary>
 	private const int ICON_WIDTH = 20;
 
@@ -142,11 +132,13 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 		var oldSenderFont = _senderFont;
 		var oldIconFont = _iconFont;
 		_senderFont = new Font(Font, Font.Style | FontStyle.Bold);
-		_iconFont = new Font("Arial", Math.Max(1f, Math.Min(Font.SizeInPoints, 9f)), FontStyle.Regular, GraphicsUnit.Point);
+		_iconFont = ChatIcons.CreateFont(Math.Max(1f, Math.Min(Font.SizeInPoints, 9f)));
 		lblSender.Font = _senderFont;
 		lblTitle.Font = Font;
 		lblArgs.Font = Font;
 		lblResult.Font = Font;
+		btnApprove.Font = Font;
+		btnReject.Font = Font;
 		lblIcon.Font = _iconFont;
 		lblResultIcon.Font = _iconFont;
 		UpdateIconLayout();
@@ -255,6 +247,15 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 
 			base.MaximumSize = value;
 			UpdateContentWidthConstraints();
+
+			// Details shown before the control was added to the history were measured without a width;
+			// re-show them like a toggle does so the table picks up their real height.
+			if (lblArgs is not null && _message?.Content is FunctionCallMessageContent { ApprovalState: ToolApprovalState.Pending })
+			{
+				lblArgs.Visible = false;
+				approvalPanel.Visible = false;
+				ApplyVisibility();
+			}
 		}
 	}
 
@@ -293,8 +294,9 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 			!lblResultIcon.Visible &&
 			!lblResult.Visible &&
 			_message?.Content is FunctionCallMessageContent functionCall &&
+			approvalPanel.Visible == (functionCall.ApprovalState == ToolApprovalState.Pending) &&
 			string.Equals(lblSender.Text, Message?.Sender?.Name ?? string.Empty, StringComparison.Ordinal) &&
-			lblTitle.Text.StartsWith(functionCall.Name, StringComparison.Ordinal);
+			lblTitle.Text.StartsWith(FunctionCallDisplay.GetTitle(functionCall), StringComparison.Ordinal);
 	}
 
 	private void UpdateDisplayCore()
@@ -311,9 +313,9 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 			return;
 		}
 
-		lblTitle.Text = fc.IsFunctionExecuting
-			? fc.Name + " ..."
-			: fc.Name + " ✔";
+		lblIcon.Text = FunctionCallDisplay.GetIcon(fc);
+		ApplyIconColors();
+		lblTitle.Text = FunctionCallDisplay.GetHeader(fc);
 
 		var argumentsText = string.Empty;
 		if (fc.Arguments?.Count > 0)
@@ -340,10 +342,22 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 	{
 		var hasArgs = _message?.Content is FunctionCallMessageContent { Arguments.Count: > 0 };
 		var hasResult = _message?.Content is FunctionCallMessageContent { Result: not null };
+		var isPending = _message?.Content is FunctionCallMessageContent { ApprovalState: ToolApprovalState.Pending };
 
-		lblArgs.Visible = _expanded && hasArgs;
+		lblArgs.Visible = (_expanded || isPending) && hasArgs;
 		lblResultIcon.Visible = _expanded && hasResult;
 		lblResult.Visible = _expanded && hasResult;
+		approvalPanel.Visible = isPending;
+	}
+
+	private void BtnApprove_Click(object? sender, EventArgs e)
+	{
+		(_message?.Content as FunctionCallMessageContent)?.Approve();
+	}
+
+	private void BtnReject_Click(object? sender, EventArgs e)
+	{
+		(_message?.Content as FunctionCallMessageContent)?.Reject();
 	}
 
 	private void ApplyLayoutUpdate(Action updateControls)
@@ -398,8 +412,28 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 			lblArgs.EnsureContentHeightForWidth(textWidth);
 		if (lblResult.Visible)
 			lblResult.EnsureContentHeightForWidth(textWidth);
+		SyncArgumentsRowHeight();
 
 		base.OnLayout(levent);
+	}
+
+	/// <summary>
+	/// The auto-size row does not always pick up the measured argument height (for example when the
+	/// arguments are shown immediately for a pending approval), so the row is sized explicitly.
+	/// </summary>
+	private void SyncArgumentsRowHeight()
+	{
+		if (tableLayout.RowStyles.Count < 2)
+			return;
+
+		var rowStyle = tableLayout.RowStyles[1];
+		var height = lblArgs.Visible ? lblArgs.Height + lblArgs.Margin.Vertical : 0f;
+		var sizeType = lblArgs.Visible ? SizeType.Absolute : SizeType.AutoSize;
+		if (rowStyle.SizeType != sizeType || Math.Abs(rowStyle.Height - height) > 0.5f)
+		{
+			rowStyle.SizeType = sizeType;
+			rowStyle.Height = height;
+		}
 	}
 
 	private void SelectableText_ContentHeightChanging(object? sender, EventArgs e)
@@ -481,11 +515,21 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 
 		var backColor = GetOpaqueBackColor();
 		tableLayout.BackColor = backColor;
+		approvalPanel.BackColor = backColor;
 		foreach (var label in new Control[] { lblSender, lblIcon, lblTitle, lblArgs, lblResultIcon, lblResult })
 		{
 			label.BackColor = backColor;
 			label.ForeColor = ForeColor;
 		}
+
+		ApplyIconColors();
+	}
+
+	private void ApplyIconColors()
+	{
+		var accentColor = _message?.Content is FunctionCallMessageContent { Skill: not null } ? ChatIcons.SkillColor : ChatIcons.ToolColor;
+		lblIcon.ForeColor = ChatIcons.GetIconColor(accentColor, ForeColor);
+		lblResultIcon.ForeColor = ChatIcons.GetIconColor(ChatIcons.ResultColor, ForeColor);
 	}
 
 	/// <inheritdoc />

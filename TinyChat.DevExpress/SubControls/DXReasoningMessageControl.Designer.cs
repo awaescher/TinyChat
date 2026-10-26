@@ -42,7 +42,7 @@ partial class DXReasoningMessageControl
 		// lblDetail
 		lblIcon.AutoSize = false;
 		lblIcon.Dock = DockStyle.Fill;
-		lblIcon.ImageOptions.SvgImage = SvgImage.FromStream(new MemoryStream(Encoding.UTF8.GetBytes(THINK_SVG)));
+		lblIcon.ImageOptions.SvgImage = FluentIcons.Reasoning;
 		lblIcon.ImageOptions.SvgImageSize = new Size(ICON_SIZE, ICON_SIZE);
 		lblIcon.UseMnemonic = false;
 		lblIcon.Width = ICON_COLUMN_WIDTH;

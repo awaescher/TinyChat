@@ -88,57 +88,7 @@ Custom input controls can implement `IChatInputDraftControl` so their own draft 
 
 ### Designer and appearance settings
 
-The following properties are available in the Windows Forms Designer and work for both control suites:
-
-```csharp
-chatControl.MessageFont = new Font("Segoe UI", 10f);
-chatControl.InputFont = new Font("Segoe UI", 10f);
-chatControl.InputEditorBackColor = Color.Empty; // native/skin default
-chatControl.InputEditorForeColor = Color.Empty; // native/skin default
-chatControl.InputEditorBorderStyle = BorderStyle.Fixed3D;
-chatControl.InputPlaceholderText = "Ask TinyChat";
-chatControl.WelcomeFont = new Font("Segoe UI", 14f);
-chatControl.WelcomeMessage = "How can I help?";
-chatControl.HistoryPadding = new Padding(12);
-chatControl.MessagePadding = new Padding(10);
-chatControl.MessageMargin = new Padding(4);
-chatControl.InputPadding = new Padding(10);
-chatControl.WelcomeTextAlign = ContentAlignment.MiddleCenter;
-chatControl.IsSplitterFixed = true;
-chatControl.SplitterPosition = 90;
-chatControl.AllowExpandFunctionCalls = true;
-chatControl.AllowExpandReasoning = true;
-chatControl.IncludeFunctionCalls = false;
-chatControl.IncludeReasoning = false;
-chatControl.AssistantSenderName = "AI Assistant";
-```
-
-`Font`, `ForeColor`, and `BackColor` provide the global appearance for the chat surface and are propagated by both the native Windows Forms and DevExpress suites. The editable input surface deliberately keeps its native Windows or active DevExpress skin colours so that it remains visually distinct and does not look read-only. Set `InputEditorBackColor` or `InputEditorForeColor` to override those defaults; reset either property to `Color.Empty` to resume platform/skin rendering. `MessageFont` and `InputFont` inherit from `Font` until explicitly changed; resetting them resumes that inheritance. `WelcomeFont` is independent, and resetting it restores the larger default welcome font.
-
-The layout and input appearance properties have the same meaning and defaults in both suites:
-
-| Property | Scope | Default after reset |
-|---|---|---|
-| `HistoryPadding` | Padding inside the history area, including the welcome surface | `0` on every side |
-| `MessagePadding` | Inner padding of regular, function-call, and reasoning messages | `8` on every side |
-| `MessageMargin` | Outer margin of every message | `3` on every side |
-| `InputPadding` | Inner padding of the complete input area | `8` on every side |
-| `InputEditorBackColor` | Background of the editable text surface | `Color.Empty` (platform/skin default) |
-| `InputEditorForeColor` | Text colour of the editable text surface | `Color.Empty` (platform/skin default) |
-| `InputEditorBorderStyle` | Native border or mapped DevExpress skin border | `BorderStyle.Fixed3D` |
-| `InputPlaceholderText` | Prompt shown while the input is empty | Empty |
-| `WelcomeTextAlign` | Alignment of the welcome text within the history area | `ContentAlignment.MiddleCenter` |
-| `IsSplitterFixed` | Prevents the user from moving the splitter when enabled | `false` |
-| `SplitterPosition` | Height of the lower input area in pixels | `60` |
-| `AllowExpandFunctionCalls` | Allows function-call details to be expanded | `true` |
-| `AllowExpandReasoning` | Allows reasoning details to be expanded | `true` |
-| `IncludeFunctionCalls` | Shows function calls captured from `IChatClient` responses | `false` |
-| `IncludeReasoning` | Shows reasoning captured from `IChatClient` responses | `false` |
-| `AssistantSenderName` | Name shown for automatic `IChatClient` responses | `Assistant` |
-
-Resetting one of these properties in the Designer restores the listed value. The inherited `ChatControl.Padding` property remains the outer padding around the combined chat surface; it is not inherited by the history, messages, or input area.
-
-These settings also apply retrospectively. Changing the assistant name, formatter, content filters, or expand permissions updates the existing message controls in place instead of rebuilding the history. Hidden function calls and reasoning continue to be captured, so enabling their filters later reveals the original controls without interrupting active streaming. Hiding a selected message intentionally clears that selection. Messages added explicitly through `AddMessage` keep their own sender identity and remain visible independently of the `IChatClient` visualization filters.
+Fonts, colours, paddings, the welcome text, the splitter and the visibility of function calls, skills and reasoning can be set in the Windows Forms Designer for both control suites. Changes apply to existing messages as well.
 
 ### Selecting and copying text
 
@@ -230,3 +180,5 @@ dotnet run --project DemoApp
 ## Credits
 
 The package icon was made by [Vectors Market](https://www.flaticon.com/authors/vectors-market) and is licensed under the [Flaticon license](https://www.flaticon.com/legal).
+
+The DevExpress controls use icons from the [Fluent UI System Icons](https://github.com/microsoft/fluentui-system-icons) by Microsoft, licensed under the [MIT License](https://github.com/microsoft/fluentui-system-icons/blob/main/LICENSE).

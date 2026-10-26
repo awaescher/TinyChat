@@ -322,6 +322,7 @@ public class ChatControlRoadmapTests
 				messageControl.BackColor.ShouldBe(initialBackColor);
 				DescendantsAndSelf(messageControl)
 					.Where(child => child is Label or LabelControl or TextBox or MemoEdit or HtmlContentControl)
+					.Where(child => child.Font.Name != ChatIcons.IconFontName)
 					.ShouldAllBe(child => child.ForeColor == initialForeColor);
 			}
 

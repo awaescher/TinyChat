@@ -9,9 +9,6 @@ namespace TinyChat.SubControls;
 /// </summary>
 internal partial class ReasoningMessageControl : Panel, IChatMessageFormattingControl, IChatMessageLayoutControl, IChatMessageRefreshControl, IReasoningMessageControl
 {
-	/// <summary>Icon glyph rendered in the left icon column.</summary>
-	private const string IconGlyph = "💭";
-
 	/// <summary>Fixed pixel width reserved for the icon column.</summary>
 	private const int IconColumnWidth = 20;
 
@@ -92,7 +89,7 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageFormattingCo
 
 		lblDetail.ContentHeightChanging += SelectableText_ContentHeightChanging;
 		lblDetail.ContentHeightChanged += SelectableText_ContentHeightChanged;
-		lblIcon.Font = new Font("Arial", 11);
+		lblIcon.Font = ChatIcons.CreateFont(ChatIcons.IconFontName is null ? 11f : 9f);
 		ApplyTextFont();
 		ApplyColors();
 		Disposed += (_, _) =>
@@ -471,6 +468,8 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageFormattingCo
 			label.BackColor = backColor;
 			label.ForeColor = ForeColor;
 		}
+
+		lblIcon.ForeColor = ChatIcons.GetIconColor(ChatIcons.ReasoningColor, ForeColor);
 	}
 
 	private Color GetOpaqueBackColor()

@@ -35,7 +35,7 @@ partial class ReasoningMessageControl
 		// lblIcon
 		lblIcon.AutoSize = false;
 		lblIcon.Dock = DockStyle.Fill;
-		lblIcon.Text = IconGlyph;
+		lblIcon.Text = ChatIcons.Reasoning;
 		lblIcon.TextAlign = ContentAlignment.MiddleCenter;
 		lblIcon.UseMnemonic = false;
 		lblIcon.Width = IconColumnWidth;

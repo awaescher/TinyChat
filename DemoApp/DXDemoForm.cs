@@ -45,6 +45,7 @@ public partial class DXDemoForm : ToolbarForm, IMessageFilter
 		dxChatControl.IncludeReasoning = true;
 		dxChatControl.ServiceProvider = DemoData.CreateDemoServiceProvider();
 		dxChatControl.Messages = DemoData.Create(Environment.UserName);
+		dxChatControl.SendMessage(DemoData.APPROVAL_DEMO_PROMPT);
 		SelectControl(dxChatControl);
 	}
 

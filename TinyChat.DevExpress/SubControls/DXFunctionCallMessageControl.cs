@@ -5,7 +5,7 @@ namespace TinyChat;
 
 /// <summary>
 /// Displays a function call and its result in a structured two-column layout.
-/// The left column shows icon glyphs from Segoe MDL2 Assets; the right column shows
+/// The left column shows Fluent UI icons (see <see cref="FluentIcons"/>); the right column shows
 /// the function name (bold), the arguments, and the result.
 /// Clicking the header or icon areas toggles the detail rows (arguments + result).
 /// The detail editors remain dedicated to text selection.
@@ -18,21 +18,8 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 	private const int ICON_WIDTH = 20;
 	private const int ICON_SIZE = 14;
 
-	/// <summary>SVG for the tool/lightning icon.</summary>
-	private const string TOOL_SVG = """
-		<svg viewBox="0 0 32 32">
-			<style type="text/css">.Yellow{fill:#FFB115;}</style>
-			<polygon points="22,2 14,2 6,16 14,16 8,30 26,12 16.3,12" class="Yellow" />
-		</svg>
-		""";
 
-	/// <summary>SVG for the result/arrow icon.</summary>
-	private const string RESULT_SVG = """
-		<svg viewBox="0 0 32 32">
-			<style type="text/css">.Green{fill:#039C23;}</style>
-			<polygon points="18,6 12.3,6 20.3,14 4,14 4,18 20.3,18 12.3,26 18,26 28,16" class="Green" />
-		</svg>
-		""";
+	private bool? _displaysSkillIcon;
 
 	/// <summary>The chat message whose <see cref="FunctionCallMessageContent"/> is being displayed.</summary>
 	private IChatMessage? _message;
@@ -224,7 +211,8 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 			return;
 		}
 
-		lblTitle.Text = $"{fc.Name} {(fc.IsFunctionExecuting ? "..." : "\u2714")}";
+		lblTitle.Text = FunctionCallDisplay.GetHeader(fc);
+		UpdateToolIcon(fc.Skill is not null);
 
 		var argumentsText = string.Empty;
 		if (fc.Arguments?.Count > 0)
@@ -233,7 +221,11 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 			argumentsText = string.Join(Environment.NewLine, fc.Arguments.Select(kv => $"{(kv.Key + ":").PadRight(maxKeyLen + 1)} {kv.Value}"));
 		}
 		if (!string.Equals(txtArguments.Text, argumentsText, StringComparison.Ordinal))
-			txtArguments.SetTextPreservingSelection(argumentsText);
+		{
+			// The HTML surface collapses plain line breaks, so each argument gets its own <br>.
+			var formattedArguments = string.Join("<br>", argumentsText.Split(Environment.NewLine));
+			txtArguments.SetFormattedTextPreservingSelection(formattedArguments);
+		}
 
 		var resultText = fc.Result?.ToString() ?? string.Empty;
 		if (!string.Equals(txtResult.Text, resultText, StringComparison.Ordinal))
@@ -250,11 +242,13 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 	{
 		var hasArgs = _message?.Content is FunctionCallMessageContent { Arguments.Count: > 0 };
 		var hasResult = _message?.Content is FunctionCallMessageContent { Result: not null };
-		var showArguments = _expanded && hasArgs;
+		var isPending = _message?.Content is FunctionCallMessageContent { ApprovalState: ToolApprovalState.Pending };
+		var showArguments = (_expanded || isPending) && hasArgs;
 		var showResult = _expanded && hasResult;
 		if (txtArguments.Visible == showArguments &&
 			lblResultIcon.Visible == showResult &&
-			txtResult.Visible == showResult)
+			txtResult.Visible == showResult &&
+			approvalPanel.Visible == isPending)
 		{
 			return;
 		}
@@ -267,6 +261,7 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 			txtArguments.Visible = showArguments;
 			lblResultIcon.Visible = showResult;
 			txtResult.Visible = showResult;
+			approvalPanel.Visible = isPending;
 		}
 		finally
 		{
@@ -284,6 +279,26 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 				Parent?.PerformLayout(this, nameof(PreferredSize));
 			}
 		}
+	}
+
+	private void UpdateToolIcon(bool isSkill)
+	{
+		if (_displaysSkillIcon == isSkill)
+			return;
+
+		_displaysSkillIcon = isSkill;
+		lblToolIcon.ImageOptions.SvgImage = isSkill ? FluentIcons.Skill : FluentIcons.Tool;
+	}
+
+
+	private void BtnApprove_Click(object? sender, EventArgs e)
+	{
+		(_message?.Content as FunctionCallMessageContent)?.Approve();
+	}
+
+	private void BtnReject_Click(object? sender, EventArgs e)
+	{
+		(_message?.Content as FunctionCallMessageContent)?.Reject();
 	}
 
 	private void UpdateExpandCursor()
@@ -342,6 +357,11 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 
 		paddingPanel.BackColor = BackColor;
 		tableLayout.BackColor = BackColor;
+		approvalPanel.BackColor = BackColor;
+		btnApprove.Appearance.Font = Font;
+		btnApprove.Appearance.Options.UseFont = true;
+		btnReject.Appearance.Font = Font;
+		btnReject.Appearance.Options.UseFont = true;
 	}
 
 	private void UpdateIconLayout()

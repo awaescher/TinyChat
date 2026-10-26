@@ -54,6 +54,26 @@ public class FunctionCallMessageContent : IChatMessageContent
 	/// </summary>
 	public object? Result { get; private set; }
 
+	/// <summary>
+	/// Gets whether the function reported an error as its result.
+	/// </summary>
+	public bool HasError { get; private set; }
+
+	/// <summary>
+	/// Gets or sets the skill access this function call represents, or <see langword="null"/> for a regular function call.
+	/// </summary>
+	public SkillCallInfo? Skill { get; set; }
+
+	/// <summary>
+	/// Gets the identifier of the approval request, or <see langword="null"/> if the call does not require approval.
+	/// </summary>
+	public string? ApprovalRequestId { get; private set; }
+
+	/// <summary>
+	/// Gets the approval state of the function call.
+	/// </summary>
+	public ToolApprovalState ApprovalState { get; private set; }
+
 	/// <inheritdoc />
 	public object? Content => this;
 
@@ -77,12 +97,74 @@ public class FunctionCallMessageContent : IChatMessageContent
 	/// Sets the function result and updates the <see cref="IsFunctionExecuting"/>.
 	/// </summary>
 	/// <param name="result">The result of the function</param>
-	public void SetResult(object? result)
+	/// <param name="hasError">Whether the result describes an error.</param>
+	public void SetResult(object? result, bool hasError = false)
 	{
 		Result = result;
+		HasError = hasError;
 		IsFunctionExecuting = false;
 
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Result)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsFunctionExecuting)));
 	}
+
+	/// <summary>
+	/// Marks the function call as waiting for the user's approval.
+	/// </summary>
+	/// <param name="requestId">The identifier of the approval request.</param>
+	public void RequireApproval(string requestId)
+	{
+		ArgumentException.ThrowIfNullOrEmpty(requestId);
+
+		ApprovalRequestId = requestId;
+		IsFunctionExecuting = false;
+		SetApprovalState(ToolApprovalState.Pending);
+	}
+
+	/// <summary>
+	/// Approves a pending function call so that it can be executed.
+	/// </summary>
+	public void Approve()
+	{
+		if (ApprovalState != ToolApprovalState.Pending)
+			return;
+
+		IsFunctionExecuting = true;
+		SetApprovalState(ToolApprovalState.Approved);
+	}
+
+	/// <summary>
+	/// Rejects a pending function call so that it will not be executed.
+	/// </summary>
+	public void Reject()
+	{
+		if (ApprovalState != ToolApprovalState.Pending)
+			return;
+
+		SetApprovalState(ToolApprovalState.Rejected);
+	}
+
+	private void SetApprovalState(ToolApprovalState state)
+	{
+		ApprovalState = state;
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ApprovalState)));
+	}
+}
+
+/// <summary>
+/// Describes the approval state of a function call.
+/// </summary>
+public enum ToolApprovalState
+{
+	/// <summary>The function call does not require approval.</summary>
+	None,
+
+	/// <summary>The function call waits for the user's decision.</summary>
+	Pending,
+
+	/// <summary>The user approved the function call.</summary>
+	Approved,
+
+	/// <summary>The user rejected the function call.</summary>
+	Rejected
 }
