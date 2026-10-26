@@ -29,7 +29,7 @@ public partial class NativeOllamaDemoForm : Form
 
 	private void NewChatButton_Click(object? sender, EventArgs e)
 	{
-		chatControl.Messages = [];
+		chatControl.StartNewChat();
 	}
 
 	private void ModelComboBox_SelectedIndexChanged(object? sender, EventArgs e)
@@ -37,7 +37,7 @@ public partial class NativeOllamaDemoForm : Form
 		if (modelComboBox.SelectedItem is string model && !string.Equals(model, _selectedModel, StringComparison.Ordinal))
 		{
 			_selectedModel = model;
-			chatControl.Messages = [];
+			chatControl.StartNewChat();
 			chatControl.AssistantSenderName = _selectedModel;
 			_ = InitializeOllamaAsync();
 		}

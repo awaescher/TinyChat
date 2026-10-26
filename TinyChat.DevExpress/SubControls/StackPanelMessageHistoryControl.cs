@@ -8,14 +8,14 @@ namespace TinyChat;
 /// A scrollable control that displays chat message history using a vertical stack panel layout.
 /// Implements the IChatMessageHistoryControl interface to provide message management functionality.
 /// </summary>
-public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessageHistoryControl, IChatMessageHistoryViewport
+public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessageHistoryControl
 {
 	private readonly StackPanel _stackPanel = new();
+	private int _messageLayoutSuspendCount;
+	private bool _resizeLayoutPending;
 	private bool _shouldFollowStreamScroll = true;
+	private bool _streamScrollPending;
 	private IChatMessageControl? _selectedMessageControl;
-
-	/// <inheritdoc />
-	public event EventHandler? ViewportChanged;
 
 	/// <summary>
 	/// Gets the maximum vertical scroll value that indicates the bottom of the scrollable area.
@@ -45,6 +45,8 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 	{
 		var control = (Control)messageControl;
 		control.MouseDown += OnMessageControlMouseDown;
+		control.MarginChanged += MessageControlMarginChanged;
+		control.VisibleChanged += MessageControlVisibleChanged;
 		_stackPanel.Controls.Add(control);
 
 		// queue this to the UI thread to ensure it runs after the control is added
@@ -52,6 +54,9 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 		// is not visible
 		BeginInvoke(() =>
 		{
+			if (IsDisposed || Disposing || control.IsDisposed || !ReferenceEquals(control.Parent, _stackPanel))
+				return;
+
 			SetSizeConstraints(control);
 			ScrollControlIntoView(control);
 
@@ -66,7 +71,8 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 	/// </summary>
 	public void ClearMessageControls()
 	{
-		foreach (var messageControl in _stackPanel.Controls.OfType<IChatMessageControl>())
+		var messageControls = _stackPanel.Controls.OfType<IChatMessageControl>().ToArray();
+		foreach (var messageControl in messageControls)
 		{
 			messageControl.SizeUpdatedWhileStreaming -= MessageControlStreamingSizeUpdate;
 			messageControl.BeforeLayoutChange -= BeforeMessageLayoutChange;
@@ -74,9 +80,17 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 
 			var control = (Control)messageControl;
 			control.MouseDown -= OnMessageControlMouseDown;
+			control.MarginChanged -= MessageControlMarginChanged;
+			control.VisibleChanged -= MessageControlVisibleChanged;
 		}
 
 		_stackPanel.Controls.Clear();
+		_selectedMessageControl = null;
+		foreach (var messageControl in messageControls)
+		{
+			messageControl.Message = null;
+			((Control)messageControl).Dispose();
+		}
 	}
 
 	/// <summary>
@@ -85,12 +99,25 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 	/// <param name="message">The message to remove the control for</param>
 	public void RemoveMessageControl(IChatMessage message)
 	{
-		if (_stackPanel.Controls.OfType<IChatMessageControl>().FirstOrDefault(mc => mc.Message?.Equals(message) ?? false) is { } messageControl)
+		var messageControls = _stackPanel.Controls.OfType<IChatMessageControl>();
+		var messageControl = messageControls.FirstOrDefault(
+			control => ReferenceEquals(control.Message, message)) ??
+			messageControls.FirstOrDefault(control => control.Message?.Equals(message) ?? false);
+		if (messageControl is not null)
 		{
 			var control = (Control)messageControl;
 			messageControl.SizeUpdatedWhileStreaming -= MessageControlStreamingSizeUpdate;
+			messageControl.BeforeLayoutChange -= BeforeMessageLayoutChange;
+			messageControl.AfterLayoutChange -= AfterMessageLayoutChange;
 			control.MouseDown -= OnMessageControlMouseDown;
+			control.MarginChanged -= MessageControlMarginChanged;
+			control.VisibleChanged -= MessageControlVisibleChanged;
 			_stackPanel.Controls.Remove(control);
+			messageControl.Message = null;
+			control.Dispose();
+
+			if (ReferenceEquals(_selectedMessageControl, messageControl))
+				_selectedMessageControl = null;
 		}
 	}
 
@@ -102,21 +129,39 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 	protected override void OnClientSizeChanged(EventArgs e)
 	{
 		base.OnClientSizeChanged(e);
-		ViewportChanged?.Invoke(this, EventArgs.Empty);
 
-		if (_stackPanel?.Controls.Count > 0)
+		if (_stackPanel?.Controls.Count == 0 || _resizeLayoutPending || !IsHandleCreated)
+			return;
+
+		// Run after the control decided whether a vertical scrollbar is required.
+		_resizeLayoutPending = true;
+		try
 		{
-			// needs to be done after the control decided whether or not
-			// a V scrollbar should be shown
-			this.BeginInvoke(() =>
-			{
-				SuspendLayout();
+			BeginInvoke(ApplyPendingResizeLayout);
+		}
+		catch (InvalidOperationException) when (IsDisposed || Disposing || !IsHandleCreated)
+		{
+			_resizeLayoutPending = false;
+		}
+	}
 
-				foreach (Control control in _stackPanel.Controls)
-					SetSizeConstraints(control);
+	private void ApplyPendingResizeLayout()
+	{
+		_resizeLayoutPending = false;
+		if (IsDisposed || Disposing)
+			return;
 
-				ResumeLayout();
-			});
+		SuspendLayout();
+		_stackPanel.SuspendLayout();
+		try
+		{
+			foreach (Control control in _stackPanel.Controls)
+				SetSizeConstraints(control);
+		}
+		finally
+		{
+			_stackPanel.ResumeLayout(performLayout: true);
+			ResumeLayout(performLayout: true);
 		}
 	}
 
@@ -127,8 +172,12 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 	/// <param name="control">The control to apply size constraints to.</param>
 	private void SetSizeConstraints(Control control)
 	{
-		control.MinimumSize = new Size(_stackPanel.ClientRectangle.Width, 0);
-		control.MaximumSize = new Size(_stackPanel.ClientRectangle.Width, 0);
+		var availableWidth = Math.Max(0, _stackPanel.ClientRectangle.Width - control.Margin.Horizontal);
+		var constraint = new Size(availableWidth, 0);
+		if (control.MinimumSize != constraint)
+			control.MinimumSize = constraint;
+		if (control.MaximumSize != constraint)
+			control.MaximumSize = constraint;
 	}
 
 
@@ -136,7 +185,6 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 	protected override void OnScroll(object sender, XtraScrollEventArgs e)
 	{
 		base.OnScroll(sender, e);
-		ViewportChanged?.Invoke(this, EventArgs.Empty);
 
 		var didScrollUp = e.ScrollOrientation == DevExpress.XtraEditors.ScrollOrientation.VerticalScroll && e.NewValue < e.OldValue;
 		var didScrollToBottom = e.NewValue >= MaxVerticalScroll;
@@ -148,7 +196,6 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 	protected override void OnMouseWheelCore(MouseEventArgs ev)
 	{
 		base.OnMouseWheelCore(ev);
-		ViewportChanged?.Invoke(this, EventArgs.Empty);
 
 		var didScrollUp = ev.Delta > 0;
 		var didScrollToBottom = VerticalScroll.Value >= MaxVerticalScroll;
@@ -156,19 +203,46 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 		_shouldFollowStreamScroll = !didScrollUp && didScrollToBottom;
 	}
 
+	/// <inheritdoc />
+	protected override void OnHandleDestroyed(EventArgs e)
+	{
+		_resizeLayoutPending = false;
+		_streamScrollPending = false;
+		base.OnHandleDestroyed(e);
+	}
+
 	/// <inheritdoc/>
 	protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
 	{
+		if (keyData == (Keys.Control | Keys.C) && HasFocusedEditor(this))
+			return base.ProcessCmdKey(ref msg, keyData);
+
 		if (keyData == (Keys.Control | Keys.C) && _selectedMessageControl is not null)
 		{
 			try
 			{
-				Clipboard.SetText(_selectedMessageControl.ToString());
+				var text = _selectedMessageControl.ToString();
+				if (!string.IsNullOrEmpty(text))
+					Clipboard.SetText(text);
 			}
 			catch { }
 			return true;
 		}
 		return base.ProcessCmdKey(ref msg, keyData);
+	}
+
+	private static bool HasFocusedEditor(Control parent)
+	{
+		foreach (Control child in parent.Controls)
+		{
+			if (child is BaseEdit or HtmlContentControl && child.ContainsFocus)
+				return true;
+
+			if (child.ContainsFocus && HasFocusedEditor(child))
+				return true;
+		}
+
+		return false;
 	}
 
 	private void OnMessageControlMouseDown(object? sender, MouseEventArgs e)
@@ -180,21 +254,73 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 		}
 	}
 
+	private void MessageControlVisibleChanged(object? sender, EventArgs e)
+	{
+		if (sender is Control { Visible: false } control &&
+			ReferenceEquals(_selectedMessageControl, control))
+		{
+			_selectedMessageControl = null;
+		}
+	}
+
+	private void MessageControlMarginChanged(object? sender, EventArgs e)
+	{
+		if (sender is not Control control || !ReferenceEquals(control.Parent, _stackPanel))
+			return;
+
+		SetSizeConstraints(control);
+		_stackPanel.PerformLayout();
+	}
+
 	private void MessageControlStreamingSizeUpdate(object? sender, EventArgs args)
 	{
 		// can't use ScrollControlIntoView() because this will stop scrolling
 		// once the message controls gets larger than the flow layout panel
-		if (_shouldFollowStreamScroll)
-			BeginInvoke(() => VerticalScroll.Value = MaxVerticalScroll);
+		if (!_shouldFollowStreamScroll || _streamScrollPending || !IsHandleCreated)
+			return;
+
+		_streamScrollPending = true;
+		try
+		{
+			BeginInvoke(ApplyPendingStreamScroll);
+		}
+		catch (InvalidOperationException) when (IsDisposed || Disposing || !IsHandleCreated)
+		{
+			_streamScrollPending = false;
+		}
+	}
+
+	private void ApplyPendingStreamScroll()
+	{
+		_streamScrollPending = false;
+		if (IsDisposed || Disposing || !_shouldFollowStreamScroll)
+			return;
+
+		var scrollValue = MaxVerticalScroll;
+		if (VerticalScroll.Value != scrollValue)
+			VerticalScroll.Value = scrollValue;
 	}
 
 	private void BeforeMessageLayoutChange(object? sender, EventArgs e)
 	{
+		_messageLayoutSuspendCount++;
+		if (_messageLayoutSuspendCount > 1)
+			return;
+
 		SuspendLayout();
+		_stackPanel.SuspendLayout();
 	}
 
 	private void AfterMessageLayoutChange(object? sender, EventArgs e)
 	{
-		ResumeLayout();
+		if (_messageLayoutSuspendCount == 0)
+			return;
+
+		_messageLayoutSuspendCount--;
+		if (_messageLayoutSuspendCount > 0)
+			return;
+
+		_stackPanel.ResumeLayout(performLayout: true);
+		ResumeLayout(performLayout: true);
 	}
 }

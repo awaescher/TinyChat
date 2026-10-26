@@ -45,6 +45,7 @@
 
 	<ItemGroup>
 	  <InternalsVisibleTo Include="TinyChat.DevExpress" />
+	  <InternalsVisibleTo Include="Tests" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -12,22 +12,36 @@ public class DXChatControl : ChatControl
 	protected override IChatMessageHistoryControl CreateMessageHistoryControl() => new StackPanelMessageHistoryControl();
 
 	/// <inheritdoc />
-	protected override IChatMessageControl CreateMessageControl(IChatMessage message) => new DXChatMessageControl { MessageFormatter = MessageFormatter, Message = message };
+	protected override Control CreateWelcomeControl() => new DXWelcomeControl();
 
 	/// <inheritdoc />
-	protected override Control CreateMessageCopyButton() => new SimpleButton
+	protected override void ApplyWelcomeControlSettings(Control control)
 	{
-		Cursor = Cursors.Hand,
-		Size = new Size(26, 26),
-		TabStop = false,
-		Text = "⧉"
-	};
+		base.ApplyWelcomeControlSettings(control);
+		if (control is DXWelcomeControl welcomeControl)
+		{
+			welcomeControl.SetWelcomeText(WelcomeMessage);
+			welcomeControl.TextAlign = WelcomeTextAlign;
+		}
+
+		ApplyDevExpressRootFont(control, WelcomeFont);
+	}
+
+	/// <inheritdoc />
+	protected override void ApplyMessageFont(Control control)
+	{
+		base.ApplyMessageFont(control);
+		ApplyDevExpressRootFont(control, MessageFont);
+	}
+
+	/// <inheritdoc />
+	protected override IChatMessageControl CreateMessageControl(IChatMessage message) => new DXChatMessageControl { MessageFormatter = MessageFormatter, Message = message };
 
 	/// <inheritdoc />
 	protected override IFunctionCallMessageControl CreateFunctionCallMessageControl(IChatMessage message) => new DXFunctionCallMessageControl { Message = message, AllowExpand = AllowExpandFunctionCalls };
 
 	/// <inheritdoc />
-	protected override IChatMessageControl CreateReasoningMessageControl(IChatMessage message) => new DXReasoningMessageControl { MessageFormatter = MessageFormatter, Message = message };
+	protected override IChatMessageControl CreateReasoningMessageControl(IChatMessage message) => new DXReasoningMessageControl { MessageFormatter = MessageFormatter, Message = message, AllowExpand = AllowExpandReasoning };
 
 	/// <inheritdoc />
 	protected override IChatInputControl CreateChatInputControl() => new DXChatInputControl();
@@ -36,11 +50,19 @@ public class DXChatControl : ChatControl
 	protected override ISplitContainerControl CreateSplitContainerControl() => new DXChatSplitContainerControl();
 
 	/// <summary>
-	/// DevExpress offers basic HTML formatting capabilities.
-	/// With the SimplifiedHtmlMessageFormatter and the limited tags that are supported by DevExpress,
-	/// we might be able to format most of the common formatting properly.
-	/// See: https://docs.devexpress.com/WindowsForms/4874/common-features/html-text-formatting
+	/// Creates the safe HTML subset rendered by the selectable DevExpress HTML content controls.
+	/// See: https://docs.devexpress.com/WindowsForms/403398/common-features/html-css-based-desktop-ui/html-tags
 	/// </summary>
-	protected override IMessageFormatter CreateDefaultMessageFormatter() => new SimplifiedHtmlMessageFormatter("b", "i", "s", "u", "br", "sub", "sup", "font", "p", "nbsp", "a", "href", "color", "backcolor", "size");
+	protected override IMessageFormatter CreateDefaultMessageFormatter() => new SimplifiedHtmlMessageFormatter(
+		"b", "i", "s", "u", "br", "sub", "sup", "font", "p", "nbsp", "a", "color", "backcolor", "size",
+		"h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "table", "thead", "tbody", "tfoot", "tr", "th", "td");
 
+	private static void ApplyDevExpressRootFont(Control control, Font font)
+	{
+		if (control is not PanelControl panel)
+			return;
+
+		panel.Appearance.Font = font;
+		panel.Appearance.Options.UseFont = true;
+	}
 }

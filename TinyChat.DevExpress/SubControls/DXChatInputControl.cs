@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using DevExpress.Utils;
 using DevExpress.Utils.Svg;
 using DevExpress.XtraEditors;
 
@@ -6,9 +8,10 @@ namespace TinyChat;
 /// <summary>
 /// Provides a DevExpress-based chat input control for composing messages with optional file attachments.
 /// </summary>
-public class DXChatInputControl : Control, IChatInputControl, IChatAttachmentInputControl
+public class DXChatInputControl : Control, IChatInputControl, IChatAttachmentInputControl, IChatInputDraftControl, IChatInputLayoutControl, IChatInputAppearanceControl
 {
 	private const int ATTACHMENT_DISPLAY_HEIGHT = 60;
+	private const int SEND_BUTTON_INSET = 6;
 
 	private const string SEND_SVG = """
 		<svg viewBox="0 0 32 32">
@@ -26,10 +29,16 @@ public class DXChatInputControl : Control, IChatInputControl, IChatAttachmentInp
 
 	private readonly List<ChatFileAttachment> _attachments = [];
 	private readonly FlowLayoutPanel _attachmentPanel;
+	private readonly PanelControl _contentPanel;
 	private readonly TableLayoutPanel _contentLayout;
 	private readonly PasteAwareMemoEdit _textBox;
 	private readonly SimpleButton _sendButton;
+	private Color _editorBackColor = Color.Empty;
+	private Color _editorForeColor = Color.Empty;
+	private BorderStyle _editorBorderStyle = BorderStyle.Fixed3D;
+	private string _placeholderText = string.Empty;
 	private bool _isReceivingStream;
+	private bool _allowCancellation;
 
 	/// <summary>
 	/// Occurs before a message is sent from the text box.
@@ -53,6 +62,78 @@ public class DXChatInputControl : Control, IChatInputControl, IChatAttachmentInp
 	/// <inheritdoc />
 	public int AttachmentDisplayHeight => ATTACHMENT_DISPLAY_HEIGHT;
 
+	/// <inheritdoc />
+	[Browsable(false)]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	public Padding ContentPadding
+	{
+		get => _contentPanel.Padding;
+		set
+		{
+			if (_contentPanel.Padding == value)
+				return;
+
+			_contentPanel.Padding = value;
+			PerformLayout();
+			PositionSendButton();
+		}
+	}
+
+	/// <inheritdoc />
+	[Browsable(false)]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	public Color EditorBackColor
+	{
+		get => _editorBackColor;
+		set
+		{
+			_editorBackColor = value;
+			ApplyEditorAppearance();
+		}
+	}
+
+	/// <inheritdoc />
+	[Browsable(false)]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	public Color EditorForeColor
+	{
+		get => _editorForeColor;
+		set
+		{
+			_editorForeColor = value;
+			ApplyEditorAppearance();
+		}
+	}
+
+	/// <inheritdoc />
+	[Browsable(false)]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	public BorderStyle EditorBorderStyle
+	{
+		get => _editorBorderStyle;
+		set
+		{
+			if (!Enum.IsDefined(value))
+				throw new InvalidEnumArgumentException(nameof(value), (int)value, typeof(BorderStyle));
+
+			_editorBorderStyle = value;
+			ApplyEditorAppearance();
+		}
+	}
+
+	/// <inheritdoc />
+	[Browsable(false)]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	public string PlaceholderText
+	{
+		get => _placeholderText;
+		set
+		{
+			_placeholderText = value ?? string.Empty;
+			ApplyEditorAppearance();
+		}
+	}
+
 	private SvgImage SendImage { get; } = SvgImage.FromStream(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(SEND_SVG)));
 
 	private SvgImage StopImage { get; } = SvgImage.FromStream(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(STOP_SVG)));
@@ -63,8 +144,12 @@ public class DXChatInputControl : Control, IChatInputControl, IChatAttachmentInp
 	public DXChatInputControl()
 	{
 		_textBox = new PasteAwareMemoEdit { Visible = true, Dock = DockStyle.Fill };
+		_textBox.Properties.BorderStyle = DevExpress.XtraEditors.Controls.BorderStyles.Default;
+		_textBox.Properties.ReadOnly = false;
 		_textBox.Properties.ScrollBars = ScrollBars.None;
 		_textBox.AttachmentPasteRequested += (_, e) => AttachmentPasteRequested?.Invoke(this, e);
+		_textBox.LocationChanged += (_, _) => PositionSendButton();
+		_textBox.SizeChanged += (_, _) => PositionSendButton();
 		_attachmentPanel = new FlowLayoutPanel
 		{
 			AutoScroll = true,
@@ -89,22 +174,22 @@ public class DXChatInputControl : Control, IChatInputControl, IChatAttachmentInp
 		_contentLayout.Controls.Add(_attachmentPanel, 0, 0);
 		_contentLayout.Controls.Add(_textBox, 0, 1);
 
-		var panel = new PanelControl { Padding = new Padding(8), Dock = DockStyle.Fill, BorderStyle = DevExpress.XtraEditors.Controls.BorderStyles.NoBorder };
-		Controls.Add(panel);
-		panel.Controls.Add(_contentLayout);
+		_contentPanel = new PanelControl { Padding = new Padding(8), Dock = DockStyle.Fill, BorderStyle = DevExpress.XtraEditors.Controls.BorderStyles.NoBorder };
+		Controls.Add(_contentPanel);
+		_contentPanel.Controls.Add(_contentLayout);
 
 		var size = new Size(24, 24);
 		_sendButton = new SimpleButton { MaximumSize = size, MinimumSize = size, Anchor = AnchorStyles.Bottom | AnchorStyles.Right };
 		_sendButton.ImageOptions.SvgImage = SendImage;
 		_sendButton.ImageOptions.SvgImageSize = new Size(18, 18);
 		_sendButton.ImageOptions.ImageToTextAlignment = ImageAlignToText.TopCenter;
-		_sendButton.Left = ClientRectangle.Width - _sendButton.Width - panel.Padding.Right / 2 * 3;
-		_sendButton.Top = ClientRectangle.Height - _sendButton.Height - panel.Padding.Bottom / 2 * 3;
 		Controls.Add(_sendButton);
+		PositionSendButton();
 		_sendButton.BringToFront();
 
 		_sendButton.Click += (_, _) => SendOrStop();
 		_textBox.KeyPress += TextBox_KeyPress;
+		ApplyAppearance();
 	}
 
 	/// <inheritdoc />
@@ -133,10 +218,66 @@ public class DXChatInputControl : Control, IChatInputControl, IChatAttachmentInp
 	}
 
 	/// <inheritdoc />
+	public void ClearDraft()
+	{
+		_textBox.Clear();
+		ClearAttachments();
+	}
+
+	/// <inheritdoc />
 	protected override void OnGotFocus(EventArgs e)
 	{
 		base.OnGotFocus(e);
 		_textBox.Focus();
+	}
+
+	/// <inheritdoc />
+	protected override void OnHandleCreated(EventArgs e)
+	{
+		base.OnHandleCreated(e);
+		ApplyReceivingState();
+	}
+
+	/// <inheritdoc />
+	protected override void OnLayout(LayoutEventArgs levent)
+	{
+		base.OnLayout(levent);
+		PositionSendButton();
+	}
+
+	/// <inheritdoc />
+	protected override void OnDpiChangedAfterParent(EventArgs e)
+	{
+		base.OnDpiChangedAfterParent(e);
+		PositionSendButton();
+	}
+
+	/// <inheritdoc />
+	protected override void OnSizeChanged(EventArgs e)
+	{
+		base.OnSizeChanged(e);
+		PositionSendButton();
+	}
+
+	/// <inheritdoc />
+	protected override void OnFontChanged(EventArgs e)
+	{
+		base.OnFontChanged(e);
+		ApplyAppearance();
+	}
+
+	/// <inheritdoc />
+	protected override void OnForeColorChanged(EventArgs e)
+	{
+		base.OnForeColorChanged(e);
+		ApplyAppearance();
+	}
+
+	/// <inheritdoc />
+	protected override void OnBackColorChanged(EventArgs e)
+	{
+		base.OnBackColorChanged(e);
+		ApplyAppearance();
 	}
 
 	private void TextBox_KeyPress(object? sender, KeyPressEventArgs e)
@@ -172,10 +313,7 @@ public class DXChatInputControl : Control, IChatInputControl, IChatAttachmentInp
 		MessageSending?.Invoke(this, sendArgs);
 
 		if (!sendArgs.Cancel)
-		{
-			_textBox.Clear();
-			ClearAttachments();
-		}
+			ClearDraft();
 	}
 
 	private void Stop()
@@ -188,18 +326,24 @@ public class DXChatInputControl : Control, IChatInputControl, IChatAttachmentInp
 	void IChatInputControl.SetIsReceivingStream(bool isReceiving, bool allowCancellation)
 	{
 		_isReceivingStream = isReceiving;
+		_allowCancellation = allowCancellation;
 
-		if (IsAvailable())
-		{
-			BeginInvoke(() =>
-			{
-				if (IsAvailable())
-				{
-					_sendButton.ImageOptions.SvgImage = isReceiving && allowCancellation ? StopImage : SendImage;
-					_sendButton.Enabled = !isReceiving || allowCancellation;
-				}
-			});
-		}
+		if (!IsAvailable() || !IsHandleCreated)
+			return;
+
+		if (InvokeRequired)
+			BeginInvoke(ApplyReceivingState);
+		else
+			ApplyReceivingState();
+	}
+
+	private void ApplyReceivingState()
+	{
+		if (!IsAvailable())
+			return;
+
+		_sendButton.ImageOptions.SvgImage = _isReceivingStream && _allowCancellation ? StopImage : SendImage;
+		_sendButton.Enabled = !_isReceivingStream || _allowCancellation;
 	}
 
 	private Control CreateAttachmentTile(ChatFileAttachment attachment)
@@ -237,6 +381,7 @@ public class DXChatInputControl : Control, IChatInputControl, IChatAttachmentInp
 		}
 
 		tile.Controls.Add(CreateAttachmentIcon(attachment));
+		ApplyAttachmentTileAppearance(tile);
 		return tile;
 	}
 
@@ -277,6 +422,104 @@ public class DXChatInputControl : Control, IChatInputControl, IChatAttachmentInp
 		_contentLayout.RowStyles[0].Height = hasAttachments ? ATTACHMENT_DISPLAY_HEIGHT : 0;
 		_attachmentPanel.Visible = hasAttachments;
 		AttachmentsChanged?.Invoke(this, EventArgs.Empty);
+	}
+
+	private void PositionSendButton()
+	{
+		if (_sendButton is null || _textBox is null)
+			return;
+
+		var editorBounds = GetBoundsRelativeToInput(_textBox);
+		var inset = ScaleLogicalPixels(SEND_BUTTON_INSET);
+		_sendButton.Left = Math.Max(editorBounds.Left, editorBounds.Right - _sendButton.Width - inset);
+		_sendButton.Top = Math.Max(editorBounds.Top, editorBounds.Bottom - _sendButton.Height - inset);
+	}
+
+	private Rectangle GetBoundsRelativeToInput(Control descendant)
+	{
+		var location = descendant.Location;
+		for (var parent = descendant.Parent; parent is not null && parent != this; parent = parent.Parent)
+			location.Offset(parent.Location);
+
+		return new Rectangle(location, descendant.Size);
+	}
+
+	private int ScaleLogicalPixels(int logicalPixels)
+	{
+		return Math.Max(1, (int)Math.Round(logicalPixels * DeviceDpi / 96f));
+	}
+
+	private void ApplyAppearance()
+	{
+		if (_textBox is null || _contentPanel is null || _contentLayout is null || _attachmentPanel is null)
+			return;
+
+		ApplyPanelAppearance(_contentPanel);
+		_contentLayout.Font = Font;
+		_contentLayout.ForeColor = ForeColor;
+		_contentLayout.BackColor = BackColor;
+		_attachmentPanel.Font = Font;
+		_attachmentPanel.ForeColor = ForeColor;
+		_attachmentPanel.BackColor = BackColor;
+
+		ApplyEditorAppearance();
+
+		foreach (var tile in _attachmentPanel.Controls.OfType<PanelControl>())
+			ApplyAttachmentTileAppearance(tile);
+	}
+
+	private void ApplyAttachmentTileAppearance(PanelControl tile)
+	{
+		ApplyPanelAppearance(tile);
+
+		foreach (var label in tile.Controls.OfType<LabelControl>())
+		{
+			label.Appearance.Font = Font;
+			label.Appearance.ForeColor = ForeColor;
+			label.Appearance.BackColor = BackColor;
+			label.Appearance.Options.UseFont = true;
+			label.Appearance.Options.UseForeColor = true;
+			label.Appearance.Options.UseBackColor = true;
+		}
+	}
+
+	private void ApplyPanelAppearance(PanelControl panel)
+	{
+		panel.Appearance.Font = Font;
+		panel.Appearance.ForeColor = ForeColor;
+		panel.Appearance.BackColor = BackColor;
+		panel.Appearance.Options.UseFont = true;
+		panel.Appearance.Options.UseForeColor = true;
+		panel.Appearance.Options.UseBackColor = true;
+	}
+
+	private void ApplyEditorAppearance()
+	{
+		if (_textBox is null)
+			return;
+
+		_textBox.Properties.ReadOnly = false;
+		_textBox.Properties.BorderStyle = EditorBorderStyle switch
+		{
+			BorderStyle.None => DevExpress.XtraEditors.Controls.BorderStyles.NoBorder,
+			BorderStyle.FixedSingle => DevExpress.XtraEditors.Controls.BorderStyles.Simple,
+			_ => DevExpress.XtraEditors.Controls.BorderStyles.Default
+		};
+		_textBox.Properties.NullValuePrompt = PlaceholderText;
+		_textBox.Properties.NullValuePromptShowForEmptyValue = true;
+		ApplyEditorAppearance(_textBox.Properties.Appearance);
+		ApplyEditorAppearance(_textBox.Properties.AppearanceFocused);
+	}
+
+	private void ApplyEditorAppearance(AppearanceObject appearance)
+	{
+		appearance.Font = Font;
+		appearance.Options.UseFont = true;
+
+		appearance.ForeColor = EditorForeColor;
+		appearance.Options.UseForeColor = !EditorForeColor.IsEmpty;
+		appearance.BackColor = EditorBackColor;
+		appearance.Options.UseBackColor = !EditorBackColor.IsEmpty;
 	}
 
 	private bool IsAvailable() => !(Disposing || IsDisposed);
