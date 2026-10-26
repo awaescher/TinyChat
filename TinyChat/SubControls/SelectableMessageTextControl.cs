@@ -1,3 +1,6 @@
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.InteropServices;
+
 namespace TinyChat;
 
 /// <summary>
@@ -6,11 +9,15 @@ namespace TinyChat;
 internal sealed class SelectableMessageTextControl : TextBox
 {
 	private const int CONTENT_PADDING = 2;
+	private const int WM_MOUSEWHEEL = 0x020A;
+	private const int EM_GETLINECOUNT = 0x00BA;
+	private const int EM_GETMARGINS = 0x00D4;
 
 	private bool _adjustingHeight;
 	private int _contentRevision;
 	private int _lastMeasuredWidth = -1;
 	private int _lastMeasuredRevision = -1;
+	private bool _lastMeasurementWasRendered;
 	private int _preferredContentHeight;
 
 	/// <summary>
@@ -42,6 +49,23 @@ internal sealed class SelectableMessageTextControl : TextBox
 		_preferredContentHeight = Font.Height + CONTENT_PADDING;
 		MinimumSize = new Size(0, _preferredContentHeight);
 		Height = _preferredContentHeight;
+	}
+
+	/// <summary>
+	/// Gets or sets the text. Line breaks are normalized to <c>\r\n</c>, because the native multiline
+	/// edit control renders a bare <c>\n</c> without breaking the line while the height measurement
+	/// counts it, which hid paragraphs and left empty space below the text.
+	/// </summary>
+	[AllowNull]
+	public override string Text
+	{
+		get => base.Text;
+		set
+		{
+			var normalizedText = (value ?? string.Empty).ReplaceLineEndings("\r\n");
+			if (!string.Equals(base.Text, normalizedText, StringComparison.Ordinal))
+				base.Text = normalizedText;
+		}
 	}
 
 	/// <inheritdoc />
@@ -89,7 +113,7 @@ internal sealed class SelectableMessageTextControl : TextBox
 	/// </summary>
 	internal void EnsureContentHeightForCurrentWidth()
 	{
-		if (Visible && ClientSize.Width != _lastMeasuredWidth)
+		if (Visible && !IsMeasurementCurrent(ClientSize.Width))
 			UpdateContentHeight();
 	}
 
@@ -102,12 +126,10 @@ internal sealed class SelectableMessageTextControl : TextBox
 	/// <param name="availableWidth">The width the control will occupy after layout.</param>
 	internal void EnsureContentHeightForWidth(int availableWidth)
 	{
-		if (!Visible || availableWidth <= 0 || availableWidth == _lastMeasuredWidth)
+		if (!Visible || availableWidth <= 0 || IsMeasurementCurrent(availableWidth))
 			return;
 
-		_lastMeasuredWidth = availableWidth;
-		_lastMeasuredRevision = _contentRevision;
-		SetContentHeight(MeasureContentHeight(availableWidth));
+		SetContentHeight(Measure(availableWidth));
 	}
 
 	/// <inheritdoc />
@@ -139,7 +161,7 @@ internal sealed class SelectableMessageTextControl : TextBox
 			return;
 		}
 
-		if (ClientSize.Width != _lastMeasuredWidth)
+		if (!IsMeasurementCurrent(ClientSize.Width))
 			UpdateContentHeight();
 		else if (Height != _preferredContentHeight)
 			SetContentHeight(_preferredContentHeight);
@@ -164,6 +186,32 @@ internal sealed class SelectableMessageTextControl : TextBox
 			UpdateContentHeight();
 	}
 
+	/// <summary>
+	/// Forwards mouse wheel input to the scrollable history. The native edit control consumes the
+	/// wheel even without scroll bars, so the history could not be scrolled while hovering text.
+	/// </summary>
+	protected override void WndProc(ref Message m)
+	{
+		if (m.Msg == WM_MOUSEWHEEL && FindScrollableAncestor() is { } scrollableAncestor)
+		{
+			SendMessage(scrollableAncestor.Handle, m.Msg, m.WParam, m.LParam);
+			return;
+		}
+
+		base.WndProc(ref m);
+	}
+
+	private Control? FindScrollableAncestor()
+	{
+		for (var parent = Parent; parent is not null; parent = parent.Parent)
+		{
+			if (parent is ScrollableControl { AutoScroll: true } && parent.IsHandleCreated)
+				return parent;
+		}
+
+		return null;
+	}
+
 	private void UpdateContentHeight()
 	{
 		if (_adjustingHeight)
@@ -174,25 +222,76 @@ internal sealed class SelectableMessageTextControl : TextBox
 			availableWidth = MaximumSize.Width;
 		if (availableWidth <= 0)
 			return;
-		if (_lastMeasuredWidth == availableWidth && _lastMeasuredRevision == _contentRevision)
+		if (IsMeasurementCurrent(availableWidth))
 		{
 			if (Height != _preferredContentHeight)
 				SetContentHeight(_preferredContentHeight);
 			return;
 		}
 
-		_lastMeasuredWidth = availableWidth;
-		_lastMeasuredRevision = _contentRevision;
-		SetContentHeight(MeasureContentHeight(availableWidth));
+		SetContentHeight(Measure(availableWidth));
 	}
 
+	/// <summary>
+	/// A measurement stays valid for the same width and text, unless it was only predicted and the
+	/// rendered line count of the native control can be read for that width now.
+	/// </summary>
+	private bool IsMeasurementCurrent(int availableWidth)
+	{
+		return _lastMeasuredWidth == availableWidth &&
+			_lastMeasuredRevision == _contentRevision &&
+			(_lastMeasurementWasRendered || !CanReadRenderedLines(availableWidth));
+	}
+
+	private int Measure(int availableWidth)
+	{
+		_lastMeasuredWidth = availableWidth;
+		_lastMeasuredRevision = _contentRevision;
+		_lastMeasurementWasRendered = CanReadRenderedLines(availableWidth);
+		return MeasureContentHeight(availableWidth);
+	}
+
+	private bool CanReadRenderedLines(int availableWidth) => IsHandleCreated && availableWidth == ClientSize.Width;
+
 	private int MeasureContentHeight(int availableWidth)
+	{
+		// Once the control has its final width the native edit control's own wrapping is authoritative;
+		// a prediction can only approximate where it breaks words such as "research-summary.md".
+		var lineCount = CanReadRenderedLines(availableWidth)
+			? Math.Max(1, (int)SendMessage(Handle, EM_GETLINECOUNT, IntPtr.Zero, IntPtr.Zero))
+			: PredictLineCount(availableWidth);
+
+		// The first line keeps the full font height so descenders are never clipped; every further line
+		// only adds the edit control's own line step.
+		return Font.Height + ((lineCount - 1) * GetRenderedLineHeight()) + CONTENT_PADDING;
+	}
+
+	/// <summary>
+	/// Gets the distance between two rendered lines. The edit control steps its lines by the font's
+	/// cell height, which is smaller than <see cref="Control.Font"/>'s <c>Height</c>; using the latter
+	/// left a growing gap below every multi-line text.
+	/// </summary>
+	private int GetRenderedLineHeight()
+	{
+		if (IsHandleCreated && TextLength > 0 && GetLineFromCharIndex(TextLength) > 0)
+		{
+			var firstLine = GetPositionFromCharIndex(0).Y;
+			var lastLineIndex = GetLineFromCharIndex(TextLength);
+			var lastLine = GetPositionFromCharIndex(GetFirstCharIndexFromLine(lastLineIndex)).Y;
+			if (lastLine > firstLine)
+				return (int)Math.Round((lastLine - firstLine) / (double)lastLineIndex);
+		}
+
+		return TextRenderer.MeasureText("Wg", Font, Size.Empty, TextFormatFlags.NoPadding).Height;
+	}
+
+	private int PredictLineCount(int availableWidth)
 	{
 		var text = string.IsNullOrEmpty(Text) ? " " : Text;
 		if (text.EndsWith('\n'))
 			text += " ";
 
-		var wrapWidth = Math.Max(1, availableWidth - CONTENT_PADDING);
+		var wrapWidth = Math.Max(1, availableWidth - GetHorizontalTextMargin());
 		var measuredSize = TextRenderer.MeasureText(
 			text,
 			Font,
@@ -204,10 +303,20 @@ internal sealed class SelectableMessageTextControl : TextBox
 		// raw value leaves the last line's descender clipped. We therefore derive the number of wrapped
 		// lines from the measured height and size the control as an exact whole number of TextBox line
 		// heights, which matches what the control paints.
-		var lineHeight = Font.Height;
-		var lineCount = Math.Max(1, (int)Math.Ceiling(measuredSize.Height / (double)lineHeight));
-		return (lineCount * lineHeight) + CONTENT_PADDING;
+		return Math.Max(1, (int)Math.Ceiling(measuredSize.Height / (double)GetRenderedLineHeight()));
 	}
+
+	private int GetHorizontalTextMargin()
+	{
+		if (!IsHandleCreated)
+			return CONTENT_PADDING;
+
+		var margins = (long)SendMessage(Handle, EM_GETMARGINS, IntPtr.Zero, IntPtr.Zero);
+		return (int)(margins & 0xFFFF) + (int)((margins >> 16) & 0xFFFF);
+	}
+
+	[DllImport("user32.dll")]
+	private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
 
 	private void SetContentHeight(int height)
 	{
