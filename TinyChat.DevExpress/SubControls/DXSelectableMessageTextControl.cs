@@ -460,6 +460,9 @@ internal static class DXFormattedTextConverter
 	private static readonly Regex _attributeRegex = new(
 		"""(?<name>[a-z][a-z0-9-]*)\s*=\s*(?:"(?<double>[^"]*)"|'(?<single>[^']*)')""",
 		RegexOptions.Compiled | RegexOptions.IgnoreCase);
+	private static readonly Regex _entityRegex = new(
+		"""&(?:#[0-9]+|#x[0-9a-f]+|[a-z][a-z0-9]*);""",
+		RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
 	/// <summary>
 	/// Converts sanitized formatter output, including the legacy DevExpress tag dialect, to template HTML.
@@ -521,12 +524,7 @@ internal static class DXFormattedTextConverter
 		if (tag == "br")
 			return closing ? string.Empty : "<br>";
 		if (tag == "nbsp")
-		{
-			if (closing)
-				return string.Empty;
-
-			return CreateTextReplacement("\u00a0", replacements);
-		}
+			return closing ? string.Empty : "\u00a0";
 		if (tag == "img")
 			return closing ? string.Empty : EncodeImageAltText(attributes, replacements);
 
@@ -773,17 +771,22 @@ internal static class DXFormattedTextConverter
 		if (text.IsEmpty)
 			return;
 
+		// Text must stay part of the template: text injected after parsing is not part of the DevExpress
+		// selection model, so dragging skipped it and the space after formatted words disappeared.
+		// The parser keeps '&' and quotes literally but decodes entities, so '<', '>' and '$' (which
+		// starts "${...}" bindings) are encoded. Only text that still contains an entity after decoding,
+		// such as a literal "&lt;", is injected after parsing to keep it as typed.
 		var decoded = WebUtility.HtmlDecode(text.ToString());
-		var encoded = WebUtility.HtmlEncode(decoded);
-		if (ContainsSupplementaryCharacter(decoded) ||
-			!string.Equals(encoded, decoded, StringComparison.Ordinal) ||
-			decoded.Contains('$', StringComparison.Ordinal))
+		if (_entityRegex.IsMatch(decoded))
 		{
 			result.Append(CreateTextReplacement(decoded, replacements));
 			return;
 		}
 
-		result.Append(encoded);
+		result.Append(decoded
+			.Replace("<", "&lt;", StringComparison.Ordinal)
+			.Replace(">", "&gt;", StringComparison.Ordinal)
+			.Replace("$", "&#36;", StringComparison.Ordinal));
 	}
 
 	private static string CreateTextReplacement(string text, List<DXHtmlTextReplacement> replacements)
@@ -791,17 +794,6 @@ internal static class DXFormattedTextConverter
 		var elementId = $"message-text-{replacements.Count}";
 		replacements.Add(new DXHtmlTextReplacement(elementId, text));
 		return $"""<span id="{elementId}">&#8203;</span>""";
-	}
-
-	private static bool ContainsSupplementaryCharacter(string text)
-	{
-		foreach (var rune in text.EnumerateRunes())
-		{
-			if (rune.Value > char.MaxValue)
-				return true;
-		}
-
-		return false;
 	}
 }
 
