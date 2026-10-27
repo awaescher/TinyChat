@@ -5,7 +5,7 @@ namespace TinyChat;
 /// <summary>
 /// A text input control that allows users to compose messages with optional file attachments.
 /// </summary>
-public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInputControl, IChatInputDraftControl, IChatInputLayoutControl, IChatInputAppearanceControl
+public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInputControl, IChatInputDraftControl, IChatInputDraftEditorControl, IChatInputLayoutControl, IChatInputAppearanceControl
 {
 	private const int ATTACHMENT_DISPLAY_HEIGHT = 60;
 	private const int DEFAULT_CONTENT_PADDING = 8;
@@ -204,6 +204,15 @@ public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInput
 	{
 		_textBox.Clear();
 		ClearAttachments();
+	}
+
+	/// <inheritdoc />
+	public void SetDraft(string text, IEnumerable<ChatFileAttachment> attachments)
+	{
+		ClearDraft();
+		_textBox.Text = (text ?? string.Empty).ReplaceLineEndings("\r\n");
+		_textBox.SelectionStart = _textBox.TextLength;
+		AddAttachments(attachments);
 	}
 
 	/// <inheritdoc />

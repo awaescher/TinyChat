@@ -24,7 +24,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Selection ranges in HtmlContentControl are version-sensitive; keep the verified build reproducible. -->
     <PackageReference Include="DevExpress.Win" Version="24.2.12" />
   </ItemGroup>
 

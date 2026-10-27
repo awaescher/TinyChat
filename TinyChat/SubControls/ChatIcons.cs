@@ -28,6 +28,10 @@ internal static class ChatIcons
 
 	internal static string Stop => IconFontName is null ? "\u25A0" : "\ue73b";
 
+	internal static string Copy => IconFontName is null ? "\u29C9" : "\ue8c8";
+
+	internal static string Revert => IconFontName is null ? "\u21B6" : "\ue7a7";
+
 	/// <summary>Gets the accent colors used for the icons, matching the DevExpress Fluent icons.</summary>
 	internal static readonly Color ToolColor = Color.FromArgb(0xFF, 0xB1, 0x15);
 	internal static readonly Color ReasoningColor = ToolColor;

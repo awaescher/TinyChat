@@ -12,10 +12,10 @@ A minimalistic but extensible chat control library for Windows Forms.
 - **Streaming support**: real-time message streaming for AI assistants and live conversations
 - **Microsoft.Extensions.AI integration**: use any registered `IChatClient`, including keyed services, with streaming, cancellation, chat options, reasoning, and function calls
 - **File and image attachments**: add files through drag and drop, clipboard paste, or the public API; images are shown as previews
-- **Selectable and copyable content**: directly select regular message text, function-call arguments and results, or reasoning details and copy it with standard keyboard shortcuts
+- **Message actions**: a small icon bar on every message offers copying (plain text, or with formatting in the DevExpress suite) and going back to that message
 - **Designer-friendly appearance**: configure fonts, colors, history, message and input spacing, welcome alignment, the splitter, and behavioral options in the Windows Forms Designer
 - **New-chat lifecycle**: cancel the active response and clear the conversation and input draft in one call
-- **Readable message rendering**: native controls use cleaned plain text, while the DevExpress suite keeps its safe HTML/CSS formatting in a permanently selectable message surface
+- **Readable message rendering**: native controls use cleaned plain text, while the DevExpress suite renders the formatting supported by its label controls
 - **Extensible architecture**: interface-driven design and factory methods for custom message types and UI components
 
 ## Control suites
@@ -23,7 +23,7 @@ A minimalistic but extensible chat control library for Windows Forms.
 | NuGet package | Control | UI components | Default formatter |
 |---|---|---|---|
 | `TinyChat` | `ChatControl` | Native Windows Forms controls | `PlainTextMessageFormatter` |
-| `TinyChat.DevExpress` | `DXChatControl` | DevExpress controls | `SimplifiedHtmlMessageFormatter` (selectable HTML/CSS body view) |
+| `TinyChat.DevExpress` | `DXChatControl` | DevExpress controls | `SimplifiedHtmlMessageFormatter` (DevExpress HTML-inspired label formatting) |
 
 Both controls share the same public chat API. `DXChatControl` derives from `ChatControl` and replaces the primary editors, message controls, history, welcome surface, and splitter with DevExpress counterparts.
 `TinyChat.DevExpress` is built and tested with DevExpress 24.2.12 and requires the corresponding DevExpress license.
@@ -73,7 +73,7 @@ chatControl.MessageSent += (_, e) =>
 
 ### Starting a new chat
 
-Use `StartNewChat()` instead of assigning an empty message collection. It requests cancellation of an active response and clears the built-in conversation, text draft, pending attachments, and selection in one call.
+Use `StartNewChat()` instead of assigning an empty message collection. It requests cancellation of an active response and clears the built-in conversation, text draft, and pending attachments in one call.
 
 ```csharp
 chatControl.NewChatStarted += (_, _) =>
@@ -90,11 +90,17 @@ Custom input controls can implement `IChatInputDraftControl` so their own draft 
 
 Fonts, colours, paddings, the welcome text, the splitter and the visibility of function calls, skills and reasoning can be set in the Windows Forms Designer for both control suites. Changes apply to existing messages as well.
 
-### Selecting and copying text
+### Message actions
 
-Both control suites display regular message bodies permanently in selectable text views. Drag directly over the required text and press <kbd>Ctrl</kbd>+<kbd>C</kbd>; no renderer or selection-mode switch is required. Starting a selection in another message clears the previous selection, so multiple message bodies are never highlighted at the same time.
+When the pointer rests over a message, a small icon bar appears on its top-right edge:
 
-Function-call arguments and results as well as reasoning details are directly selectable in the same way. You can also click the sender/header or message background and press <kbd>Ctrl</kbd>+<kbd>C</kbd> to copy the complete message.
+- **Copy**: copies the message as plain text, with Markdown and HTML removed.
+- **Copy with formatting** (`DXChatControl` only): copies the message as HTML together with its plain text, so bold text, colours, links and line breaks are kept when pasting into Word, Outlook or OneNote.
+- **Go back**: permanently rewinds the conversation. Every later message is removed and is no longer sent to the `IChatClient`. When the message is an assistant response, it stays and the input is cleared. When the message was sent by the user, it is removed as well and its text and attachments are placed in the input, ready to be edited and sent again. This button is not offered while a response is being received.
+
+The bar only shows icons: the native suite uses the Windows icon font like the tool-call icons, the DevExpress suite uses Fluent UI System Icons. You can also click the sender/header or message body and press <kbd>Ctrl</kbd>+<kbd>C</kbd> to copy the complete message.
+
+Use `ShowMessageActions` and `MessageActionsHoverDelay` to configure the bar. `RevertToMessage()` performs the revert in code, returns `false` while `IsBusy`, and raises `ConversationReverted` with the removed messages. Override `GetMessageActions()` to add or remove buttons (custom actions use `ChatMessageActionKind.Custom` with an `Image`), `CreateMessageActionButton()` to change their look, and `IsUserMessage()` to change which messages are treated as user messages. Custom input controls implement `IChatInputDraftEditorControl` to receive the reverted draft.
 
 ### File and image attachments
 
@@ -159,13 +165,11 @@ chatControl.ChatClientServiceKey = "premium";
 
 ### Formatting
 
-Both suites use a permanently visible message surface so that text can always be selected without changing renderers. `ChatControl` uses a read-only native `TextBox` and `PlainTextMessageFormatter` to remove common HTML and Markdown syntax while keeping the text readable.
+`ChatControl` uses native labels and `PlainTextMessageFormatter` to remove common HTML and Markdown syntax while keeping the text readable.
 
-`DXChatControl` uses a permanent DevExpress `HtmlContentControl`. It combines formatted rendering with native DevExpress text selection, automatic height calculation, and stable streaming updates in the same control. `SimplifiedHtmlMessageFormatter` remains the default; its supported bold, italic, underline, strike-through, heading, color, code-font, paragraph, line-break, and link output is converted to a safe HTML/CSS-template subset before rendering. Remote images and unsafe link schemes are not injected into message templates.
+`DXChatControl` uses DevExpress `LabelControl`s with [HTML-inspired text formatting](https://docs.devexpress.com/WindowsForms/4874/common-features/html-text-formatting). `SimplifiedHtmlMessageFormatter` is the default and converts Markdown and HTML into the supported bold, italic, underline, strike-through, colour, size, code-font, paragraph, line-break and link tags.
 
 Both suites preserve Unicode emoji, including multi-code-point sequences. Their exact colour and glyph style still depend on the installed Windows fonts and the active renderer; native Windows Forms commonly displays monochrome glyphs.
-
-Function-call arguments and results as well as reasoning details use the same selectable DevExpress HTML surface, with their plain text HTML-encoded before display.
 
 To customize normalization and rendering, implement `IMessageFormatter` and override `CreateDefaultMessageFormatter()`.
 

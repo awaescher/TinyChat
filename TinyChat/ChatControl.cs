@@ -57,6 +57,14 @@ public partial class ChatControl : UserControl
 	private CancellationTokenSource? _currentCancellationTokenSource;
 	private Task _chatClientSendCompletion = Task.CompletedTask;
 	private bool _attachmentDraftVisible;
+	private readonly PlainTextMessageFormatter _plainTextFormatter = new();
+	private Control? _messageActionBar;
+	private IChatMessageControl? _messageActionsTarget;
+	private System.Windows.Forms.Timer? _messageActionsHoverTimer;
+	private System.Windows.Forms.Timer? _messageActionsHideTimer;
+	private bool _showMessageActions = true;
+	private int _streamingMessageCount;
+	private bool _isWaitingForApproval;
 
 	/// <summary>
 	/// Occurs when a message is sent from the text box and allows the cancellation of sending.
@@ -92,6 +100,11 @@ public partial class ChatControl : UserControl
 	/// <see cref="FunctionCallMessageContent.Approve"/> or <see cref="FunctionCallMessageContent.Reject"/>.
 	/// </summary>
 	public event EventHandler<ToolApprovalRequestedEventArgs>? ToolApprovalRequested;
+
+	/// <summary>
+	/// Occurs after the conversation was reverted to a message by <see cref="RevertToMessage"/>.
+	/// </summary>
+	public event EventHandler<ConversationRevertedEventArgs>? ConversationReverted;
 
 	/// <summary>
 	/// Gets the control that manages and displays the chat message history.
@@ -717,6 +730,33 @@ public partial class ChatControl : UserControl
 	public long MaximumAttachmentFileSize { get; set; } = DEFAULT_MAXIMUM_ATTACHMENT_FILE_SIZE;
 
 	/// <summary>
+	/// Gets or sets whether an action bar (copy, go back) is shown when the pointer rests over a message.
+	/// </summary>
+	[Category("Chat")]
+	[Description("Gets or sets whether an action bar with copy and go-back buttons is shown when the pointer rests over a message.")]
+	[DefaultValue(true)]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+	public bool ShowMessageActions
+	{
+		get => _showMessageActions;
+		set
+		{
+			_showMessageActions = value;
+			if (!value)
+				HideMessageActionBar(clearTarget: true);
+		}
+	}
+
+	/// <summary>
+	/// Gets or sets the delay in milliseconds before the message action bar is shown.
+	/// </summary>
+	[Category("Chat")]
+	[Description("Gets or sets the hover delay in milliseconds before the message action bar is shown.")]
+	[DefaultValue(800)]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+	public int MessageActionsHoverDelay { get; set; } = 800;
+
+	/// <summary>
 	/// Updates the visibility of the welcome control based on the current message history.
 	/// </summary>
 	protected virtual void UpdateWelcomeControlVisibility()
@@ -1013,7 +1053,10 @@ public partial class ChatControl : UserControl
 	protected override void OnHandleDestroyed(EventArgs e)
 	{
 		if (Disposing)
+		{
 			CancelCurrentOperation();
+			DisposeMessageActionBar();
+		}
 
 		base.OnHandleDestroyed(e);
 	}
@@ -1085,6 +1128,7 @@ public partial class ChatControl : UserControl
 		var messageControl = AppendMessageControl(message);
 
 		var inputControl = InputControl as IChatInputControl;
+		Interlocked.Increment(ref _streamingMessageCount);
 
 		// loop through the stream in a background thread and append the chunks to the string builder
 		context.Post(async (_) =>
@@ -1135,6 +1179,7 @@ public partial class ChatControl : UserControl
 				finally
 				{
 					cancellationSource.Dispose();
+					Interlocked.Decrement(ref _streamingMessageCount);
 				}
 			}
 
@@ -1197,6 +1242,8 @@ public partial class ChatControl : UserControl
 			messageControl => ReferenceEquals(messageControl.Message, removedMessage));
 		if (removedControl is not null)
 			_messageControls.Remove(removedControl);
+		if (removedControl is not null && ReferenceEquals(removedControl, _messageActionsTarget))
+			HideMessageActionBar(clearTarget: true);
 
 		if (MessageHistoryControl is IChatMessageHistoryControl casted)
 		{
@@ -1219,6 +1266,7 @@ public partial class ChatControl : UserControl
 	{
 		CancelCurrentOperation();
 		(InputControl as IChatInputControl)?.SetIsReceivingStream(false, allowCancellation: false);
+		HideMessageActionBar(clearTarget: true);
 
 		_messages.Clear();
 		_functionCallVisualizationMessages.Clear();
@@ -1230,6 +1278,72 @@ public partial class ChatControl : UserControl
 
 		_attachmentDraftVisible = false;
 		NewChatStarted?.Invoke(this, EventArgs.Empty);
+	}
+
+	/// <summary>
+	/// Permanently reverts the conversation to the given message. Every later message is removed from the
+	/// history, so it is no longer sent to the <see cref="IChatClient"/>. A message sent by the user is removed
+	/// as well and its text and attachments are placed in the input, ready to be edited and sent again.
+	/// Otherwise, the message is kept and the input draft is cleared.
+	/// Nothing happens while a response is still being received (see <see cref="IsBusy"/>). A tool call that
+	/// still waits for approval is rejected first.
+	/// </summary>
+	/// <param name="message">The message to revert the conversation to.</param>
+	/// <returns><see langword="true"/> if the conversation was reverted; otherwise, <see langword="false"/>.</returns>
+	public virtual bool RevertToMessage(IChatMessage message)
+	{
+		ArgumentNullException.ThrowIfNull(message);
+
+		if (IsBusy)
+			return false;
+
+		var messageIndex = _messages.FindIndex(candidate => ReferenceEquals(candidate, message));
+		if (messageIndex < 0)
+			return false;
+
+		AbandonPendingApprovals();
+		HideMessageActionBar(clearTarget: true);
+
+		var isUserMessage = IsUserMessage(message);
+		var firstRemovedIndex = isUserMessage ? messageIndex : messageIndex + 1;
+		var removedMessages = _messages.Skip(firstRemovedIndex).ToArray();
+		for (var index = removedMessages.Length - 1; index >= 0; index--)
+			RemoveMessage(removedMessages[index]);
+
+		if (isUserMessage)
+			SetInputDraft(message.Content);
+		else if (InputControl is IChatInputDraftControl draftControl)
+			draftControl.ClearDraft();
+
+		ConversationReverted?.Invoke(this, new ConversationRevertedEventArgs(message, removedMessages));
+		return true;
+	}
+
+	/// <summary>
+	/// Determines whether a message was sent by the user of this chat control.
+	/// </summary>
+	/// <param name="message">The message to evaluate.</param>
+	/// <returns><see langword="true"/> if the message was sent by the user; otherwise, <see langword="false"/>.</returns>
+	protected virtual bool IsUserMessage(IChatMessage message)
+	{
+		if (ReferenceEquals(message.Sender, Sender))
+			return true;
+
+		return message.Content is not (FunctionCallMessageContent or ReasoningMessageContent) &&
+			DetermineChatRole(message.Sender?.Name ?? "User") == ChatRole.User;
+	}
+
+	private void SetInputDraft(IChatMessageContent content)
+	{
+		if (InputControl is not IChatInputDraftEditorControl draftEditor)
+			return;
+
+		if (content is FileAttachmentMessageContent attachmentContent)
+			draftEditor.SetDraft(attachmentContent.Text, attachmentContent.Attachments);
+		else
+			draftEditor.SetDraft(content.ToString() ?? string.Empty, []);
+
+		InputControl.Focus();
 	}
 
 	/// <summary>
@@ -1283,6 +1397,7 @@ public partial class ChatControl : UserControl
 	/// </summary>
 	private void PopulateMessages()
 	{
+		HideMessageActionBar(clearTarget: true);
 		var previousControls = _messageControls.ToArray();
 		_messageControls.Clear();
 
@@ -1417,6 +1532,9 @@ public partial class ChatControl : UserControl
 			LayoutMessageControl(MessageHistoryControl, control);
 			casted.AppendMessageControl(messageControl);
 		}
+
+		if (control.Parent is not null)
+			AttachMessageActionBar(messageControl);
 
 		return messageControl;
 	}
@@ -1727,6 +1845,7 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 
 		if (!e.Cancel)
 		{
+			AbandonPendingApprovals();
 			AddMessage(sender, e.Content);
 			_chatClientSendCompletion = SendMessageByChatClient();
 			MessageSent?.Invoke(this, new MessageSentEventArgs(sender, e.Content));
@@ -1919,6 +2038,460 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 	}
 
 	/// <summary>
+	/// Creates the action bar shown in the top-right corner of a message while the pointer rests over it.
+	/// The bar receives one button per action from <see cref="CreateMessageActionButton"/>.
+	/// </summary>
+	/// <returns>The action bar control.</returns>
+	protected virtual Control CreateMessageActionBar()
+	{
+		return new MessageActionBar
+		{
+			AutoSize = true,
+			AutoSizeMode = AutoSizeMode.GrowAndShrink,
+			FlowDirection = FlowDirection.LeftToRight,
+			Margin = Padding.Empty,
+			Padding = new Padding(2),
+			WrapContents = false
+		};
+	}
+
+	/// <summary>
+	/// Creates the icon-only button for an action of the action bar.
+	/// </summary>
+	/// <param name="action">The action the button runs.</param>
+	/// <returns>The button control. Its click is wired by the caller.</returns>
+	protected virtual Control CreateMessageActionButton(ChatMessageAction action)
+	{
+		ArgumentNullException.ThrowIfNull(action);
+
+		var button = new MessageActionButton
+		{
+			FlatStyle = FlatStyle.Flat,
+			Margin = new Padding(1, 0, 1, 0),
+			Size = new Size(26, 24),
+			TabStop = false,
+			UseMnemonic = false
+		};
+		button.FlatAppearance.BorderSize = 0;
+
+		if (action.Image is not null)
+		{
+			button.Image = action.Image;
+		}
+		else
+		{
+			button.Glyph = action.Kind switch
+			{
+				ChatMessageActionKind.Revert => ChatIcons.Revert,
+				_ => ChatIcons.Copy
+			};
+			if (ChatIcons.IconFontName is not null)
+				button.Font = ChatIcons.CreateFont(10f);
+		}
+
+		return button;
+	}
+
+	/// <summary>
+	/// Gets the actions offered in the action bar of a message.
+	/// Going back is not offered while a response is still being received.
+	/// </summary>
+	/// <param name="messageControl">The control displaying the message.</param>
+	/// <returns>The actions in display order.</returns>
+	protected virtual IEnumerable<ChatMessageAction> GetMessageActions(IChatMessageControl messageControl)
+	{
+		if (messageControl.Message is not { } message)
+			yield break;
+
+		yield return new ChatMessageAction(ChatMessageActionKind.Copy, () => CopyMessage(messageControl));
+
+		if (!IsBusy)
+			yield return new ChatMessageAction(ChatMessageActionKind.Revert, () => RevertToMessage(message));
+	}
+
+	/// <summary>
+	/// Gets whether a response is currently being requested or streamed.
+	/// While the response only waits for the user to approve or reject a tool call, the chat is not busy:
+	/// sending a new message or going back rejects the open approvals instead.
+	/// </summary>
+	[Browsable(false)]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	public bool IsBusy
+	{
+		get
+		{
+			if (_streamingMessageCount > 0)
+				return true;
+			if (_isWaitingForApproval)
+				return false;
+
+			lock (_cancellationLock)
+			{
+				if (_currentCancellationTokenSource is not null)
+					return true;
+			}
+
+			return !_chatClientSendCompletion.IsCompleted;
+		}
+	}
+
+	/// <summary>
+	/// Gets whether the chat waits for the user to approve or reject a tool call.
+	/// </summary>
+	[Browsable(false)]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	public bool IsWaitingForApproval => _isWaitingForApproval;
+
+	/// <summary>
+	/// Ends the turn that waits for approvals by rejecting them, so a new message or a revert starts from a
+	/// consistent conversation. The rejection stays in the history and is sent with the next request.
+	/// </summary>
+	private void AbandonPendingApprovals()
+	{
+		if (!_isWaitingForApproval)
+			return;
+
+		CancelCurrentOperation();
+	}
+
+	/// <summary>
+	/// Copies the plain text of a message to the clipboard.
+	/// </summary>
+	/// <param name="messageControl">The control displaying the message.</param>
+	protected void CopyMessage(IChatMessageControl messageControl)
+	{
+		var text = GetMessagePlainText(messageControl);
+		if (!string.IsNullOrEmpty(text))
+			Clipboard.SetText(text);
+	}
+
+	/// <summary>
+	/// Gets the readable text of a message without any formatting.
+	/// </summary>
+	/// <param name="messageControl">The control displaying the message.</param>
+	/// <returns>The plain text of the message.</returns>
+	protected virtual string GetMessagePlainText(IChatMessageControl messageControl)
+	{
+		var content = messageControl.Message?.Content;
+		var text = content switch
+		{
+			null => messageControl.ToString(),
+			FileAttachmentMessageContent attachmentContent => attachmentContent.Text,
+			FunctionCallMessageContent or ReasoningMessageContent => messageControl.ToString(),
+			_ => content.ToString()
+		};
+
+		return _plainTextFormatter.Format(text ?? string.Empty);
+	}
+
+	/// <summary>
+	/// Runs a message action and reports a failure through <see cref="ErrorOccurred"/> instead of throwing,
+	/// as the clipboard can temporarily be unavailable.
+	/// </summary>
+	/// <param name="action">The action to run.</param>
+	protected void RunMessageAction(ChatMessageAction action)
+	{
+		ArgumentNullException.ThrowIfNull(action);
+
+		try
+		{
+			action.Execute();
+		}
+		catch (Exception ex)
+		{
+			try
+			{
+				ErrorOccurred?.Invoke(this, new Helper.ChatErrorEventArgs(ex));
+			}
+			catch
+			{
+				// A failing error handler must not escape the button click.
+			}
+		}
+	}
+
+	private void AttachMessageActionBar(IChatMessageControl messageControl)
+	{
+		EnsureMessageActionBar();
+
+		void WireHoverEvents(Control control)
+		{
+			control.MouseEnter += (_, _) => StartMessageActionsHover(messageControl);
+			control.MouseMove += (_, _) => StartMessageActionsHover(messageControl);
+			control.MouseLeave += (_, _) => StartMessageActionsHideDelay();
+			control.ControlAdded += (_, e) =>
+			{
+				if (e.Control is not null)
+					WireHoverEvents(e.Control);
+			};
+
+			foreach (Control child in control.Controls)
+				WireHoverEvents(child);
+		}
+
+		WireHoverEvents((Control)messageControl);
+	}
+
+	private void EnsureMessageActionBar()
+	{
+		if (_messageActionBar is not null)
+			return;
+
+		_messageActionsHoverTimer = new System.Windows.Forms.Timer { Interval = Math.Max(1, MessageActionsHoverDelay) };
+		_messageActionsHideTimer = new System.Windows.Forms.Timer { Interval = 150 };
+		_messageActionBar = CreateMessageActionBar();
+		_messageActionBar.Visible = false;
+		_messageActionBar.MouseEnter += (_, _) => _messageActionsHideTimer.Stop();
+		_messageActionBar.MouseLeave += (_, _) => StartMessageActionsHideDelay();
+		_messageActionsHoverTimer.Tick += (_, _) =>
+		{
+			_messageActionsHoverTimer.Stop();
+			DisplayMessageActionBar();
+		};
+		_messageActionsHideTimer.Tick += (_, _) =>
+		{
+			_messageActionsHideTimer.Stop();
+			if (!IsPointerInsideMessageActionsArea())
+				HideMessageActionBar(clearTarget: true);
+		};
+
+		Controls.Add(_messageActionBar);
+		_messageActionBar.BringToFront();
+
+		if (MessageHistoryControl is IChatMessageHistoryViewport viewport)
+			viewport.ViewportChanged += MessageHistoryViewport_Changed;
+
+		if (MessageHistoryControl is not null)
+		{
+			MessageHistoryControl.SizeChanged += MessageHistoryViewport_Changed;
+			MessageHistoryControl.VisibleChanged += MessageHistoryViewport_Changed;
+		}
+	}
+
+	private void StartMessageActionsHover(IChatMessageControl messageControl)
+	{
+		if (_messageActionBar is null || _messageActionsHoverTimer is null || _messageActionsHideTimer is null)
+			return;
+		if (!ShowMessageActions)
+			return;
+
+		_messageActionsHideTimer.Stop();
+		if (!ReferenceEquals(_messageActionsTarget, messageControl))
+		{
+			HideMessageActionBar(clearTarget: false);
+			_messageActionsTarget = messageControl;
+		}
+
+		if (_messageActionBar.Visible || _messageActionsHoverTimer.Enabled)
+			return;
+
+		_messageActionsHoverTimer.Interval = Math.Max(1, MessageActionsHoverDelay);
+		_messageActionsHoverTimer.Start();
+	}
+
+	private void StartMessageActionsHideDelay()
+	{
+		if (_messageActionsHideTimer is null)
+			return;
+
+		_messageActionsHideTimer.Stop();
+		_messageActionsHideTimer.Start();
+	}
+
+	private void DisplayMessageActionBar()
+	{
+		if (_messageActionBar is null ||
+			_messageActionsTarget is not Control messageControl ||
+			_messageActionsTarget.Message is null ||
+			MessageHistoryControl is null ||
+			messageControl.IsDisposed ||
+			!messageControl.Visible ||
+			!IsHandleCreated ||
+			!messageControl.IsHandleCreated ||
+			!MessageHistoryControl.IsHandleCreated ||
+			!IsPointerInsideMessageActionsArea())
+		{
+			return;
+		}
+
+		var actions = GetMessageActions(_messageActionsTarget).ToArray();
+		if (actions.Length == 0)
+			return;
+
+		PopulateMessageActionBar(actions);
+
+		var messageBounds = RectangleToClient(messageControl.RectangleToScreen(messageControl.ClientRectangle));
+		var historyBounds = RectangleToClient(MessageHistoryControl.RectangleToScreen(MessageHistoryControl.ClientRectangle));
+		historyBounds.Intersect(ClientRectangle);
+		var visibleMessageBounds = Rectangle.Intersect(messageBounds, historyBounds);
+		var barSize = _messageActionBar.GetPreferredSize(Size.Empty);
+		if (visibleMessageBounds.Width < barSize.Width || visibleMessageBounds.Height < barSize.Height)
+			return;
+
+		// Straddle the top edge of the message, so the bar covers the spacing and sender header but not the text.
+		var preferredX = messageBounds.Right - messageControl.Padding.Right - barSize.Width;
+		var maximumX = visibleMessageBounds.Right - barSize.Width;
+		var preferredY = messageBounds.Top - (barSize.Height / 2);
+		var minimumY = historyBounds.Top;
+		var maximumY = visibleMessageBounds.Bottom - barSize.Height;
+
+		_messageActionBar.Size = barSize;
+		_messageActionBar.Location = new Point(
+			Math.Clamp(preferredX, visibleMessageBounds.Left, maximumX),
+			Math.Clamp(preferredY, minimumY, Math.Max(minimumY, maximumY)));
+		_messageActionBar.BringToFront();
+		_messageActionBar.Visible = true;
+	}
+
+	private void PopulateMessageActionBar(IReadOnlyList<ChatMessageAction> actions)
+	{
+		if (_messageActionBar is null)
+			return;
+
+		_messageActionBar.SuspendLayout();
+		try
+		{
+			while (_messageActionBar.Controls.Count > 0)
+				_messageActionBar.Controls[0].Dispose();
+
+			foreach (var action in actions)
+			{
+				var button = CreateMessageActionButton(action);
+				button.Cursor = Cursors.Default;
+				button.Click += (_, _) =>
+				{
+					HideMessageActionBar(clearTarget: true);
+					RunMessageAction(action);
+				};
+				button.MouseEnter += (_, _) => _messageActionsHideTimer?.Stop();
+				button.MouseLeave += (_, _) => StartMessageActionsHideDelay();
+				_messageActionBar.Controls.Add(button);
+			}
+
+			ApplyMessageActionBarColors(_messageActionBar);
+		}
+		finally
+		{
+			_messageActionBar.ResumeLayout(performLayout: true);
+		}
+	}
+
+	/// <summary>
+	/// Applies the chat colors to the action bar and its buttons.
+	/// </summary>
+	/// <param name="actionBar">The action bar to update.</param>
+	protected virtual void ApplyMessageActionBarColors(Control actionBar)
+	{
+		ArgumentNullException.ThrowIfNull(actionBar);
+
+		var backColor = SystemColors.Window;
+		actionBar.BackColor = backColor;
+		actionBar.ForeColor = SystemColors.WindowText;
+		foreach (Control button in actionBar.Controls)
+		{
+			button.BackColor = backColor;
+			button.ForeColor = SystemColors.WindowText;
+		}
+	}
+
+	private bool IsPointerInsideMessageActionsArea()
+	{
+		var pointerPosition = Cursor.Position;
+		var insideMessage = _messageActionsTarget is Control messageControl &&
+			messageControl.IsHandleCreated &&
+			messageControl.RectangleToScreen(messageControl.ClientRectangle).Contains(pointerPosition);
+		var insideBar = _messageActionBar is { Visible: true, IsHandleCreated: true } &&
+			_messageActionBar.RectangleToScreen(_messageActionBar.ClientRectangle).Contains(pointerPosition);
+		return insideMessage || insideBar;
+	}
+
+	private void HideMessageActionBar(bool clearTarget)
+	{
+		_messageActionsHoverTimer?.Stop();
+		_messageActionsHideTimer?.Stop();
+		if (_messageActionBar is { IsDisposed: false })
+			_messageActionBar.Visible = false;
+
+		if (clearTarget)
+			_messageActionsTarget = null;
+	}
+
+	private void MessageHistoryViewport_Changed(object? sender, EventArgs e)
+	{
+		HideMessageActionBar(clearTarget: true);
+	}
+
+	private void DisposeMessageActionBar()
+	{
+		if (MessageHistoryControl is IChatMessageHistoryViewport viewport)
+			viewport.ViewportChanged -= MessageHistoryViewport_Changed;
+
+		if (MessageHistoryControl is not null)
+		{
+			MessageHistoryControl.SizeChanged -= MessageHistoryViewport_Changed;
+			MessageHistoryControl.VisibleChanged -= MessageHistoryViewport_Changed;
+		}
+
+		_messageActionsHoverTimer?.Dispose();
+		_messageActionsHideTimer?.Dispose();
+		_messageActionBar?.Dispose();
+		_messageActionsHoverTimer = null;
+		_messageActionsHideTimer = null;
+		_messageActionBar = null;
+		_messageActionsTarget = null;
+	}
+
+	/// <summary>
+	/// A flow panel with a thin border, so the action bar stands out from the message below it.
+	/// </summary>
+	private sealed class MessageActionBar : FlowLayoutPanel
+	{
+		protected override void OnPaint(PaintEventArgs e)
+		{
+			base.OnPaint(e);
+			var bounds = ClientRectangle;
+			bounds.Width--;
+			bounds.Height--;
+			using var pen = new Pen(Color.FromArgb(96, ForeColor));
+			e.Graphics.DrawRectangle(pen, bounds);
+		}
+	}
+
+	private sealed class MessageActionButton : Button
+	{
+		public MessageActionButton()
+		{
+			SetStyle(ControlStyles.Selectable, false);
+		}
+
+		/// <summary>
+		/// Gets or sets the icon font glyph. It is painted with grayscale anti-aliasing, because ClearType
+		/// adds coloured fringes to the thin icon strokes.
+		/// </summary>
+		[Browsable(false)]
+		[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+		public string Glyph { get; set; } = string.Empty;
+
+		protected override bool ShowFocusCues => false;
+
+		protected override void OnPaint(PaintEventArgs pevent)
+		{
+			base.OnPaint(pevent);
+			if (string.IsNullOrEmpty(Glyph))
+				return;
+
+			pevent.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+			using var brush = new SolidBrush(ForeColor);
+			using var format = new StringFormat(StringFormat.GenericTypographic)
+			{
+				Alignment = StringAlignment.Center,
+				LineAlignment = StringAlignment.Center
+			};
+			pevent.Graphics.DrawString(Glyph, Font, brush, ClientRectangle, format);
+		}
+	}
+
+	/// <summary>
 	/// Creates a new chat message instance.
 	/// </summary>
 	/// <param name="sender">The sender of the message.</param>
@@ -1990,9 +2563,23 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 					if (approvalRequests.Count == 0 || cancellationSource.IsCancellationRequested)
 						break;
 
-					await WaitForApprovalsAsync(approvalRequests, cancellationSource.Token).ConfigureAwait(true);
+					// While the user decides, the chat is idle: the input offers sending again and messages can
+					// be reverted. Both reject the open approvals first (see AbandonPendingApprovals).
+					_isWaitingForApproval = true;
+					inputControl?.SetIsReceivingStream(false, allowCancellation: false);
+					try
+					{
+						await WaitForApprovalsAsync(approvalRequests, cancellationSource.Token).ConfigureAwait(true);
+					}
+					finally
+					{
+						_isWaitingForApproval = false;
+					}
+
 					if (cancellationSource.IsCancellationRequested)
 						break;
+
+					inputControl?.SetIsReceivingStream(true, allowCancellation: true);
 				}
 			}
 			catch (OperationCanceledException)

@@ -80,15 +80,13 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageFormattingCo
 
 	/// <summary>
 	/// Initializes a new instance of <see cref="ReasoningMessageControl"/>, creating and wiring up the
-	/// icon, header, and selectable detail editor via the designer-generated <see cref="InitializeComponent"/>.
+	/// icon, header, and detail labels via the designer-generated <see cref="InitializeComponent"/>.
 	/// </summary>
 	public ReasoningMessageControl()
 	{
 		_streamingDisplayUpdate = new CoalescedUiUpdate(this, UpdateDisplay);
 		InitializeComponent();
 
-		lblDetail.ContentHeightChanging += SelectableText_ContentHeightChanging;
-		lblDetail.ContentHeightChanged += SelectableText_ContentHeightChanged;
 		lblIcon.Font = ChatIcons.CreateFont(ChatIcons.IconFontName is null ? 11f : 9f);
 		ApplyTextFont();
 		ApplyColors();
@@ -99,7 +97,7 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageFormattingCo
 			_senderFont = null;
 		};
 
-		WireMouseDown(tableLayout, lblIcon, lblHeader);
+		WireMouseDown(tableLayout, lblIcon, lblHeader, lblDetail);
 		UpdateExpandCursor();
 	}
 
@@ -248,7 +246,7 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageFormattingCo
 
 	/// <summary>
 	/// Toggles the expanded/collapsed state of the detail panel when the user clicks
-	/// the header or icon area. The detail text control remains dedicated to text selection.
+	/// anywhere on the control.
 	/// </summary>
 	/// <param name="sender">The object that raised the click event.</param>
 	/// <param name="e">Event data (not used).</param>
@@ -278,6 +276,7 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageFormattingCo
 		tableLayout.Cursor = cursor;
 		lblIcon.Cursor = cursor;
 		lblHeader.Cursor = cursor;
+		lblDetail.Cursor = cursor;
 	}
 
 	/// <summary>
@@ -319,7 +318,7 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageFormattingCo
 		var text = _message?.Content is ReasoningMessageContent reasoningContent
 			? MessageFormatter.Format(reasoningContent)
 			: string.Empty;
-		UpdateDetailText(text);
+		lblDetail.Text = text;
 		_detailTextDirty = false;
 	}
 
@@ -339,12 +338,6 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageFormattingCo
 			tableLayout.PerformLayout();
 			PerformLayout();
 
-			if (lblDetail.Visible)
-				lblDetail.RefreshContentHeight();
-
-			tableLayout.PerformLayout();
-			PerformLayout();
-
 			try
 			{
 				AfterLayoutChange?.Invoke(this, EventArgs.Empty);
@@ -356,35 +349,6 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageFormattingCo
 		}
 	}
 
-	private void SelectableText_ContentHeightChanging(object? sender, EventArgs e)
-	{
-		BeforeLayoutChange?.Invoke(this, EventArgs.Empty);
-	}
-
-	private void SelectableText_ContentHeightChanged(object? sender, EventArgs e)
-	{
-		AfterLayoutChange?.Invoke(this, EventArgs.Empty);
-	}
-
-	private void UpdateDetailText(string text)
-	{
-		if (lblDetail.Text == text)
-			return;
-
-		var preserveSelection = lblDetail.IsHandleCreated &&
-			(lblDetail.ContainsFocus || lblDetail.SelectionLength > 0);
-		var selectionStart = preserveSelection ? lblDetail.SelectionStart : 0;
-		var selectionLength = preserveSelection ? lblDetail.SelectionLength : 0;
-		lblDetail.Text = text;
-
-		if (!preserveSelection)
-			return;
-
-		selectionStart = Math.Min(selectionStart, text.Length);
-		selectionLength = Math.Min(selectionLength, text.Length - selectionStart);
-		lblDetail.Select(selectionStart, selectionLength);
-	}
-
 	/// <inheritdoc />
 	protected override void OnSizeChanged(EventArgs e)
 	{
@@ -392,23 +356,6 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageFormattingCo
 
 		if (_isReceivingStream)
 			SizeUpdatedWhileStreaming?.Invoke(this, EventArgs.Empty);
-	}
-
-	/// <inheritdoc />
-	protected override void OnLayout(LayoutEventArgs levent)
-	{
-		// Compute the width the detail text will occupy (client width minus padding and the icon
-		// column) and re-measure its height *before* the base layout positions the table rows. This
-		// keeps the rows stacked with the correct height in a single pass; measuring afterwards would
-		// re-flow re-entrantly and leave the rows overlapping until another layout pass.
-		if (lblDetail.Visible)
-		{
-			var contentWidth = Math.Max(0, ClientSize.Width - ContentPadding.Horizontal);
-			var textWidth = Math.Max(0, contentWidth - IconColumnWidth);
-			lblDetail.EnsureContentHeightForWidth(textWidth);
-		}
-
-		base.OnLayout(levent);
 	}
 
 	/// <inheritdoc />

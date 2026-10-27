@@ -35,8 +35,8 @@ public class DevExpressStructuredIconAlignmentTests
 			.OfType<LabelControl>()
 			.Single(label => label.Text.StartsWith("lookup_with", StringComparison.Ordinal));
 		var resultEditor = DescendantsAndSelf(control)
-			.OfType<HtmlContentControl>()
-			.Single(editor => editor.Text.StartsWith("A deliberately", StringComparison.Ordinal));
+			.OfType<LabelControl>()
+			.Single(label => label.Text.StartsWith("A deliberately", StringComparison.Ordinal));
 
 		icons.Length.ShouldBe(2);
 		GetRenderedFontHeight(title).ShouldBe(font.Height);
@@ -158,7 +158,6 @@ public class DevExpressStructuredIconAlignmentTests
 		return control switch
 		{
 			LabelControl label => label.Appearance.Font.Height,
-			HtmlContentControl editor => editor.Appearance.Font.Height,
 			_ => control.Font.Height
 		};
 	}

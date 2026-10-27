@@ -10,9 +10,6 @@ namespace TinyChat;
 /// </summary>
 internal sealed class DXWelcomeControl : PanelControl
 {
-	private const string ROBOT_ART = "●\n┌─┴─┐\n◉‿◉\n└───┘";
-	private const string ROBOT_FONT_NAME = "Segoe UI Symbol";
-
 	private readonly LabelControl _label;
 	private ContentAlignment _textAlign = ContentAlignment.MiddleCenter;
 
@@ -55,7 +52,7 @@ internal sealed class DXWelcomeControl : PanelControl
 	}
 
 	/// <summary>
-	/// Sets plain welcome text and uses a symbol font only for the built-in robot artwork.
+	/// Sets the plain welcome text. It is HTML-encoded, so it is shown as typed.
 	/// </summary>
 	/// <param name="text">The unformatted welcome text.</param>
 	internal void SetWelcomeText(string text)
@@ -121,13 +118,5 @@ internal sealed class DXWelcomeControl : PanelControl
 		_label.Appearance.Options.UseTextOptions = true;
 	}
 
-	private static string FormatWelcomeText(string text)
-	{
-		if (!text.StartsWith(ROBOT_ART, StringComparison.Ordinal))
-			return WebUtility.HtmlEncode(text);
-
-		var encodedRobot = WebUtility.HtmlEncode(ROBOT_ART);
-		var encodedMessage = WebUtility.HtmlEncode(text[ROBOT_ART.Length..]);
-		return $"<font=\"{ROBOT_FONT_NAME}\">{encodedRobot}</font>{encodedMessage}";
-	}
+	private static string FormatWelcomeText(string text) => WebUtility.HtmlEncode(text);
 }

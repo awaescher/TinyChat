@@ -8,7 +8,7 @@ namespace TinyChat;
 /// <summary>
 /// Provides a DevExpress-based chat input control for composing messages with optional file attachments.
 /// </summary>
-public class DXChatInputControl : Control, IChatInputControl, IChatAttachmentInputControl, IChatInputDraftControl, IChatInputLayoutControl, IChatInputAppearanceControl
+public class DXChatInputControl : Control, IChatInputControl, IChatAttachmentInputControl, IChatInputDraftControl, IChatInputDraftEditorControl, IChatInputLayoutControl, IChatInputAppearanceControl
 {
 	private const int ATTACHMENT_DISPLAY_HEIGHT = 60;
 	private const int SEND_BUTTON_INSET = 6;
@@ -210,6 +210,15 @@ public class DXChatInputControl : Control, IChatInputControl, IChatAttachmentInp
 	{
 		_textBox.Clear();
 		ClearAttachments();
+	}
+
+	/// <inheritdoc />
+	public void SetDraft(string text, IEnumerable<ChatFileAttachment> attachments)
+	{
+		ClearDraft();
+		_textBox.Text = (text ?? string.Empty).ReplaceLineEndings("\r\n");
+		_textBox.SelectionStart = _textBox.Text.Length;
+		AddAttachments(attachments);
 	}
 
 	/// <inheritdoc />

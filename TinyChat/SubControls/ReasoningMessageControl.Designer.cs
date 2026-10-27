@@ -20,7 +20,7 @@ partial class ReasoningMessageControl
 		lblSender = new Label();
 		lblIcon = new Label();
 		lblHeader = new Label();
-		lblDetail = new SelectableMessageTextControl();
+		lblDetail = new Label();
 		tableLayout = new TableLayoutPanel();
 		tableLayout.SuspendLayout();
 		SuspendLayout();
@@ -50,8 +50,10 @@ partial class ReasoningMessageControl
 
 		// lblDetail
 		lblDetail.AutoSize = true;
+		lblDetail.Cursor = Cursors.Hand;
 		lblDetail.Dock = DockStyle.Fill;
 		lblDetail.Margin = new Padding(0, 2, 0, 6);
+		lblDetail.UseMnemonic = false;
 		lblDetail.Visible = false;
 
 		// tableLayout
@@ -94,6 +96,7 @@ partial class ReasoningMessageControl
 		tableLayout.Click += Toggle;
 		lblIcon.Click += Toggle;
 		lblHeader.Click += Toggle;
+		lblDetail.Click += Toggle;
 
 		tableLayout.ResumeLayout(false);
 		tableLayout.PerformLayout();
@@ -105,5 +108,5 @@ partial class ReasoningMessageControl
 	private TableLayoutPanel tableLayout;
 	private Label lblIcon;
 	private Label lblHeader;
-	private SelectableMessageTextControl lblDetail;
+	private Label lblDetail;
 }

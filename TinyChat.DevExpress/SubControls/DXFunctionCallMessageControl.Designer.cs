@@ -26,8 +26,8 @@ partial class DXFunctionCallMessageControl
 		lblToolIcon = new LabelControl();
 		lblResultIcon = new LabelControl();
 		lblTitle = new LabelControl();
-		txtArguments = new DXSelectableMessageTextControl();
-		txtResult = new DXSelectableMessageTextControl();
+		lblArguments = new LabelControl();
+		lblResult = new LabelControl();
 		approvalPanel = new FlowLayoutPanel();
 		btnApprove = new SimpleButton();
 		btnReject = new SimpleButton();
@@ -73,14 +73,22 @@ partial class DXFunctionCallMessageControl
 		lblTitle.AllowHtmlString = true;
 		lblTitle.UseMnemonic = false;
 
-		// txtArguments
-		txtArguments.Dock = DockStyle.Fill;
-		txtArguments.Margin = new Padding(0, 2, 0, 6);
-		txtArguments.Visible = false;
+		// lblArguments
+		lblArguments.AutoSizeMode = LabelAutoSizeMode.Vertical;
+		lblArguments.Appearance.TextOptions.WordWrap = DevExpress.Utils.WordWrap.Wrap;
+		lblArguments.Appearance.Options.UseTextOptions = true;
+		lblArguments.Dock = DockStyle.Fill;
+		lblArguments.Margin = new Padding(0, 2, 0, 6);
+		lblArguments.UseMnemonic = false;
+		lblArguments.Visible = false;
 
-		// txtResult
-		txtResult.Dock = DockStyle.Fill;
-		txtResult.Visible = false;
+		// lblResult
+		lblResult.AutoSizeMode = LabelAutoSizeMode.Vertical;
+		lblResult.Appearance.TextOptions.WordWrap = DevExpress.Utils.WordWrap.Wrap;
+		lblResult.Appearance.Options.UseTextOptions = true;
+		lblResult.Dock = DockStyle.Fill;
+		lblResult.UseMnemonic = false;
+		lblResult.Visible = false;
 
 		// btnApprove
 		btnApprove.AutoSize = true;
@@ -127,9 +135,9 @@ partial class DXFunctionCallMessageControl
 
 		// Row 1, col 0 intentionally left empty - no spacer, so the row fully
 		// collapses when _argsLabel is hidden.
-		tableLayout.Controls.Add(txtArguments, 1, 1);
+		tableLayout.Controls.Add(lblArguments, 1, 1);
 		tableLayout.Controls.Add(lblResultIcon, 0, 2);
-		tableLayout.Controls.Add(txtResult, 1, 2);
+		tableLayout.Controls.Add(lblResult, 1, 2);
 		// Row 3: approval buttons, only visible while an approval is pending.
 		tableLayout.Controls.Add(approvalPanel, 1, 3);
 		tableLayout.Dock = DockStyle.Fill;
@@ -163,7 +171,9 @@ partial class DXFunctionCallMessageControl
 		tableLayout.Click += Toggle;
 		lblToolIcon.Click += Toggle;
 		lblTitle.Click += Toggle;
+		lblArguments.Click += Toggle;
 		lblResultIcon.Click += Toggle;
+		lblResult.Click += Toggle;
 
 		approvalPanel.ResumeLayout(false);
 		approvalPanel.PerformLayout();
@@ -179,10 +189,10 @@ partial class DXFunctionCallMessageControl
 	private TableLayoutPanel tableLayout;
 	private LabelControl lblToolIcon;
 	private LabelControl lblTitle;
-	private DXSelectableMessageTextControl txtArguments;
+	private LabelControl lblArguments;
 	private LabelControl lblResultIcon;
 	private PanelControl paddingPanel;
-	private DXSelectableMessageTextControl txtResult;
+	private LabelControl lblResult;
 	private FlowLayoutPanel approvalPanel;
 	private SimpleButton btnApprove;
 	private SimpleButton btnReject;

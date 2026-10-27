@@ -3,11 +3,14 @@ namespace TinyChat;
 /// <summary>
 /// A flow layout panel control that manages and displays chat message history with automatic scrolling and width management.
 /// </summary>
-public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHistoryControl
+public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHistoryControl, IChatMessageHistoryViewport
 {
 	private bool _shouldFollowStreamScroll = true;
 	private bool _streamScrollPending;
 	private IChatMessageControl? _selectedMessageControl;
+
+	/// <inheritdoc />
+	public event EventHandler? ViewportChanged;
 
 	/// <summary>
 	/// Gets the maximum vertical scroll value that indicates the bottom of the scrollable area.
@@ -109,6 +112,7 @@ public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHist
 	protected override void OnClientSizeChanged(EventArgs e)
 	{
 		base.OnClientSizeChanged(e);
+		ViewportChanged?.Invoke(this, EventArgs.Empty);
 
 		SuspendLayout();
 
@@ -123,6 +127,7 @@ public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHist
 	protected override void OnPaddingChanged(EventArgs e)
 	{
 		base.OnPaddingChanged(e);
+		ViewportChanged?.Invoke(this, EventArgs.Empty);
 
 		SuspendLayout();
 		foreach (Control control in Controls)
@@ -163,6 +168,7 @@ public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHist
 	protected override void OnScroll(ScrollEventArgs se)
 	{
 		base.OnScroll(se);
+		ViewportChanged?.Invoke(this, EventArgs.Empty);
 
 		var didScrollUp = se.ScrollOrientation == ScrollOrientation.VerticalScroll && se.NewValue < se.OldValue;
 		var didScrollToBottom = se.NewValue >= MaxVerticalScroll;
@@ -174,6 +180,7 @@ public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHist
 	protected override void OnMouseWheel(MouseEventArgs e)
 	{
 		base.OnMouseWheel(e);
+		ViewportChanged?.Invoke(this, EventArgs.Empty);
 
 		var didScrollUp = e.Delta > 0;
 		var didScrollToBottom = VerticalScroll.Value >= MaxVerticalScroll;
@@ -191,9 +198,6 @@ public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHist
 	/// <inheritdoc/>
 	protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
 	{
-		if (keyData == (Keys.Control | Keys.C) && HasFocusedTextEditor(this))
-			return base.ProcessCmdKey(ref msg, keyData);
-
 		if (keyData == (Keys.Control | Keys.C) && _selectedMessageControl is not null)
 		{
 			try
@@ -206,20 +210,6 @@ public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHist
 			return true;
 		}
 		return base.ProcessCmdKey(ref msg, keyData);
-	}
-
-	private static bool HasFocusedTextEditor(Control parent)
-	{
-		foreach (Control child in parent.Controls)
-		{
-			if (child is TextBoxBase && child.ContainsFocus)
-				return true;
-
-			if (child.ContainsFocus && HasFocusedTextEditor(child))
-				return true;
-		}
-
-		return false;
 	}
 
 	private void OnMessageControlMouseDown(object? sender, MouseEventArgs e)

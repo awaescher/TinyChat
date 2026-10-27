@@ -3,13 +3,10 @@ using System.Drawing;
 using System.Reflection;
 using System.Windows.Forms;
 using DevExpress.Utils;
-using DevExpress.Utils.Html;
-using DevExpress.Utils.Html.Internal;
 using DevExpress.XtraEditors;
 using Shouldly;
 using TinyChat;
 using TinyChat.Messages;
-using TinyChat.Messages.Formatting;
 
 namespace Tests;
 
@@ -231,12 +228,15 @@ public class ChatControlRoadmapTests
 			AssertSenderFont(messageControl, "Assistant", updatedMessageFont, useDevExpress);
 			AssertSenderFont(functionControl, "Tool", updatedMessageFont, useDevExpress);
 			AssertSenderFont(reasoningControl, "Reasoner", updatedMessageFont, useDevExpress);
-			GetSelectableMessageEditor(messageControl).Font.ShouldBe(updatedMessageFont);
+			if (useDevExpress)
+				DescendantsAndSelf(messageControl).OfType<LabelControl>().Single(label => label.Text == "Hello").Appearance.Font.ShouldBe(updatedMessageFont);
+			else
+				DescendantsAndSelf(messageControl).OfType<Label>().Single(label => label.Text == "Hello").Font.ShouldBe(updatedMessageFont);
 			DescendantsAndSelf(control.WelcomeControl).ShouldContain(child => child.Text == "Updated welcome");
 		}
 
 		[Test]
-		public void Uses_A_Symbol_Font_For_The_Default_DevExpress_Robot()
+		public void Renders_The_Default_DevExpress_Robot_In_The_Welcome_Font_Like_The_Native_Suite()
 		{
 			using var control = CreateChatControl(useDevExpress: true);
 			var welcomeLabel = DescendantsAndSelf(control.WelcomeControl!)
@@ -244,11 +244,33 @@ public class ChatControlRoadmapTests
 				.Single();
 
 			welcomeLabel.AllowHtmlString.ShouldBeTrue();
-			welcomeLabel.Text.ShouldStartWith("""<font="Segoe UI Symbol">●""");
+			welcomeLabel.Text.ShouldNotContain("<font");
 			welcomeLabel.Text.ShouldContain("◉‿◉");
-			welcomeLabel.Text.ShouldContain("</font>\n\nGreetings human.");
-			welcomeLabel.PlainText.ShouldContain("◉‿◉");
-			welcomeLabel.PlainText.ShouldContain("How can I help you today?");
+			welcomeLabel.Text.ShouldContain("How can I help you today?");
+			welcomeLabel.Appearance.Font.Name.ShouldBe(control.WelcomeFont.Name);
+		}
+
+		[Explicit("Writes screenshots for a visual check")]
+		[TestCase(false)]
+		[TestCase(true)]
+		public void Renders_The_Welcome_Robot(bool useDevExpress)
+		{
+			using var form = new Form { ClientSize = new Size(360, 320), StartPosition = FormStartPosition.Manual, Location = new Point(40, 40) };
+			using var control = useDevExpress ? new DXChatControl { Dock = DockStyle.Fill } : new ChatControl { Dock = DockStyle.Fill };
+			form.Controls.Add(control);
+			form.Show();
+			form.Activate();
+			for (var index = 0; index < 10; index++)
+			{
+				Application.DoEvents();
+				Thread.Sleep(20);
+			}
+
+			var bounds = control.WelcomeControl!.RectangleToScreen(control.WelcomeControl.ClientRectangle);
+			using var bitmap = new Bitmap(bounds.Width, bounds.Height);
+			using (var graphics = Graphics.FromImage(bitmap))
+				graphics.CopyFromScreen(bounds.Location, Point.Empty, bounds.Size);
+			bitmap.Save(Path.Combine(Path.GetTempPath(), "opencode", $"welcome_{(useDevExpress ? "dx" : "native")}.png"));
 		}
 
 		[Test]
@@ -321,7 +343,7 @@ public class ChatControlRoadmapTests
 				messageControl.ForeColor.ShouldBe(initialForeColor);
 				messageControl.BackColor.ShouldBe(initialBackColor);
 				DescendantsAndSelf(messageControl)
-					.Where(child => child is Label or LabelControl or TextBox or MemoEdit or HtmlContentControl)
+					.Where(child => child is Label or LabelControl or TextBox or MemoEdit)
 					.Where(child => child.Font.Name != ChatIcons.IconFontName)
 					.ShouldAllBe(child => child.ForeColor == initialForeColor);
 			}
@@ -504,315 +526,6 @@ public class ChatControlRoadmapTests
 		}
 	}
 
-	public class SelectableDevExpressMessageText
-	{
-		[Test]
-		public void Preserves_Supplementary_Unicode_Characters_In_The_Html_Dom()
-		{
-			const string text = "Emoji 😀 🔍 👩🏽‍💻 🏳️‍🌈 🇩🇪 �";
-			using var control = new DXChatMessageControl
-			{
-				MessageFormatter = new PlainTextMessageFormatter(),
-				Message = new ChatMessage(
-					new NamedSender("Assistant"),
-					new StringMessageContent(text))
-			};
-			control.CreateControl();
-			var editor = control.Controls.OfType<HtmlContentControl>().Single();
-			_ = editor.GetContentSize();
-			var contentElement = editor.FindElementById("message-content");
-			contentElement.ShouldNotBeNull();
-
-			var renderedText = string.Concat(
-				DescendantHtmlNodes(contentElement)
-					.OfType<DxHtmlTextElementBase>()
-					.Select(element => element.Text));
-
-			editor.Text.ShouldBe(text);
-			renderedText.ShouldBe(text);
-			SelectHtmlText(editor, "👩🏽‍💻");
-			editor.SelectedText.ShouldBe("👩🏽‍💻");
-
-			typeof(Control)
-				.GetMethod("RecreateHandle", BindingFlags.Instance | BindingFlags.NonPublic)!
-				.Invoke(editor, null);
-			_ = editor.GetContentSize();
-			var recreatedContentElement = editor.FindElementById("message-content");
-			recreatedContentElement.ShouldNotBeNull();
-			var recreatedText = string.Concat(
-				DescendantHtmlNodes(recreatedContentElement)
-					.OfType<DxHtmlTextElementBase>()
-					.Select(element => element.Text));
-			recreatedText.ShouldBe(text);
-		}
-
-		[Test]
-		public void Uses_A_Permanently_Visible_DevExpress_Html_Control_And_Selects_A_Substring()
-		{
-			using var control = new DXChatMessageControl
-			{
-				MessageFormatter = new PlainTextMessageFormatter(),
-				Message = new ChatMessage(
-					new NamedSender("Assistant"),
-					new StringMessageContent("Alpha beta gamma"))
-			};
-			control.CreateControl();
-			var editor = control.Controls.OfType<HtmlContentControl>().Single();
-
-			editor.AllowContentSelection.ShouldBe(DefaultBoolean.True);
-			editor.AllowFocus.ShouldBeTrue();
-			editor.AutoScroll.ShouldBeFalse();
-			editor.Text.ShouldBe("Alpha beta gamma");
-			control.Controls
-				.OfType<LabelControl>()
-				.ShouldNotContain(label => label.Text == "Alpha beta gamma");
-
-			SelectHtmlText(editor, "beta");
-
-			editor.Visible.ShouldBeTrue();
-			editor.SelectedText.ShouldBe("beta");
-		}
-
-		[Test]
-		public void Keeps_The_Same_Editor_And_Selection_While_Streaming()
-		{
-			var builder = new NotifyingStringBuilder().Append("**Started**");
-			using var host = new Panel { Size = new Size(190, 500) };
-			using var control = new DXChatMessageControl
-			{
-				MessageFormatter = new SimplifiedHtmlMessageFormatter("b"),
-				Message = new ChatMessage(
-					new NamedSender("Assistant"),
-					new ChangingMessageContent(builder))
-			};
-			control.MinimumSize = new Size(190, 0);
-			control.MaximumSize = new Size(190, 0);
-			control.Width = 190;
-			host.Controls.Add(control);
-			host.CreateControl();
-			control.CreateControl();
-			var editor = control.Controls.OfType<HtmlContentControl>().Single();
-			editor.Text.ShouldBe("Started");
-			editor.Visible.ShouldBeTrue();
-			editor.FindElementsByTag("b").ShouldNotBeEmpty();
-			SelectHtmlText(editor, "Started");
-			var initialHeight = editor.Height;
-
-			builder.Append(" ").Append(string.Join(" ", Enumerable.Repeat("and continued", 20)));
-			host.PerformLayout();
-			control.PerformLayout();
-			Application.DoEvents();
-
-			control.Controls.OfType<HtmlContentControl>().Single().ShouldBeSameAs(editor);
-			editor.Text.ShouldNotContain("<b>");
-			editor.Text.ShouldContain("and continued");
-			editor.FindElementsByTag("b").ShouldNotBeEmpty();
-			editor.SelectedText.ShouldBe("Started");
-			editor.Visible.ShouldBeTrue();
-			editor.Height.ShouldBeGreaterThan(initialHeight);
-		}
-
-		[Test]
-		public void Preserves_An_Emoji_Selection_While_Streaming()
-		{
-			var builder = new NotifyingStringBuilder().Append("Started 🔍");
-			using var control = new DXChatMessageControl
-			{
-				MessageFormatter = new PlainTextMessageFormatter(),
-				Message = new ChatMessage(
-					new NamedSender("Assistant"),
-					new ChangingMessageContent(builder))
-			};
-			control.CreateControl();
-			var editor = control.Controls.OfType<HtmlContentControl>().Single();
-			SelectHtmlText(editor, "🔍");
-
-			builder.Append(" and continued");
-			_ = editor.GetContentSize();
-
-			editor.Text.ShouldBe("Started 🔍 and continued");
-			editor.SelectedText.ShouldBe("🔍");
-		}
-
-		[Test]
-		public void Preserves_Formatted_Line_Breaks_In_Selectable_Copy_Text()
-		{
-			using var control = new DXChatMessageControl
-			{
-				MessageFormatter = new SimplifiedHtmlMessageFormatter("br"),
-				Message = new ChatMessage(
-					new NamedSender("Assistant"),
-					new StringMessageContent("First<br>Second"))
-			};
-			var editor = control.Controls.OfType<HtmlContentControl>().Single();
-
-			editor.Text.ShouldBe($"First{Environment.NewLine}Second");
-			control.ToString().ShouldBe(editor.Text);
-		}
-
-		[Test]
-		public void Renders_Supported_Formatting_Inside_The_Selectable_Html_Control()
-		{
-			using var control = new DXChatMessageControl
-			{
-				MessageFormatter = new SimplifiedHtmlMessageFormatter("b", "i", "font", "color", "size"),
-				Message = new ChatMessage(
-					new NamedSender("Assistant"),
-					new StringMessageContent("**Bold 🔍** *italic* `code` <color=red>red</color> <size=+2>large</size>"))
-			};
-			control.CreateControl();
-			var editor = control.Controls.OfType<HtmlContentControl>().Single();
-			_ = editor.GetContentSize();
-
-			editor.FindElementsByTag("b").ShouldNotBeEmpty();
-			editor.FindElementsByTag("i").ShouldNotBeEmpty();
-			editor.FindElementsByTag("span").Count().ShouldBeGreaterThanOrEqualTo(3);
-			editor.HtmlTemplate.Template.ShouldNotContain("<color=");
-			editor.HtmlTemplate.Template.ShouldNotContain("<font=");
-			editor.Text.ShouldBe("Bold 🔍 italic code red large");
-			var boldText = string.Concat(
-				editor.FindElementsByTag("b")
-					.SelectMany(DescendantHtmlNodes)
-					.OfType<DxHtmlTextElementBase>()
-					.Select(element => element.Text));
-			boldText.ShouldBe("Bold 🔍");
-		}
-
-		[Test]
-		public void Keeps_Only_The_Most_Recent_Html_Text_Selection()
-		{
-			using var first = new DXChatMessageControl
-			{
-				MessageFormatter = new PlainTextMessageFormatter(),
-				Message = new ChatMessage(
-					new NamedSender("Assistant"),
-					new StringMessageContent("Alpha selection"))
-			};
-			using var second = new DXChatMessageControl
-			{
-				MessageFormatter = new PlainTextMessageFormatter(),
-				Message = new ChatMessage(
-					new NamedSender("Assistant"),
-					new StringMessageContent("Beta selection"))
-			};
-			first.CreateControl();
-			second.CreateControl();
-			var firstEditor = first.Controls.OfType<HtmlContentControl>().Single();
-			var secondEditor = second.Controls.OfType<HtmlContentControl>().Single();
-
-			SelectHtmlText(firstEditor, "Alpha");
-			firstEditor.SelectedText.ShouldBe("Alpha");
-
-			SelectHtmlText(secondEditor, "Beta");
-
-			firstEditor.SelectedText.ShouldBeEmpty();
-			secondEditor.SelectedText.ShouldBe("Beta");
-		}
-	}
-
-	public class SelectableStructuredMessageText
-	{
-		[TestCase(false)]
-		[TestCase(true)]
-		public void Uses_Selectable_Editors_For_Function_Call_And_Reasoning_Details(bool useDevExpress)
-		{
-			using var control = CreateChatControl(useDevExpress);
-			var functionControl = (Control)control.AddMessage(
-				new NamedSender("Tool"),
-				new FunctionCallMessageContent(
-					"call-1",
-					"lookup",
-					new Dictionary<string, object?> { ["query"] = "TinyChat" },
-					"result"));
-			var reasoningControl = (Control)control.AddMessage(
-				new NamedSender("Assistant"),
-				new ReasoningMessageContent("Detailed reasoning"));
-
-			var functionEditors = DescendantsAndSelf(functionControl)
-				.Where(child => IsSelectableMessageEditor(child, useDevExpress))
-				.ToArray();
-			var reasoningEditors = DescendantsAndSelf(reasoningControl)
-				.Where(child => IsSelectableMessageEditor(child, useDevExpress))
-				.ToArray();
-
-			functionEditors.Length.ShouldBe(2);
-			reasoningEditors.Length.ShouldBe(1);
-			functionEditors.ShouldContain(editor => editor.Text.Contains("query", StringComparison.Ordinal));
-			functionEditors.ShouldContain(editor => editor.Text.Contains("result", StringComparison.Ordinal));
-			DescendantsAndSelf(functionControl)
-				.Where(IsNonSelectableLabel)
-				.ShouldNotContain(label => label.Text.Contains("TinyChat", StringComparison.Ordinal));
-			DescendantsAndSelf(reasoningControl)
-				.Where(IsNonSelectableLabel)
-				.ShouldNotContain(label => label.Text.Contains("Detailed reasoning", StringComparison.Ordinal));
-			foreach (var editor in functionEditors.Concat(reasoningEditors))
-				AssertUnfocusedSelectionIsHidden(editor);
-		}
-
-		[Test]
-		public void DevExpress_Function_Call_Details_Grow_And_Do_Not_Toggle_From_The_Editor()
-		{
-			using var host = new Panel { Size = new Size(260, 500) };
-			using var control = CreateDevExpressFunctionCallMessageControl();
-			HostStructuredMessageControl(host, control, 260);
-			var editors = DescendantsAndSelf(control).OfType<HtmlContentControl>().ToArray();
-
-			editors.Length.ShouldBe(2);
-			editors.ShouldAllBe(editor => !editor.Visible);
-			var collapsedHeight = control.Height;
-
-			InvokeToggle(control);
-
-			editors.ShouldAllBe(editor => editor.Visible);
-			var argumentsEditor = editors.Single(editor => editor.Text.Contains("TinyChat", StringComparison.Ordinal));
-			var tableLayout = DescendantsAndSelf(control).OfType<TableLayoutPanel>().Single();
-			var argumentsRow = tableLayout.GetPositionFromControl(argumentsEditor).Row;
-			argumentsEditor.Height.ShouldBeGreaterThan(argumentsEditor.Font.Height);
-			tableLayout.GetRowHeights()[argumentsRow].ShouldBeGreaterThanOrEqualTo(argumentsEditor.Height);
-			control.Height.ShouldBeGreaterThan(collapsedHeight);
-			SelectHtmlText(argumentsEditor, "TinyChat");
-			argumentsEditor.SelectedText.ShouldBe("TinyChat");
-
-			var parentMouseDownCount = 0;
-			control.MouseDown += (_, _) => parentMouseDownCount++;
-			InvokeMouseDown(argumentsEditor);
-			InvokeClick(argumentsEditor);
-
-			parentMouseDownCount.ShouldBe(0);
-			editors.ShouldAllBe(editor => editor.Visible);
-		}
-
-		[Test]
-		public void DevExpress_Reasoning_Detail_Grows_And_Does_Not_Toggle_From_The_Editor()
-		{
-			using var host = new Panel { Size = new Size(260, 500) };
-			using var control = CreateDevExpressReasoningMessageControl();
-			HostStructuredMessageControl(host, control, 260);
-			var editor = DescendantsAndSelf(control).OfType<HtmlContentControl>().Single();
-
-			editor.Visible.ShouldBeFalse();
-
-			InvokeToggle(control);
-
-			editor.Visible.ShouldBeTrue();
-			editor.Text.ShouldStartWith("Thinking through the answer");
-			var tableLayout = DescendantsAndSelf(control).OfType<TableLayoutPanel>().Single();
-			var detailRow = tableLayout.GetPositionFromControl(editor).Row;
-			editor.Height.ShouldBeGreaterThan(editor.Font.Height);
-			tableLayout.GetRowHeights()[detailRow].ShouldBeGreaterThanOrEqualTo(editor.Height);
-			SelectHtmlText(editor, "through");
-			editor.SelectedText.ShouldBe("through");
-
-			var parentMouseDownCount = 0;
-			control.MouseDown += (_, _) => parentMouseDownCount++;
-			InvokeMouseDown(editor);
-			InvokeClick(editor);
-
-			parentMouseDownCount.ShouldBe(0);
-			editor.Visible.ShouldBeTrue();
-		}
-	}
-
 	private static ChatControl CreateChatControl(bool useDevExpress, bool createControl = true)
 	{
 		var control = useDevExpress ? (ChatControl)new DXChatControl() : new ChatControl();
@@ -909,142 +622,6 @@ public class ChatControlRoadmapTests
 		memoEdit.Properties.AppearanceFocused.ForeColor.ShouldBe(foreColor);
 		memoEdit.Properties.AppearanceFocused.Options.UseBackColor.ShouldBeTrue();
 		memoEdit.Properties.AppearanceFocused.Options.UseForeColor.ShouldBeTrue();
-	}
-
-	private static Control GetSelectableMessageEditor(Control messageControl)
-	{
-		return messageControl.Controls.Cast<Control>()
-			.Single(child => child is TextBox or HtmlContentControl);
-	}
-
-	private static bool IsSelectableMessageEditor(Control control, bool useDevExpress)
-	{
-		return useDevExpress
-			? control is HtmlContentControl
-			: control is TextBox;
-	}
-
-	private static bool IsNonSelectableLabel(Control control) => control is Label or LabelControl;
-
-	private static void AssertUnfocusedSelectionIsHidden(Control control)
-	{
-		switch (control)
-		{
-			case TextBox textBox:
-				textBox.HideSelection.ShouldBeTrue();
-				break;
-			case HtmlContentControl htmlContentControl:
-				htmlContentControl.AllowContentSelection.ShouldBe(DefaultBoolean.True);
-				break;
-			default:
-				throw new InvalidOperationException($"Unsupported selectable editor type: {control.GetType().FullName}");
-		}
-	}
-
-	private static Control CreateDevExpressFunctionCallMessageControl()
-	{
-		var type = typeof(DXChatControl).Assembly.GetType("TinyChat.DXFunctionCallMessageControl")!;
-		var control = (Control)Activator.CreateInstance(type, nonPublic: true)!;
-		((IFunctionCallMessageControl)control).AllowExpand = true;
-		((IChatMessageControl)control).Message = new ChatMessage(
-			new NamedSender("Tool"),
-			new FunctionCallMessageContent(
-				"call-1",
-				"lookup",
-				new Dictionary<string, object?>
-				{
-					["query"] = "TinyChat " + string.Join(" ", Enumerable.Repeat("wrapped function argument", 12))
-				},
-				"Found"));
-		return control;
-	}
-
-	private static Control CreateDevExpressReasoningMessageControl()
-	{
-		var type = typeof(DXChatControl).Assembly.GetType("TinyChat.DXReasoningMessageControl")!;
-		var control = (Control)Activator.CreateInstance(type, nonPublic: true)!;
-		type.GetProperty(nameof(DXChatMessageControl.MessageFormatter))!
-			.SetValue(control, new PlainTextMessageFormatter());
-		((IChatMessageControl)control).Message = new ChatMessage(
-			new NamedSender("Assistant"),
-			new ReasoningMessageContent(
-				"Thinking through the answer " + string.Join(" ", Enumerable.Repeat("with wrapped reasoning detail", 12))));
-		return control;
-	}
-
-	private static void HostStructuredMessageControl(Control host, Control control, int width)
-	{
-		control.MinimumSize = new Size(width, 0);
-		control.MaximumSize = new Size(width, 0);
-		control.Width = width;
-		host.Controls.Add(control);
-		host.CreateControl();
-		control.CreateControl();
-		foreach (var editor in DescendantsAndSelf(control).OfType<HtmlContentControl>())
-			editor.CreateControl();
-		PerformStructuredMessageLayout(host, control);
-	}
-
-	private static void SelectHtmlText(HtmlContentControl control, string selectedText)
-	{
-		control.CreateControl();
-		_ = control.GetContentSize();
-		var contentElement = control.FindElementById("message-content");
-		contentElement.ShouldNotBeNull();
-		var textElement = DescendantHtmlNodes(contentElement)
-			.OfType<DxHtmlTextElementBase>()
-			.FirstOrDefault(element => element.Text.Contains(selectedText, StringComparison.Ordinal));
-		textElement.ShouldNotBeNull();
-
-		var selectionStart = textElement.Text.IndexOf(selectedText, StringComparison.Ordinal);
-		var selectionRange = new DxHtmlSelectionRange(
-			textElement,
-			textElement,
-			selectionStart,
-			selectionStart + selectedText.Length);
-		((IDxHtmlSelection)textElement.RootElement.Selection).Current = selectionRange;
-	}
-
-	private static IEnumerable<DxHtmlNode> DescendantHtmlNodes(DxHtmlNode parent)
-	{
-		foreach (DxHtmlNode child in parent.ChildNodes)
-		{
-			yield return child;
-
-			foreach (var descendant in DescendantHtmlNodes(child))
-				yield return descendant;
-		}
-	}
-
-	private static void PerformStructuredMessageLayout(Control host, Control control)
-	{
-		host.PerformLayout();
-		control.PerformLayout();
-		Application.DoEvents();
-	}
-
-	private static void InvokeToggle(Control control)
-	{
-		control.GetType()
-			.GetMethod("Toggle", BindingFlags.Instance | BindingFlags.NonPublic)!
-			.Invoke(control, [control, EventArgs.Empty]);
-		PerformStructuredMessageLayout(control.Parent!, control);
-	}
-
-	private static void InvokeMouseDown(Control control)
-	{
-		var onMouseDown = typeof(Control).GetMethod(
-			"OnMouseDown",
-			BindingFlags.Instance | BindingFlags.NonPublic)!;
-		onMouseDown.Invoke(control, [new MouseEventArgs(MouseButtons.Left, 1, 1, 1, 0)]);
-	}
-
-	private static void InvokeClick(Control control)
-	{
-		var onClick = typeof(Control).GetMethod(
-			"OnClick",
-			BindingFlags.Instance | BindingFlags.NonPublic)!;
-		onClick.Invoke(control, [EventArgs.Empty]);
 	}
 
 	private static void AssertSenderFont(

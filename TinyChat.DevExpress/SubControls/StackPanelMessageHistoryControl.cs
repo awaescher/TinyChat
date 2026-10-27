@@ -8,7 +8,7 @@ namespace TinyChat;
 /// A scrollable control that displays chat message history using a vertical stack panel layout.
 /// Implements the IChatMessageHistoryControl interface to provide message management functionality.
 /// </summary>
-public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessageHistoryControl
+public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessageHistoryControl, IChatMessageHistoryViewport
 {
 	private readonly StackPanel _stackPanel = new();
 	private int _messageLayoutSuspendCount;
@@ -16,6 +16,9 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 	private bool _shouldFollowStreamScroll = true;
 	private bool _streamScrollPending;
 	private IChatMessageControl? _selectedMessageControl;
+
+	/// <inheritdoc />
+	public event EventHandler? ViewportChanged;
 
 	/// <summary>
 	/// Gets the maximum vertical scroll value that indicates the bottom of the scrollable area.
@@ -129,6 +132,7 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 	protected override void OnClientSizeChanged(EventArgs e)
 	{
 		base.OnClientSizeChanged(e);
+		ViewportChanged?.Invoke(this, EventArgs.Empty);
 
 		if (_stackPanel?.Controls.Count == 0 || _resizeLayoutPending || !IsHandleCreated)
 			return;
@@ -185,6 +189,7 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 	protected override void OnScroll(object sender, XtraScrollEventArgs e)
 	{
 		base.OnScroll(sender, e);
+		ViewportChanged?.Invoke(this, EventArgs.Empty);
 
 		var didScrollUp = e.ScrollOrientation == DevExpress.XtraEditors.ScrollOrientation.VerticalScroll && e.NewValue < e.OldValue;
 		var didScrollToBottom = e.NewValue >= MaxVerticalScroll;
@@ -196,6 +201,7 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 	protected override void OnMouseWheelCore(MouseEventArgs ev)
 	{
 		base.OnMouseWheelCore(ev);
+		ViewportChanged?.Invoke(this, EventArgs.Empty);
 
 		var didScrollUp = ev.Delta > 0;
 		var didScrollToBottom = VerticalScroll.Value >= MaxVerticalScroll;
@@ -214,9 +220,6 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 	/// <inheritdoc/>
 	protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
 	{
-		if (keyData == (Keys.Control | Keys.C) && HasFocusedEditor(this))
-			return base.ProcessCmdKey(ref msg, keyData);
-
 		if (keyData == (Keys.Control | Keys.C) && _selectedMessageControl is not null)
 		{
 			try
@@ -229,20 +232,6 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 			return true;
 		}
 		return base.ProcessCmdKey(ref msg, keyData);
-	}
-
-	private static bool HasFocusedEditor(Control parent)
-	{
-		foreach (Control child in parent.Controls)
-		{
-			if (child is BaseEdit or HtmlContentControl && child.ContainsFocus)
-				return true;
-
-			if (child.ContainsFocus && HasFocusedEditor(child))
-				return true;
-		}
-
-		return false;
 	}
 
 	private void OnMessageControlMouseDown(object? sender, MouseEventArgs e)

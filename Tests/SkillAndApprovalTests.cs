@@ -300,7 +300,7 @@ public class SkillAndApprovalTests
 			var history = control.MessageHistoryControl!;
 			var messageControl = (Control)FindMessageControl(control, control.Messages.Single(m => ReferenceEquals(m.Content, requested)));
 			var button = DescendantsAndSelf(messageControl).OfType<Button>().First();
-			var args = DescendantsAndSelf(messageControl).OfType<TextBox>().First(t => t.Visible);
+			var args = DescendantsAndSelf(messageControl).OfType<Label>().First(label => label.Visible && label.Text.Contains("skillName", StringComparison.Ordinal));
 			var buttonBounds = history.RectangleToClient(button.RectangleToScreen(button.ClientRectangle));
 			var argsBounds = history.RectangleToClient(args.RectangleToScreen(args.ClientRectangle));
 			var messageBounds = history.RectangleToClient(messageControl.RectangleToScreen(messageControl.ClientRectangle));

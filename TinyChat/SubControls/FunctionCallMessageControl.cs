@@ -6,8 +6,7 @@ namespace TinyChat;
 /// Displays a function call and its result in a structured two-column layout.
 /// The left column shows icon glyphs (see <see cref="ChatIcons"/>); the right column shows
 /// the function name (bold), the arguments, and the result.
-/// Clicking the header or icon areas toggles the detail rows (arguments + result).
-/// The detail text controls remain dedicated to text selection.
+/// Clicking anywhere on the control toggles the detail rows (arguments + result).
 /// </summary>
 internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLayoutControl, IChatMessageRefreshControl, IFunctionCallMessageControl
 {
@@ -54,10 +53,6 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 	{
 		InitializeComponent();
 
-		lblArgs.ContentHeightChanging += SelectableText_ContentHeightChanging;
-		lblArgs.ContentHeightChanged += SelectableText_ContentHeightChanged;
-		lblResult.ContentHeightChanging += SelectableText_ContentHeightChanging;
-		lblResult.ContentHeightChanged += SelectableText_ContentHeightChanged;
 		ApplyTextFont();
 		ApplyColors();
 		Disposed += (_, _) =>
@@ -68,7 +63,7 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 			_iconFont = null;
 		};
 
-		WireMouseDown(tableLayout, lblIcon, lblTitle, lblResultIcon);
+		WireMouseDown(tableLayout, lblIcon, lblTitle, lblArgs, lblResultIcon, lblResult);
 		UpdateExpandCursor();
 	}
 
@@ -247,15 +242,6 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 
 			base.MaximumSize = value;
 			UpdateContentWidthConstraints();
-
-			// Details shown before the control was added to the history were measured without a width;
-			// re-show them like a toggle does so the table picks up their real height.
-			if (lblArgs is not null && _message?.Content is FunctionCallMessageContent { ApprovalState: ToolApprovalState.Pending })
-			{
-				lblArgs.Visible = false;
-				approvalPanel.Visible = false;
-				ApplyVisibility();
-			}
 		}
 	}
 
@@ -272,7 +258,7 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 	}
 
 	/// <summary>
-	/// Rebuilds the header and selectable detail controls from the current <see cref="Message"/> and applies visibility.
+	/// Rebuilds the header and detail labels from the current <see cref="Message"/> and applies visibility.
 	/// Does nothing if <see cref="Message"/> is <see langword="null"/> or its content is not
 	/// a <see cref="FunctionCallMessageContent"/>.
 	/// </summary>
@@ -376,18 +362,6 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 			tableLayout.PerformLayout();
 			PerformLayout();
 
-			if (lblArgs.Visible)
-				lblArgs.RefreshContentHeight();
-			if (lblResult.Visible)
-				lblResult.RefreshContentHeight();
-
-			tableLayout.PerformLayout();
-			PerformLayout();
-			if (lblArgs.Visible)
-				lblArgs.Invalidate();
-			if (lblResult.Visible)
-				lblResult.Invalidate();
-
 			try
 			{
 				AfterLayoutChange?.Invoke(this, EventArgs.Empty);
@@ -397,53 +371,6 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 				Parent?.PerformLayout(this, nameof(PreferredSize));
 			}
 		}
-	}
-
-	/// <inheritdoc />
-	protected override void OnLayout(LayoutEventArgs levent)
-	{
-		// Compute the width the argument/result text will occupy (client width minus padding and the
-		// icon column) and re-measure their heights *before* the base layout positions the table rows.
-		// This keeps the rows stacked with the correct height in a single pass; measuring afterwards
-		// would re-flow re-entrantly and leave the rows overlapping until another layout pass.
-		var contentWidth = Math.Max(0, ClientSize.Width - ContentPadding.Horizontal);
-		var textWidth = Math.Max(0, contentWidth - _iconColumnWidth);
-		if (lblArgs.Visible)
-			lblArgs.EnsureContentHeightForWidth(textWidth);
-		if (lblResult.Visible)
-			lblResult.EnsureContentHeightForWidth(textWidth);
-		SyncArgumentsRowHeight();
-
-		base.OnLayout(levent);
-	}
-
-	/// <summary>
-	/// The auto-size row does not always pick up the measured argument height (for example when the
-	/// arguments are shown immediately for a pending approval), so the row is sized explicitly.
-	/// </summary>
-	private void SyncArgumentsRowHeight()
-	{
-		if (tableLayout.RowStyles.Count < 2)
-			return;
-
-		var rowStyle = tableLayout.RowStyles[1];
-		var height = lblArgs.Visible ? lblArgs.Height + lblArgs.Margin.Vertical : 0f;
-		var sizeType = lblArgs.Visible ? SizeType.Absolute : SizeType.AutoSize;
-		if (rowStyle.SizeType != sizeType || Math.Abs(rowStyle.Height - height) > 0.5f)
-		{
-			rowStyle.SizeType = sizeType;
-			rowStyle.Height = height;
-		}
-	}
-
-	private void SelectableText_ContentHeightChanging(object? sender, EventArgs e)
-	{
-		BeforeLayoutChange?.Invoke(this, EventArgs.Empty);
-	}
-
-	private void SelectableText_ContentHeightChanged(object? sender, EventArgs e)
-	{
-		AfterLayoutChange?.Invoke(this, EventArgs.Empty);
 	}
 
 	private void WireMouseDown(params Control[] controls)
@@ -459,7 +386,9 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 		tableLayout.Cursor = cursor;
 		lblTitle.Cursor = cursor;
 		lblIcon.Cursor = cursor;
+		lblArgs.Cursor = cursor;
 		lblResultIcon.Cursor = cursor;
+		lblResult.Cursor = cursor;
 	}
 
 	private void UpdateIconLayout()

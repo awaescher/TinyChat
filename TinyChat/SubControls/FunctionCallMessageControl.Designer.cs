@@ -19,8 +19,8 @@ partial class FunctionCallMessageControl
 		lblIcon = new Label();
 		lblResultIcon = new Label();
 		lblTitle = new Label();
-		lblArgs = new SelectableMessageTextControl();
-		lblResult = new SelectableMessageTextControl();
+		lblArgs = new Label();
+		lblResult = new Label();
 		approvalPanel = new FlowLayoutPanel();
 		btnApprove = new Button();
 		btnReject = new Button();
@@ -67,13 +67,15 @@ partial class FunctionCallMessageControl
 
 		// lblArgs
 		lblArgs.AutoSize = true;
-		lblArgs.Dock = DockStyle.Top;
+		lblArgs.Dock = DockStyle.Fill;
 		lblArgs.Margin = new Padding(0, 2, 0, 6);
+		lblArgs.UseMnemonic = false;
 		lblArgs.Visible = false;
 
 		// lblResult
 		lblResult.AutoSize = true;
-		lblResult.Dock = DockStyle.Top;
+		lblResult.Dock = DockStyle.Fill;
+		lblResult.UseMnemonic = false;
 		lblResult.Visible = false;
 
 		// btnApprove
@@ -154,7 +156,9 @@ partial class FunctionCallMessageControl
 		tableLayout.Click += Toggle;
 		lblIcon.Click += Toggle;
 		lblTitle.Click += Toggle;
+		lblArgs.Click += Toggle;
 		lblResultIcon.Click += Toggle;
+		lblResult.Click += Toggle;
 
 		approvalPanel.ResumeLayout(false);
 		approvalPanel.PerformLayout();
@@ -168,9 +172,9 @@ partial class FunctionCallMessageControl
 	private TableLayoutPanel tableLayout;
 	private Label lblIcon;
 	private Label lblTitle;
-	private SelectableMessageTextControl lblArgs;
+	private Label lblArgs;
 	private Label lblResultIcon;
-	private SelectableMessageTextControl lblResult;
+	private Label lblResult;
 	private FlowLayoutPanel approvalPanel;
 	private Button btnApprove;
 	private Button btnReject;

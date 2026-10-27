@@ -206,7 +206,7 @@ public class ChatControlAttachmentAndCancellationTests
 
 			messageControl.MinimumSize.Width.ShouldBe(messageControl.MaximumSize.Width);
 			messageControl.Width.ShouldBeGreaterThan(300);
-			var messageTextControl = messageControl.Controls.OfType<TextBox>().Single(textBox => textBox.Text.StartsWith("A caption"));
+			var messageTextControl = messageControl.Controls.OfType<Label>().Single(label => label.Text.StartsWith("A caption"));
 			messageTextControl.Width.ShouldBeGreaterThan(300);
 			var previewPanel = messageControl.Controls.OfType<FileAttachmentPreviewPanel>().Single();
 			previewPanel.Width.ShouldBeGreaterThan(128);
