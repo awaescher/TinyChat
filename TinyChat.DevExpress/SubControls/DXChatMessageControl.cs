@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using DevExpress.Utils;
 using DevExpress.XtraEditors;
 using TinyChat.Messages.Formatting;
 
@@ -13,7 +14,7 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl, IChatMess
 	private IChatMessage? _message;
 	private bool _isReceivingStream;
 	private readonly LabelControl _senderLabel;
-	private readonly DXSelectableMessageTextControl _messageEditor;
+	private readonly LabelControl _messageLabel;
 	private readonly CoalescedUiUpdate _streamingDisplayUpdate;
 	private FileAttachmentPreviewPanel? _attachmentPreviewPanel;
 	private IMessageFormatter _messageFormatter = new PlainTextMessageFormatter();
@@ -56,8 +57,13 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl, IChatMess
 	}
 
 	/// <summary>
+	/// Gets the formatted text currently displayed by the message label.
+	/// </summary>
+	internal string FormattedText => _messageLabel.Text;
+
+	/// <summary>
 	/// Initializes a new instance of the <see cref="DXChatMessageControl"/> class.
-	/// Sets up the sender and permanently visible selectable HTML content control.
+	/// Sets up the layout with sender and message labels, configures styling and sizing behavior.
 	/// </summary>
 	public DXChatMessageControl()
 	{
@@ -65,24 +71,20 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl, IChatMess
 		BorderStyle = DevExpress.XtraEditors.Controls.BorderStyles.NoBorder;
 		AutoSize = true;
 
-		_senderLabel = new LabelControl() { AllowHtmlString = true, Dock = DockStyle.Top, AutoSizeMode = LabelAutoSizeMode.Vertical, Font = new Font(Font, FontStyle.Bold), UseMnemonic = false, Padding = new Padding(0, 0, 0, 3) };
-		_messageEditor = new DXSelectableMessageTextControl
-		{
-			Dock = DockStyle.Top,
-			Visible = false
-		};
-		_messageEditor.ContentHeightChanging += (_, _) => BeforeLayoutChange?.Invoke(this, EventArgs.Empty);
-		_messageEditor.ContentHeightChanged += (_, _) => AfterLayoutChange?.Invoke(this, EventArgs.Empty);
+		_senderLabel = new LabelControl() { AllowHtmlString = true, Dock = DockStyle.Top, AutoSizeMode = LabelAutoSizeMode.Vertical, UseMnemonic = false, Padding = new Padding(0, 0, 0, 3) };
+		_messageLabel = new LabelControl() { AllowHtmlString = true, Dock = DockStyle.Top, AutoSizeMode = LabelAutoSizeMode.Vertical, UseMnemonic = false, Visible = false };
+		_messageLabel.Appearance.TextOptions.WordWrap = WordWrap.Wrap;
+		_messageLabel.Appearance.Options.UseTextOptions = true;
 
 		Controls.Add(_senderLabel);
-		Controls.Add(_messageEditor);
+		Controls.Add(_messageLabel);
 
-		_messageEditor.BringToFront();
+		_messageLabel.BringToFront();
 
 		AutoSize = true;
 		ContentPadding = new Padding(8);
 
-		WireMouseDown(_senderLabel);
+		WireMouseDown(_senderLabel, _messageLabel);
 		ApplyAppearance();
 	}
 
@@ -94,7 +96,7 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl, IChatMess
 
 	/// <summary>
 	/// Gets or sets the chat message displayed by this control.
-	/// When set, updates the sender header and selectable content editor.
+	/// When set, updates the sender and content labels with the message data.
 	/// </summary>
 	/// <value>
 	/// The <see cref="IChatMessage"/> instance to display, or null if no message is set.
@@ -119,7 +121,7 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl, IChatMess
 
 	/// <summary>
 	/// Gets or sets the maximum size of the control.
-	/// When set, also updates the maximum size of the internal header and editor to account for padding.
+	/// When set, also updates the maximum size of the internal labels to account for padding.
 	/// </summary>
 	/// <value>
 	/// The maximum <see cref="Size"/> that this control can occupy.
@@ -171,7 +173,6 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl, IChatMess
 	protected override void OnSizeChanged(EventArgs e)
 	{
 		base.OnSizeChanged(e);
-		_messageEditor?.UpdateContentHeight();
 
 		if (_isReceivingStream)
 			SizeUpdatedWhileStreaming?.Invoke(this, EventArgs.Empty);
@@ -209,7 +210,7 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl, IChatMess
 	}
 
 	/// <inheritdoc/>
-	public override string ToString() => _messageEditor.Text;
+	public override string ToString() => DXFormattedText.ToPlainText(_messageLabel.Text);
 
 	/// <inheritdoc />
 	protected override void Dispose(bool disposing)
@@ -243,21 +244,23 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl, IChatMess
 			messageVisible = true;
 		}
 
-		var layoutMetadataChanged =
+		var changed =
 			!string.Equals(_senderLabel.Text, senderText, StringComparison.Ordinal) ||
-			_messageEditor.Visible != messageVisible;
-		if (layoutMetadataChanged)
-			BeforeLayoutChange?.Invoke(this, EventArgs.Empty);
+			!string.Equals(_messageLabel.Text, formattedText, StringComparison.Ordinal) ||
+			_messageLabel.Visible != messageVisible;
+		if (!changed)
+			return;
+
+		BeforeLayoutChange?.Invoke(this, EventArgs.Empty);
 		try
 		{
 			_senderLabel.Text = senderText;
-			_messageEditor.SetFormattedTextPreservingSelection(formattedText);
-			_messageEditor.Visible = messageVisible;
+			_messageLabel.Text = formattedText;
+			_messageLabel.Visible = messageVisible;
 		}
 		finally
 		{
-			if (layoutMetadataChanged)
-				AfterLayoutChange?.Invoke(this, EventArgs.Empty);
+			AfterLayoutChange?.Invoke(this, EventArgs.Empty);
 		}
 	}
 
@@ -315,18 +318,11 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl, IChatMess
 
 	private void ApplyAppearance()
 	{
-		if (_senderLabel is null || _messageEditor is null)
+		if (_senderLabel is null || _messageLabel is null)
 			return;
 
-		_senderLabel.Appearance.Font = Font;
-		_senderLabel.Appearance.FontStyleDelta = FontStyle.Bold;
-		_senderLabel.Appearance.ForeColor = ForeColor;
-		_senderLabel.Appearance.BackColor = BackColor;
-		_senderLabel.Appearance.Options.UseFont = true;
-		_senderLabel.Appearance.Options.UseForeColor = true;
-		_senderLabel.Appearance.Options.UseBackColor = true;
-
-		_messageEditor.ApplyTextAppearance(Font, ForeColor, BackColor);
+		ApplyLabelAppearance(_senderLabel, FontStyle.Bold);
+		ApplyLabelAppearance(_messageLabel, FontStyle.Regular);
 
 		if (_attachmentPreviewPanel is not null)
 		{
@@ -334,24 +330,30 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl, IChatMess
 			_attachmentPreviewPanel.ForeColor = ForeColor;
 			_attachmentPreviewPanel.BackColor = BackColor;
 		}
+	}
 
+	private void ApplyLabelAppearance(LabelControl label, FontStyle fontStyle)
+	{
+		label.Appearance.Font = Font;
+		label.Appearance.FontStyleDelta = fontStyle;
+		label.Appearance.ForeColor = ForeColor;
+		label.Appearance.BackColor = BackColor;
+		label.Appearance.Options.UseFont = true;
+		label.Appearance.Options.UseForeColor = true;
+		label.Appearance.Options.UseBackColor = true;
 	}
 
 	private void UpdateContentWidthConstraints()
 	{
-		if (_senderLabel is null || _messageEditor is null)
+		if (_senderLabel is null || _messageLabel is null)
 			return;
 
 		var contentWidth = MaximumSize.Width == 0
 			? 0
 			: Math.Max(0, MaximumSize.Width - ContentPadding.Horizontal);
 		_senderLabel.MaximumSize = new Size(contentWidth, 0);
-		_messageEditor.MaximumSize = new Size(contentWidth, 0);
-		if (contentWidth > 0 && _messageEditor.Width != contentWidth)
-			_messageEditor.Width = contentWidth;
+		_messageLabel.MaximumSize = new Size(contentWidth, 0);
 		if (_attachmentPreviewPanel is not null)
 			_attachmentPreviewPanel.MaximumSize = new Size(contentWidth, 0);
-
-		_messageEditor.UpdateContentHeight();
 	}
 }

@@ -29,6 +29,8 @@ public class DemoData
 		return [
 			new DemoChatMessage(AssistantName, "Hi! I'm your AI Research Assistant. Ask me anything \u2014 I'll search my knowledge base and verify facts for you. \U0001F52C"),
 			new DemoChatMessage(currentUser, "What is the Transformer architecture in AI?"),
+			new DemoChatMessage(AssistantName, CreateSkillCall("skill_1", "load_skill", SkillCallKind.Load, null, "# Research assistant\n1. Read the `references/sources.md` resource.\n2. Search the knowledge base and verify facts.")),
+			new DemoChatMessage(AssistantName, CreateSkillCall("skill_2", "read_skill_resource", SkillCallKind.ReadResource, "references/sources.md", "Trusted sources: peer-reviewed journals, official documentation, encyclopedias.")),
 			new DemoChatMessage(AssistantName, new ReasoningMessageContent("The user wants to know about the Transformer architecture. I should search for a concise and accurate explanation from reliable sources.").SetDone()),
 			new DemoChatMessage(AssistantName, "Great question! Let me research that for you."),
 			new DemoChatMessage(AssistantName, new FunctionCallMessageContent("call_1", "search_knowledge_base", new Dictionary<string, object?> { ["query"] = "Transformer architecture AI deep learning" }, "Found: The Transformer is a deep learning architecture introduced in 'Attention Is All You Need' (Vaswani et al., 2017), based entirely on self-attention mechanisms.")),
@@ -36,7 +38,27 @@ public class DemoData
 			new DemoChatMessage(AssistantName, new ReasoningMessageContent("Good results. Let me verify the claim about the publication year and the key innovation of self-attention.").SetDone()),
 			new DemoChatMessage(AssistantName, new FunctionCallMessageContent("call_2", "verify_facts", new Dictionary<string, object?> { ["claim"] = "Transformers introduced in 2017", ["sources"] = "academic papers" }, "Confirmed: Published by Vaswani et al. at NeurIPS 2017. Self-attention is the core innovation.")),
 			new DemoChatMessage(AssistantName, "The **Transformer** is a neural network architecture introduced in the landmark paper \"Attention Is All You Need\" (Vaswani et al., 2017). Unlike its predecessors (RNNs, LSTMs), it relies entirely on **self-attention mechanisms**, allowing it to process sequences in parallel rather than sequentially.\n\nToday, Transformers power virtually all modern large language models including GPT, BERT, LLaMA, and many more.\n\nWould you like me to dive deeper into any specific aspect? \U0001F50D"),
+			new DemoChatMessage(AssistantName, CreateSkillCall("skill_3", "run_skill_script", SkillCallKind.RunScript, "export-summary", "Summary exported to research-summary.md")),
 		];
+	}
+
+	/// <summary>
+	/// The prompt sent automatically on startup so that a pending skill approval is visible right away.
+	/// </summary>
+	public const string APPROVAL_DEMO_PROMPT = "Please export the summary again.";
+
+	private static FunctionCallMessageContent CreateSkillCall(string callId, string toolName, SkillCallKind kind, string? itemName, string result)
+	{
+		var arguments = new Dictionary<string, object?> { ["skillName"] = "research-assistant" };
+		if (kind == SkillCallKind.ReadResource)
+			arguments["resourceName"] = itemName;
+		else if (kind == SkillCallKind.RunScript)
+			arguments["scriptName"] = itemName;
+
+		return new FunctionCallMessageContent(callId, toolName, arguments, result)
+		{
+			Skill = new SkillCallInfo(kind, "research-assistant", itemName)
+		};
 	}
 
 	/// <summary>

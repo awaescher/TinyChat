@@ -5,13 +5,11 @@ namespace TinyChat;
 /// <summary>
 /// A text input control that allows users to compose messages with optional file attachments.
 /// </summary>
-public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInputControl, IChatInputDraftControl, IChatInputLayoutControl, IChatInputAppearanceControl
+public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInputControl, IChatInputDraftControl, IChatInputDraftEditorControl, IChatInputLayoutControl, IChatInputAppearanceControl
 {
 	private const int ATTACHMENT_DISPLAY_HEIGHT = 60;
 	private const int DEFAULT_CONTENT_PADDING = 8;
 	private const int SEND_BUTTON_INSET = 6;
-	private const string SEND_CHAR = "\u27A4";
-	private const string STOP_CHAR = "\u25A0";
 
 	private readonly List<ChatFileAttachment> _attachments = [];
 	private readonly FlowLayoutPanel _attachmentPanel;
@@ -164,7 +162,9 @@ public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInput
 		_contentPanel.Controls.Add(_contentLayout);
 
 		var size = new Size(24, 24);
-		_sendButton = new Button { Text = SEND_CHAR, MaximumSize = size, MinimumSize = size, Anchor = AnchorStyles.Bottom | AnchorStyles.Right };
+		_sendButton = new NoFocusCueButton { Text = ChatIcons.Send, MaximumSize = size, MinimumSize = size, Anchor = AnchorStyles.Bottom | AnchorStyles.Right, TabStop = false };
+		if (ChatIcons.IconFontName is not null)
+			_sendButton.Font = ChatIcons.CreateFont(9f);
 		Controls.Add(_sendButton);
 		_sendButton.BringToFront();
 		PositionSendButton();
@@ -204,6 +204,15 @@ public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInput
 	{
 		_textBox.Clear();
 		ClearAttachments();
+	}
+
+	/// <inheritdoc />
+	public void SetDraft(string text, IEnumerable<ChatFileAttachment> attachments)
+	{
+		ClearDraft();
+		_textBox.Text = (text ?? string.Empty).ReplaceLineEndings("\r\n");
+		_textBox.SelectionStart = _textBox.TextLength;
+		AddAttachments(attachments);
 	}
 
 	/// <inheritdoc />
@@ -338,7 +347,7 @@ public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInput
 		if (!IsAvailable())
 			return;
 
-		_sendButton.Text = _isReceivingStream && _allowCancellation ? STOP_CHAR : SEND_CHAR;
+		_sendButton.Text = _isReceivingStream && _allowCancellation ? ChatIcons.Stop : ChatIcons.Send;
 		_sendButton.Enabled = !_isReceivingStream || _allowCancellation;
 	}
 
@@ -636,5 +645,15 @@ public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInput
 			AttachmentPasteRequested.Invoke(this, new AttachmentPasteRequestedEventArgs(data));
 			return true;
 		}
+	}
+
+	private sealed class NoFocusCueButton : Button
+	{
+		public NoFocusCueButton()
+		{
+			SetStyle(ControlStyles.Selectable, false);
+		}
+
+		protected override bool ShowFocusCues => false;
 	}
 }

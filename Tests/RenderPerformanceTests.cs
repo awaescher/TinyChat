@@ -218,6 +218,7 @@ public class RenderPerformanceTests
 			[
 				new NamedSender("Assistant"),
 				SingleResponseStream(),
+				new List<FunctionCallMessageContent>(),
 				CancellationToken.None
 			])!;
 

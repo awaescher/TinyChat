@@ -25,7 +25,7 @@ partial class DXReasoningMessageControl
 		lblSender = new LabelControl();
 		lblIcon = new LabelControl();
 		lblTitle = new LabelControl();
-		txtDetail = new DXSelectableMessageTextControl();
+		lblDetail = new LabelControl();
 		tableLayout = new TableLayoutPanel();
 		paddingPanel = new PanelControl();
 		tableLayout.SuspendLayout();
@@ -42,7 +42,7 @@ partial class DXReasoningMessageControl
 		// lblDetail
 		lblIcon.AutoSize = false;
 		lblIcon.Dock = DockStyle.Fill;
-		lblIcon.ImageOptions.SvgImage = SvgImage.FromStream(new MemoryStream(Encoding.UTF8.GetBytes(THINK_SVG)));
+		lblIcon.ImageOptions.SvgImage = FluentIcons.Reasoning;
 		lblIcon.ImageOptions.SvgImageSize = new Size(ICON_SIZE, ICON_SIZE);
 		lblIcon.UseMnemonic = false;
 		lblIcon.Width = ICON_COLUMN_WIDTH;
@@ -54,10 +54,16 @@ partial class DXReasoningMessageControl
 		lblTitle.UseMnemonic = false;
 		lblTitle.Cursor = Cursors.Hand;
 
-		// txtDetail
-		txtDetail.Dock = DockStyle.Fill;
-		txtDetail.Margin = new Padding(0, 2, 0, 6);
-		txtDetail.Visible = false;
+		// lblDetail
+		lblDetail.AllowHtmlString = true;
+		lblDetail.Appearance.TextOptions.WordWrap = DevExpress.Utils.WordWrap.Wrap;
+		lblDetail.Appearance.Options.UseTextOptions = true;
+		lblDetail.AutoSizeMode = LabelAutoSizeMode.Vertical;
+		lblDetail.Cursor = Cursors.Hand;
+		lblDetail.Dock = DockStyle.Fill;
+		lblDetail.Margin = new Padding(0, 2, 0, 6);
+		lblDetail.UseMnemonic = false;
+		lblDetail.Visible = false;
 
 		// _table
 		// Col 0: fixed icon width | Col 1: remaining text
@@ -75,7 +81,7 @@ partial class DXReasoningMessageControl
 		tableLayout.Controls.Add(lblTitle, 1, 0);
 		// Row 1, col 0 intentionally left empty - no spacer, so the row fully
 		// collapses when _detailLabel is hidden.
-		tableLayout.Controls.Add(txtDetail, 1, 1);
+		tableLayout.Controls.Add(lblDetail, 1, 1);
 		tableLayout.Cursor = Cursors.Hand;
 		tableLayout.Dock = DockStyle.Fill;
 		tableLayout.Margin = Padding.Empty;
@@ -106,6 +112,7 @@ partial class DXReasoningMessageControl
 		tableLayout.Click += Toggle;
 		lblIcon.Click += Toggle;
 		lblTitle.Click += Toggle;
+		lblDetail.Click += Toggle;
 
 		tableLayout.ResumeLayout(false);
 		tableLayout.PerformLayout();
@@ -119,6 +126,6 @@ partial class DXReasoningMessageControl
 	private TableLayoutPanel tableLayout;
 	private LabelControl lblIcon;
 	private LabelControl lblTitle;
-	private DXSelectableMessageTextControl txtDetail;
+	private LabelControl lblDetail;
 	private PanelControl paddingPanel;
 }

@@ -5,10 +5,9 @@ namespace TinyChat;
 
 /// <summary>
 /// Displays a function call and its result in a structured two-column layout.
-/// The left column shows icon glyphs from Segoe MDL2 Assets; the right column shows
+/// The left column shows Fluent UI icons (see <see cref="FluentIcons"/>); the right column shows
 /// the function name (bold), the arguments, and the result.
-/// Clicking the header or icon areas toggles the detail rows (arguments + result).
-/// The detail editors remain dedicated to text selection.
+/// Clicking anywhere on the control toggles the detail rows (arguments + result).
 /// </summary>
 internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChatMessageLayoutControl, IChatMessageRefreshControl, IFunctionCallMessageControl
 {
@@ -18,21 +17,8 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 	private const int ICON_WIDTH = 20;
 	private const int ICON_SIZE = 14;
 
-	/// <summary>SVG for the tool/lightning icon.</summary>
-	private const string TOOL_SVG = """
-		<svg viewBox="0 0 32 32">
-			<style type="text/css">.Yellow{fill:#FFB115;}</style>
-			<polygon points="22,2 14,2 6,16 14,16 8,30 26,12 16.3,12" class="Yellow" />
-		</svg>
-		""";
 
-	/// <summary>SVG for the result/arrow icon.</summary>
-	private const string RESULT_SVG = """
-		<svg viewBox="0 0 32 32">
-			<style type="text/css">.Green{fill:#039C23;}</style>
-			<polygon points="18,6 12.3,6 20.3,14 4,14 4,18 20.3,18 12.3,26 18,26 28,16" class="Green" />
-		</svg>
-		""";
+	private bool? _displaysSkillIcon;
 
 	/// <summary>The chat message whose <see cref="FunctionCallMessageContent"/> is being displayed.</summary>
 	private IChatMessage? _message;
@@ -71,11 +57,7 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 	{
 		InitializeComponent();
 
-		txtArguments.ContentHeightChanging += SelectableText_ContentHeightChanging;
-		txtArguments.ContentHeightChanged += SelectableText_ContentHeightChanged;
-		txtResult.ContentHeightChanging += SelectableText_ContentHeightChanging;
-		txtResult.ContentHeightChanged += SelectableText_ContentHeightChanged;
-		WireMouseDown(paddingPanel, tableLayout, lblToolIcon, lblTitle, lblResultIcon);
+		WireMouseDown(paddingPanel, tableLayout, lblToolIcon, lblTitle, lblArguments, lblResultIcon, lblResult);
 		ApplyAppearance();
 		UpdateExpandCursor();
 	}
@@ -206,7 +188,7 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 		}
 	}
 	/// <summary>
-	/// Refreshes the header and selectable detail editors from the current <see cref="Message"/>.
+	/// Refreshes the header and detail labels from the current <see cref="Message"/>.
 	/// Does nothing if <see cref="Message"/> is <see langword="null"/> or its content is not
 	/// a <see cref="FunctionCallMessageContent"/>.
 	/// </summary>
@@ -217,14 +199,15 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 		if (_message?.Content is not FunctionCallMessageContent fc)
 		{
 			lblTitle.Text = string.Empty;
-			txtArguments.SetTextPreservingSelection(string.Empty);
-			txtResult.SetTextPreservingSelection(string.Empty);
+			lblArguments.Text = string.Empty;
+			lblResult.Text = string.Empty;
 			_expanded = false;
 			ApplyVisibility();
 			return;
 		}
 
-		lblTitle.Text = $"{fc.Name} {(fc.IsFunctionExecuting ? "..." : "\u2714")}";
+		lblTitle.Text = FunctionCallDisplay.GetHeader(fc);
+		UpdateToolIcon(fc.Skill is not null);
 
 		var argumentsText = string.Empty;
 		if (fc.Arguments?.Count > 0)
@@ -232,12 +215,8 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 			var maxKeyLen = fc.Arguments.Keys.Max(k => k.Length);
 			argumentsText = string.Join(Environment.NewLine, fc.Arguments.Select(kv => $"{(kv.Key + ":").PadRight(maxKeyLen + 1)} {kv.Value}"));
 		}
-		if (!string.Equals(txtArguments.Text, argumentsText, StringComparison.Ordinal))
-			txtArguments.SetTextPreservingSelection(argumentsText);
-
-		var resultText = fc.Result?.ToString() ?? string.Empty;
-		if (!string.Equals(txtResult.Text, resultText, StringComparison.Ordinal))
-			txtResult.SetTextPreservingSelection(resultText);
+		lblArguments.Text = argumentsText;
+		lblResult.Text = fc.Result?.ToString() ?? string.Empty;
 
 		ApplyVisibility();
 	}
@@ -250,11 +229,13 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 	{
 		var hasArgs = _message?.Content is FunctionCallMessageContent { Arguments.Count: > 0 };
 		var hasResult = _message?.Content is FunctionCallMessageContent { Result: not null };
-		var showArguments = _expanded && hasArgs;
+		var isPending = _message?.Content is FunctionCallMessageContent { ApprovalState: ToolApprovalState.Pending };
+		var showArguments = (_expanded || isPending) && hasArgs;
 		var showResult = _expanded && hasResult;
-		if (txtArguments.Visible == showArguments &&
+		if (lblArguments.Visible == showArguments &&
 			lblResultIcon.Visible == showResult &&
-			txtResult.Visible == showResult)
+			lblResult.Visible == showResult &&
+			approvalPanel.Visible == isPending)
 		{
 			return;
 		}
@@ -264,9 +245,10 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 		tableLayout.SuspendLayout();
 		try
 		{
-			txtArguments.Visible = showArguments;
+			lblArguments.Visible = showArguments;
 			lblResultIcon.Visible = showResult;
-			txtResult.Visible = showResult;
+			lblResult.Visible = showResult;
+			approvalPanel.Visible = isPending;
 		}
 		finally
 		{
@@ -286,6 +268,26 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 		}
 	}
 
+	private void UpdateToolIcon(bool isSkill)
+	{
+		if (_displaysSkillIcon == isSkill)
+			return;
+
+		_displaysSkillIcon = isSkill;
+		lblToolIcon.ImageOptions.SvgImage = isSkill ? FluentIcons.Skill : FluentIcons.Tool;
+	}
+
+
+	private void BtnApprove_Click(object? sender, EventArgs e)
+	{
+		(_message?.Content as FunctionCallMessageContent)?.Approve();
+	}
+
+	private void BtnReject_Click(object? sender, EventArgs e)
+	{
+		(_message?.Content as FunctionCallMessageContent)?.Reject();
+	}
+
 	private void UpdateExpandCursor()
 	{
 		var cursor = AllowExpand ? Cursors.Hand : Cursors.Default;
@@ -294,7 +296,9 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 		tableLayout.Cursor = cursor;
 		lblToolIcon.Cursor = cursor;
 		lblTitle.Cursor = cursor;
+		lblArguments.Cursor = cursor;
 		lblResultIcon.Cursor = cursor;
+		lblResult.Cursor = cursor;
 	}
 
 	/// <inheritdoc />
@@ -335,13 +339,18 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 		ApplyLabelAppearance(lblSender, FontStyle.Bold);
 		ApplyLabelAppearance(lblToolIcon);
 		ApplyLabelAppearance(lblTitle);
+		ApplyLabelAppearance(lblArguments);
 		ApplyLabelAppearance(lblResultIcon);
-		txtArguments.ApplyTextAppearance(Font, ForeColor, BackColor);
-		txtResult.ApplyTextAppearance(Font, ForeColor, BackColor);
+		ApplyLabelAppearance(lblResult);
 		UpdateIconLayout();
 
 		paddingPanel.BackColor = BackColor;
 		tableLayout.BackColor = BackColor;
+		approvalPanel.BackColor = BackColor;
+		btnApprove.Appearance.Font = Font;
+		btnApprove.Appearance.Options.UseFont = true;
+		btnReject.Appearance.Font = Font;
+		btnReject.Appearance.Options.UseFont = true;
 	}
 
 	private void UpdateIconLayout()
@@ -362,8 +371,8 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 			svgSize);
 		ApplyIconLayout(
 			lblResultIcon,
-			txtResult.Margin,
-			Math.Max(txtResult.Appearance.Font.Height, scaledIconSize),
+			lblResult.Margin,
+			Math.Max(lblResult.Appearance.Font.Height, scaledIconSize),
 			scaledIconColumnWidth,
 			svgSize);
 	}
@@ -396,17 +405,15 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 
 	private void UpdateContentWidthConstraints()
 	{
-		if (lblTitle is null || txtArguments is null || txtResult is null)
+		if (lblTitle is null || lblArguments is null || lblResult is null)
 			return;
 
 		var textWidth = MaximumSize.Width == 0
 			? 0
 			: Math.Max(0, MaximumSize.Width - ContentPadding.Horizontal - ScaleLogicalPixels(ICON_WIDTH));
 		lblTitle.MaximumSize = new Size(textWidth, 0);
-		txtArguments.MaximumSize = new Size(textWidth, 0);
-		txtResult.MaximumSize = new Size(textWidth, 0);
-		txtArguments.UpdateContentHeight();
-		txtResult.UpdateContentHeight();
+		lblArguments.MaximumSize = new Size(textWidth, 0);
+		lblResult.MaximumSize = new Size(textWidth, 0);
 	}
 
 	private int ScaleLogicalPixels(int logicalPixels)
@@ -420,16 +427,6 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 			c.MouseDown += (_, e) => OnMouseDown(e);
 	}
 
-	private void SelectableText_ContentHeightChanging(object? sender, EventArgs e)
-	{
-		BeforeLayoutChange?.Invoke(this, EventArgs.Empty);
-	}
-
-	private void SelectableText_ContentHeightChanged(object? sender, EventArgs e)
-	{
-		AfterLayoutChange?.Invoke(this, EventArgs.Empty);
-	}
-
 	/// <inheritdoc />
 	void IChatMessageRefreshControl.RefreshMessageDisplay()
 	{
@@ -437,5 +434,5 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 	}
 
 	/// <inheritdoc/>
-	public override string ToString() => $"{lblTitle.Text}{Environment.NewLine}{txtArguments.Text}{Environment.NewLine}{txtResult.Text}";
+	public override string ToString() => $"{lblTitle.Text}{Environment.NewLine}{lblArguments.Text}{Environment.NewLine}{lblResult.Text}";
 }

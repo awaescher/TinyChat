@@ -388,8 +388,12 @@ public class ChatControlRetrospectivePropertyTests
 
 	private static Control[] FindDetailEditors(Control messageControl, bool useDevExpress)
 	{
+		// The detail rows (arguments, result, reasoning) are the text labels that start collapsed.
 		var editors = DescendantsAndSelf(messageControl)
-			.Where(control => useDevExpress ? control is HtmlContentControl : control is TextBox)
+			.OfType<TableLayoutPanel>()
+			.SelectMany(table => table.Controls.Cast<Control>()
+				.Where(control => table.GetColumn(control) == 1 && table.GetRow(control) > 0))
+			.Where(control => (useDevExpress ? control is LabelControl : control is Label) && !control.Visible)
 			.ToArray();
 		editors.ShouldNotBeEmpty();
 		return editors;

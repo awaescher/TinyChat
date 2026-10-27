@@ -13,7 +13,8 @@ namespace DemoApp;
 /// reasoning, tool calls, and text — without requiring a real LLM backend.
 /// <para>
 /// The response sequence demonstrates the full interleaving pattern:
-/// Reasoning → Text → Tool Call → Text → Reasoning → Tool Call → Final Text.
+/// Skill load → Skill resource → Reasoning → Text → Tool Call → Text → Reasoning → Tool Call → Final Text
+/// → Skill script waiting for approval → (after the decision) script result → Text.
 /// </para>
 /// </summary>
 internal sealed class DemoChatClient : IChatClient
@@ -33,8 +34,56 @@ internal sealed class DemoChatClient : IChatClient
 		ChatOptions? options = null,
 		[EnumeratorCancellation] CancellationToken cancellationToken = default)
 	{
+		// ── Follow-up after the user decided on the script approval ───────
+		var approvalResponse = messages.LastOrDefault()?.Contents.OfType<ToolApprovalResponseContent>().FirstOrDefault();
+		if (approvalResponse is not null)
+		{
+			await foreach (var update in ContinueAfterApprovalAsync(approvalResponse, cancellationToken))
+				yield return update;
+			yield break;
+		}
+
 		var userQuestion = messages.LastOrDefault(m => m.Role == ChatRole.User)?.Text ?? "your question";
 		var shortTopic = userQuestion.Length > 80 ? userQuestion[..80] + "…" : userQuestion;
+
+		// ── Shortcut: export requests go straight to the approval ─────────
+		if (userQuestion.Contains("export", StringComparison.OrdinalIgnoreCase))
+		{
+			await Task.Delay(400, cancellationToken);
+			yield return CreateUpdate(new ToolApprovalRequestContent("approval_export_1", CreateExportScriptCall("Transformer architecture")));
+			yield break;
+		}
+
+		// ── Phase 0: Skills — load instructions and read a resource ──────
+		yield return CreateFunctionCallUpdate(
+			"call_skill_load",
+			"load_skill",
+			new Dictionary<string, object?> { ["skillName"] = "research-assistant" });
+
+		await Task.Delay(600, cancellationToken);
+
+		yield return CreateFunctionResultUpdate(
+			"call_skill_load",
+			"# Research assistant\n1. Read the `references/sources.md` resource.\n2. Search the knowledge base.\n3. Run the `export-summary` script to save the result.");
+
+		await Task.Delay(300, cancellationToken);
+
+		yield return CreateFunctionCallUpdate(
+			"call_skill_resource",
+			"read_skill_resource",
+			new Dictionary<string, object?>
+			{
+				["skillName"] = "research-assistant",
+				["resourceName"] = "references/sources.md"
+			});
+
+		await Task.Delay(600, cancellationToken);
+
+		yield return CreateFunctionResultUpdate(
+			"call_skill_resource",
+			"Trusted sources: peer-reviewed journals, official documentation, encyclopedias.");
+
+		await Task.Delay(300, cancellationToken);
 
 		// ── Phase 1: Reasoning ────────────────────────────────────────────
 		foreach (var chunk in ChunkText(
@@ -117,6 +166,62 @@ internal sealed class DemoChatClient : IChatClient
 			yield return CreateTextUpdate(chunk);
 			await Task.Delay(40, cancellationToken);
 		}
+
+		await Task.Delay(300, cancellationToken);
+
+		// ── Phase 8: Skill script that requires the user's approval ──────
+		// The turn ends here; ChatControl shows the approve/reject buttons and
+		// sends the decision back in a follow-up request.
+		yield return CreateUpdate(new ToolApprovalRequestContent(
+			"approval_export_1",
+			CreateExportScriptCall(shortTopic)));
+	}
+
+	private static async IAsyncEnumerable<ChatResponseUpdate> ContinueAfterApprovalAsync(
+		ToolApprovalResponseContent approvalResponse,
+		[EnumeratorCancellation] CancellationToken cancellationToken)
+	{
+		if (approvalResponse.ToolCall is not FunctionCallContent scriptCall)
+			yield break;
+
+		string text;
+		if (approvalResponse.Approved)
+		{
+			yield return CreateUpdate(new FunctionCallContent(scriptCall.CallId, scriptCall.Name, scriptCall.Arguments));
+			await Task.Delay(1200, cancellationToken);
+			yield return CreateFunctionResultUpdate(scriptCall.CallId, "Summary exported to research-summary.md");
+			text = "Done! I exported the summary to research-summary.md. \u2705";
+		}
+		else
+		{
+			yield return CreateFunctionResultUpdate(scriptCall.CallId, "Tool call invocation was rejected by the approver.");
+			text = "Okay, I did not export the summary.";
+		}
+
+		await Task.Delay(300, cancellationToken);
+
+		foreach (var chunk in ChunkText(text))
+		{
+			yield return CreateTextUpdate(chunk);
+			await Task.Delay(40, cancellationToken);
+		}
+	}
+
+	private static FunctionCallContent CreateExportScriptCall(string topic) => new(
+		"call_skill_script",
+		"run_skill_script",
+		new Dictionary<string, object?>
+		{
+			["skillName"] = "research-assistant",
+			["scriptName"] = "export-summary",
+			["arguments"] = $"{{ \"topic\": \"{topic}\" }}"
+		});
+
+	private static ChatResponseUpdate CreateUpdate(AIContent content)
+	{
+		var update = new ChatResponseUpdate { Role = ChatRole.Assistant };
+		update.Contents.Add(content);
+		return update;
 	}
 
 	public object? GetService(Type serviceType, object? serviceKey = null)

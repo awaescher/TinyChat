@@ -14,16 +14,6 @@ internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMes
 	private const int ICON_COLUMN_WIDTH = 20;
 	private const int ICON_SIZE = 14;
 
-	/// <summary>SVG for the think/idea icon.</summary>
-	private const string THINK_SVG = """
-		<svg viewBox="0 0 32 32">
-			<style type="text/css">.Black{fill:#727272;}.Yellow{fill:#FFB115;}</style>
-			<path d="M13,24h6c0.6,0,1-0.5,1-1s-0.4-1-1-1h-6c-0.6,0-1,0.5-1,1S12.4,24,13,24z" class="Black" />
-			<path d="M19,26h-6c-0.6,0-1,0.5-1,1s0.4,1,1,1h1c0,1.1,0.9,2,2,2s2-0.9,2-2h1c0.6,0,1-0.5,1-1S19.6,26,19,26z" class="Black" />
-			<path d="M16,2c-4.4,0-8,3.6-8,8c0,5,4,6,4,10c2,0,6,0,8,0c0-4,4-5,4-10C24,5.6,20.4,2,16,2z" class="Yellow" />
-		</svg>
-		""";
-
 	/// <summary>The chat message whose <see cref="ReasoningMessageContent"/> is being displayed.</summary>
 	private IChatMessage? _message;
 	private bool _isReceivingStream;
@@ -100,16 +90,14 @@ internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMes
 
 	/// <summary>
 	/// Initializes a new instance of <see cref="DXReasoningMessageControl"/>, creating and wiring up the
-	/// icon, header and selectable detail editor via the designer-generated <see cref="InitializeComponent"/>.
+	/// icon, header and detail labels via the designer-generated <see cref="InitializeComponent"/>.
 	/// </summary>
 	public DXReasoningMessageControl()
 	{
 		_streamingDisplayUpdate = new CoalescedUiUpdate(this, UpdateDisplay);
 		InitializeComponent();
 
-		txtDetail.ContentHeightChanging += SelectableText_ContentHeightChanging;
-		txtDetail.ContentHeightChanged += SelectableText_ContentHeightChanged;
-		WireMouseDown(paddingPanel, tableLayout, lblIcon, lblTitle);
+		WireMouseDown(paddingPanel, tableLayout, lblIcon, lblTitle, lblDetail);
 		ApplyAppearance();
 		UpdateExpandCursor();
 		Disposed += (_, _) => _streamingDisplayUpdate.Cancel();
@@ -192,7 +180,7 @@ internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMes
 		{
 			if (_expanded)
 				EnsureDetailTextCurrent();
-			txtDetail.Visible = _expanded && Message is not null;
+			lblDetail.Visible = _expanded && Message is not null;
 		}
 		finally
 		{
@@ -220,6 +208,7 @@ internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMes
 		tableLayout.Cursor = cursor;
 		lblIcon.Cursor = cursor;
 		lblTitle.Cursor = cursor;
+		lblDetail.Cursor = cursor;
 	}
 
 	private string GetHeaderText()
@@ -237,8 +226,8 @@ internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMes
 		var metadataChanged =
 			!string.Equals(lblSender.Text, senderText, StringComparison.Ordinal) ||
 			!string.Equals(lblTitle.Text, headerText, StringComparison.Ordinal) ||
-			txtDetail.Visible != detailVisible;
-		if (!txtDetail.Visible && !metadataChanged)
+			lblDetail.Visible != detailVisible;
+		if (!lblDetail.Visible && !metadataChanged)
 			return;
 
 		BeforeLayoutChange?.Invoke(this, EventArgs.Empty);
@@ -248,7 +237,7 @@ internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMes
 			lblTitle.Text = headerText;
 			if (detailVisible)
 				EnsureDetailTextCurrent();
-			txtDetail.Visible = detailVisible;
+			lblDetail.Visible = detailVisible;
 		}
 		finally
 		{
@@ -261,10 +250,9 @@ internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMes
 		if (!_detailTextDirty)
 			return;
 
-		if (Message is null)
-			txtDetail.SetTextPreservingSelection(string.Empty);
-		else
-			txtDetail.SetFormattedTextPreservingSelection(MessageFormatter.Format(Message.Content));
+		lblDetail.Text = Message is null
+			? string.Empty
+			: MessageFormatter.Format(Message.Content);
 		_detailTextDirty = false;
 	}
 
@@ -376,7 +364,7 @@ internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMes
 		ApplyLabelAppearance(lblSender, FontStyle.Bold);
 		ApplyLabelAppearance(lblIcon);
 		ApplyLabelAppearance(lblTitle);
-		txtDetail.ApplyTextAppearance(Font, ForeColor, BackColor);
+		ApplyLabelAppearance(lblDetail);
 		UpdateIconLayout();
 
 		paddingPanel.BackColor = BackColor;
@@ -411,15 +399,14 @@ internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMes
 
 	private void UpdateContentWidthConstraints()
 	{
-		if (lblTitle is null || txtDetail is null)
+		if (lblTitle is null || lblDetail is null)
 			return;
 
 		var textWidth = MaximumSize.Width == 0
 			? 0
 			: Math.Max(0, MaximumSize.Width - ContentPadding.Horizontal - ScaleLogicalPixels(ICON_COLUMN_WIDTH));
 		lblTitle.MaximumSize = new Size(textWidth, 0);
-		txtDetail.MaximumSize = new Size(textWidth, 0);
-		txtDetail.UpdateContentHeight();
+		lblDetail.MaximumSize = new Size(textWidth, 0);
 	}
 
 	private int ScaleLogicalPixels(int logicalPixels)
@@ -427,20 +414,10 @@ internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMes
 		return Math.Max(1, (int)Math.Round(logicalPixels * DeviceDpi / 96f));
 	}
 
-	private void SelectableText_ContentHeightChanging(object? sender, EventArgs e)
-	{
-		BeforeLayoutChange?.Invoke(this, EventArgs.Empty);
-	}
-
-	private void SelectableText_ContentHeightChanged(object? sender, EventArgs e)
-	{
-		AfterLayoutChange?.Invoke(this, EventArgs.Empty);
-	}
-
 	/// <inheritdoc/>
 	public override string ToString()
 	{
 		EnsureDetailTextCurrent();
-		return txtDetail.Text;
+		return DXFormattedText.ToPlainText(lblDetail.Text);
 	}
 }

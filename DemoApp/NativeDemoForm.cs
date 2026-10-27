@@ -38,6 +38,7 @@ public partial class NativeDemoForm : Form, IMessageFilter
 		chatControl.IncludeReasoning = true;
 		chatControl.ServiceProvider = DemoData.CreateDemoServiceProvider();
 		chatControl.Messages = DemoData.Create(Environment.UserName);
+		chatControl.SendMessage(DemoData.APPROVAL_DEMO_PROMPT);
 		SelectControl(chatControl);
 	}
 

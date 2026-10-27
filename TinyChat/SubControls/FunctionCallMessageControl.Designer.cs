@@ -19,10 +19,14 @@ partial class FunctionCallMessageControl
 		lblIcon = new Label();
 		lblResultIcon = new Label();
 		lblTitle = new Label();
-		lblArgs = new SelectableMessageTextControl();
-		lblResult = new SelectableMessageTextControl();
+		lblArgs = new Label();
+		lblResult = new Label();
+		approvalPanel = new FlowLayoutPanel();
+		btnApprove = new Button();
+		btnReject = new Button();
 		tableLayout = new TableLayoutPanel();
 		tableLayout.SuspendLayout();
+		approvalPanel.SuspendLayout();
 		SuspendLayout();
 
 		// lblSender
@@ -38,7 +42,7 @@ partial class FunctionCallMessageControl
 		lblIcon.Dock = DockStyle.None;
 		lblIcon.Height = Font.Height;
 		lblIcon.Margin = Padding.Empty;
-		lblIcon.Text = TOOL_CALL_ICON;
+		lblIcon.Text = ChatIcons.Tool;
 		lblIcon.TextAlign = ContentAlignment.MiddleCenter;
 		lblIcon.UseMnemonic = false;
 		lblIcon.Width = ICON_WIDTH;
@@ -49,7 +53,7 @@ partial class FunctionCallMessageControl
 		lblResultIcon.Dock = DockStyle.None;
 		lblResultIcon.Height = Font.Height;
 		lblResultIcon.Margin = Padding.Empty;
-		lblResultIcon.Text = RESULT_ICON;
+		lblResultIcon.Text = ChatIcons.Result;
 		lblResultIcon.TextAlign = ContentAlignment.MiddleCenter;
 		lblResultIcon.UseMnemonic = false;
 		lblResultIcon.Visible = false;
@@ -63,14 +67,47 @@ partial class FunctionCallMessageControl
 
 		// lblArgs
 		lblArgs.AutoSize = true;
-		lblArgs.Dock = DockStyle.Top;
+		lblArgs.Dock = DockStyle.Fill;
 		lblArgs.Margin = new Padding(0, 2, 0, 6);
+		lblArgs.UseMnemonic = false;
 		lblArgs.Visible = false;
 
 		// lblResult
 		lblResult.AutoSize = true;
-		lblResult.Dock = DockStyle.Top;
+		lblResult.Dock = DockStyle.Fill;
+		lblResult.UseMnemonic = false;
 		lblResult.Visible = false;
+
+		// btnApprove
+		btnApprove.AutoSize = true;
+		btnApprove.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+		btnApprove.Cursor = Cursors.Default;
+		btnApprove.Margin = new Padding(0, 4, 6, 0);
+		btnApprove.Text = FunctionCallDisplay.APPROVE_GLYPH;
+		btnApprove.UseMnemonic = false;
+		btnApprove.Click += BtnApprove_Click;
+
+		// btnReject
+		btnReject.AutoSize = true;
+		btnReject.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+		btnReject.Cursor = Cursors.Default;
+		btnReject.Margin = new Padding(0, 4, 0, 0);
+		btnReject.Text = FunctionCallDisplay.REJECT_GLYPH;
+		btnReject.UseMnemonic = false;
+		btnReject.Click += BtnReject_Click;
+
+		// approvalPanel
+		approvalPanel.AutoSize = true;
+		approvalPanel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+		approvalPanel.Controls.Add(btnApprove);
+		approvalPanel.Controls.Add(btnReject);
+		approvalPanel.Cursor = Cursors.Default;
+		approvalPanel.Dock = DockStyle.Top;
+		approvalPanel.FlowDirection = FlowDirection.LeftToRight;
+		approvalPanel.Margin = Padding.Empty;
+		approvalPanel.Padding = Padding.Empty;
+		approvalPanel.Visible = false;
+		approvalPanel.WrapContents = false;
 
 		// _table
 		// Col 0: fixed icon width | Col 1: remaining text
@@ -93,11 +130,14 @@ partial class FunctionCallMessageControl
 		tableLayout.Controls.Add(lblArgs, 1, 1);
 		tableLayout.Controls.Add(lblResultIcon, 0, 2);
 		tableLayout.Controls.Add(lblResult, 1, 2);
+		// Row 3: approval buttons, only visible while an approval is pending.
+		tableLayout.Controls.Add(approvalPanel, 1, 3);
 
 		tableLayout.Dock = DockStyle.Fill;
 		tableLayout.Margin = Padding.Empty;
 		tableLayout.Padding = Padding.Empty;
-		tableLayout.RowCount = 3;
+		tableLayout.RowCount = 4;
+		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -116,8 +156,12 @@ partial class FunctionCallMessageControl
 		tableLayout.Click += Toggle;
 		lblIcon.Click += Toggle;
 		lblTitle.Click += Toggle;
+		lblArgs.Click += Toggle;
 		lblResultIcon.Click += Toggle;
+		lblResult.Click += Toggle;
 
+		approvalPanel.ResumeLayout(false);
+		approvalPanel.PerformLayout();
 		tableLayout.ResumeLayout(false);
 		tableLayout.PerformLayout();
 		ResumeLayout(false);
@@ -128,7 +172,10 @@ partial class FunctionCallMessageControl
 	private TableLayoutPanel tableLayout;
 	private Label lblIcon;
 	private Label lblTitle;
-	private SelectableMessageTextControl lblArgs;
+	private Label lblArgs;
 	private Label lblResultIcon;
-	private SelectableMessageTextControl lblResult;
+	private Label lblResult;
+	private FlowLayoutPanel approvalPanel;
+	private Button btnApprove;
+	private Button btnReject;
 }
