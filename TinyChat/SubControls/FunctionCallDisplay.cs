@@ -35,4 +35,27 @@ internal static class FunctionCallDisplay
 	}
 
 	internal static string GetHeader(FunctionCallMessageContent content) => $"{GetTitle(content)} {GetStatus(content)}";
+
+	internal static FunctionCallStatus GetStatusKind(FunctionCallMessageContent content)
+	{
+		if (content.ApprovalState == ToolApprovalState.Pending)
+			return FunctionCallStatus.Pending;
+
+		if (content.ApprovalState == ToolApprovalState.Rejected)
+			return FunctionCallStatus.Rejected;
+
+		if (content.IsFunctionExecuting)
+			return FunctionCallStatus.Executing;
+
+		return content.HasError ? FunctionCallStatus.Failed : FunctionCallStatus.Succeeded;
+	}
+}
+
+internal enum FunctionCallStatus
+{
+	Pending,
+	Executing,
+	Succeeded,
+	Failed,
+	Rejected
 }
