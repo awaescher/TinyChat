@@ -19,6 +19,8 @@ partial class FunctionCallMessageControl
 		lblIcon = new Label();
 		lblResultIcon = new Label();
 		lblTitle = new Label();
+		lblStatus = new Label();
+		headerPanel = new FlowLayoutPanel();
 		lblArgs = new Label();
 		lblResult = new Label();
 		approvalPanel = new FlowLayoutPanel();
@@ -61,9 +63,26 @@ partial class FunctionCallMessageControl
 
 		// lblTitle
 		lblTitle.AutoSize = true;
-		lblTitle.Dock = DockStyle.Fill;
+		lblTitle.Margin = Padding.Empty;
 		lblTitle.UseMnemonic = false;
 		lblTitle.TextAlign = ContentAlignment.MiddleLeft;
+
+		// lblStatus
+		lblStatus.AutoSize = true;
+		lblStatus.Margin = Padding.Empty;
+		lblStatus.TextAlign = ContentAlignment.MiddleLeft;
+		lblStatus.UseMnemonic = false;
+
+		// headerPanel
+		headerPanel.AutoSize = true;
+		headerPanel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+		headerPanel.Controls.Add(lblTitle);
+		headerPanel.Controls.Add(lblStatus);
+		headerPanel.Dock = DockStyle.Fill;
+		headerPanel.FlowDirection = FlowDirection.LeftToRight;
+		headerPanel.Margin = Padding.Empty;
+		headerPanel.Padding = Padding.Empty;
+		headerPanel.WrapContents = false;
 
 		// lblArgs
 		lblArgs.AutoSize = true;
@@ -124,7 +143,7 @@ partial class FunctionCallMessageControl
 		tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, ICON_WIDTH));
 		tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
 		tableLayout.Controls.Add(lblIcon, 0, 0);
-		tableLayout.Controls.Add(lblTitle, 1, 0);
+		tableLayout.Controls.Add(headerPanel, 1, 0);
 		// Row 1, col 0 intentionally left empty - no spacer, so the row fully
 		// collapses when _argsLabel is hidden.
 		tableLayout.Controls.Add(lblArgs, 1, 1);
@@ -156,6 +175,8 @@ partial class FunctionCallMessageControl
 		tableLayout.Click += Toggle;
 		lblIcon.Click += Toggle;
 		lblTitle.Click += Toggle;
+		headerPanel.Click += Toggle;
+		lblStatus.Click += Toggle;
 		lblArgs.Click += Toggle;
 		lblResultIcon.Click += Toggle;
 		lblResult.Click += Toggle;
@@ -172,6 +193,8 @@ partial class FunctionCallMessageControl
 	private TableLayoutPanel tableLayout;
 	private Label lblIcon;
 	private Label lblTitle;
+	private Label lblStatus;
+	private FlowLayoutPanel headerPanel;
 	private Label lblArgs;
 	private Label lblResultIcon;
 	private Label lblResult;

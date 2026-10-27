@@ -138,6 +138,35 @@ public class SkillAndApprovalTests
 			bitmap.Save(Path.Combine(Path.GetTempPath(), "opencode", $"theme_{name}.png"));
 		}
 
+		[Explicit("Writes screenshots for a visual check")]
+		[TestCase(false)]
+		[TestCase(true)]
+		public void Renders_Failed_Function_Calls(bool useDevExpress)
+		{
+			using var form = new Form { Size = new Size(380, 260) };
+			using ChatControl control = useDevExpress
+				? new DXChatControl { Dock = DockStyle.Fill, IncludeFunctionCalls = true }
+				: new ChatControl { Dock = DockStyle.Fill, IncludeFunctionCalls = true };
+			form.Controls.Add(control);
+			form.Show();
+			foreach (var name in new[] { "GetFocusedFormHandle", "GetOpenForms" })
+			{
+				var content = new FunctionCallMessageContent(name, name, null);
+				content.SetResult("Error: Function failed.", hasError: true);
+				control.AddMessage(new NamedSender("Assistant"), content);
+			}
+			control.AddMessage(new NamedSender("Assistant"), new FunctionCallMessageContent("ok", "GetApplicationContext", null, "ok"));
+			for (var index = 0; index < 20; index++)
+			{
+				Application.DoEvents();
+				Thread.Sleep(10);
+			}
+
+			using var bitmap = new Bitmap(form.ClientSize.Width, form.ClientSize.Height);
+			form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size));
+			bitmap.Save(Path.Combine(Path.GetTempPath(), "opencode", useDevExpress ? "dx_failed_calls.png" : "native_failed_calls.png"));
+		}
+
 		[Test]
 		public void Provides_All_Fluent_Icons_For_DevExpress()
 		{

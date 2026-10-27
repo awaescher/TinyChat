@@ -3199,7 +3199,13 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 		// The whole body is guarded so this fire-and-forget task can never fault. An unobserved fault
 		// would otherwise be re-thrown by the runtime onto a captured SynchronizationContext, which may
 		// already be gone (for example a torn-down unit-test context), crashing the process.
+		//
+		// The source itself is still advanced on the caller's context: chat clients may invoke tools
+		// from within the stream, and those tools commonly access UI controls and must therefore run
+		// on the UI thread, just like they did when the stream was enumerated directly.
 		var previousContext = SynchronizationContext.Current;
+		var callerContext = previousContext;
+		var callerThreadId = Environment.CurrentManagedThreadId;
 		SynchronizationContext.SetSynchronizationContext(null);
 		try
 		{
@@ -3210,7 +3216,7 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 				enumerator = source.GetAsyncEnumerator(cancellationToken);
 				while (true)
 				{
-					var moveNextTask = enumerator.MoveNextAsync().AsTask();
+					var moveNextTask = MoveNextOnContextAsync(enumerator, callerContext, callerThreadId);
 					bool hasNext;
 					try
 					{
@@ -3262,6 +3268,63 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 		{
 			// Last-resort guard: never let this fire-and-forget task fault.
 			writer.TryComplete();
+		}
+		finally
+		{
+			SynchronizationContext.SetSynchronizationContext(previousContext);
+		}
+	}
+
+	private static Task<bool> MoveNextOnContextAsync<T>(IAsyncEnumerator<T> enumerator, SynchronizationContext? context, int contextThreadId)
+	{
+		if (context is null)
+			return enumerator.MoveNextAsync().AsTask();
+
+		if (Environment.CurrentManagedThreadId == contextThreadId)
+			return MoveNextWithContext(enumerator, context);
+
+		var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+		try
+		{
+			context.Post(_ =>
+			{
+				try
+				{
+					MoveNextWithContext(enumerator, context).ContinueWith(
+						task =>
+						{
+							if (task.IsCanceled)
+								completion.TrySetCanceled();
+							else if (task.IsFaulted)
+								completion.TrySetException(task.Exception!.InnerExceptions);
+							else
+								completion.TrySetResult(task.Result);
+						},
+						CancellationToken.None,
+						TaskContinuationOptions.ExecuteSynchronously,
+						TaskScheduler.Default);
+				}
+				catch (Exception ex)
+				{
+					completion.TrySetException(ex);
+				}
+			}, null);
+		}
+		catch (Exception ex)
+		{
+			completion.TrySetException(ex);
+		}
+
+		return completion.Task;
+	}
+
+	private static Task<bool> MoveNextWithContext<T>(IAsyncEnumerator<T> enumerator, SynchronizationContext context)
+	{
+		var previousContext = SynchronizationContext.Current;
+		SynchronizationContext.SetSynchronizationContext(context);
+		try
+		{
+			return enumerator.MoveNextAsync().AsTask();
 		}
 		finally
 		{

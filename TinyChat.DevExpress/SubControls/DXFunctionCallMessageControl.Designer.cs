@@ -17,6 +17,8 @@ partial class DXFunctionCallMessageControl
 			content.PropertyChanged -= OnContentPropertyChanged;
 		if (disposing && (components != null))
 			components.Dispose();
+		if (disposing)
+			statusImages?.Dispose();
 		base.Dispose(disposing);
 	}
 
@@ -33,6 +35,10 @@ partial class DXFunctionCallMessageControl
 		btnReject = new SimpleButton();
 		tableLayout = new TableLayoutPanel();
 		paddingPanel = new PanelControl();
+		statusImages = new DevExpress.Utils.SvgImageCollection();
+		statusImages.Add(STATUS_SUCCESS, FluentIcons.Success);
+		statusImages.Add(STATUS_WARNING, FluentIcons.Warning);
+		statusImages.Add(STATUS_REJECTED, FluentIcons.Rejected);
 		approvalPanel.SuspendLayout();
 		tableLayout.SuspendLayout();
 		paddingPanel.SuspendLayout();
@@ -71,6 +77,7 @@ partial class DXFunctionCallMessageControl
 		// _callTitleLabel
 		lblTitle.AutoSizeMode = LabelAutoSizeMode.Vertical;
 		lblTitle.AllowHtmlString = true;
+		lblTitle.HtmlImages = statusImages;
 		lblTitle.UseMnemonic = false;
 
 		// lblArguments
@@ -196,4 +203,5 @@ partial class DXFunctionCallMessageControl
 	private FlowLayoutPanel approvalPanel;
 	private SimpleButton btnApprove;
 	private SimpleButton btnReject;
+	private DevExpress.Utils.SvgImageCollection statusImages;
 }

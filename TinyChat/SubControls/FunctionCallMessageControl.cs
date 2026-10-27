@@ -17,6 +17,7 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 	private IChatMessage? _message;
 	private Font? _senderFont;
 	private Font? _iconFont;
+	private Font? _statusIconFont;
 	private int _iconColumnWidth = ICON_WIDTH;
 
 	/// <summary>
@@ -61,9 +62,11 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 			_senderFont = null;
 			_iconFont?.Dispose();
 			_iconFont = null;
+			_statusIconFont?.Dispose();
+			_statusIconFont = null;
 		};
 
-		WireMouseDown(tableLayout, lblIcon, lblTitle, lblArgs, lblResultIcon, lblResult);
+		WireMouseDown(tableLayout, lblIcon, headerPanel, lblTitle, lblStatus, lblArgs, lblResultIcon, lblResult);
 		UpdateExpandCursor();
 	}
 
@@ -126,8 +129,10 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 	{
 		var oldSenderFont = _senderFont;
 		var oldIconFont = _iconFont;
+		var oldStatusIconFont = _statusIconFont;
 		_senderFont = new Font(Font, Font.Style | FontStyle.Bold);
 		_iconFont = ChatIcons.CreateFont(Math.Max(1f, Math.Min(Font.SizeInPoints, 9f)));
+		_statusIconFont = ChatIcons.IconFontName is null ? null : ChatIcons.CreateFont(Math.Max(1f, Font.SizeInPoints * 0.8f));
 		lblSender.Font = _senderFont;
 		lblTitle.Font = Font;
 		lblArgs.Font = Font;
@@ -136,9 +141,14 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 		btnReject.Font = Font;
 		lblIcon.Font = _iconFont;
 		lblResultIcon.Font = _iconFont;
+		if (_message?.Content is FunctionCallMessageContent content)
+			UpdateStatus(content);
+		else
+			lblStatus.Font = Font;
 		UpdateIconLayout();
 		oldSenderFont?.Dispose();
 		oldIconFont?.Dispose();
+		oldStatusIconFont?.Dispose();
 	}
 
 	/// <inheritdoc />
@@ -282,7 +292,7 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 			_message?.Content is FunctionCallMessageContent functionCall &&
 			approvalPanel.Visible == (functionCall.ApprovalState == ToolApprovalState.Pending) &&
 			string.Equals(lblSender.Text, Message?.Sender?.Name ?? string.Empty, StringComparison.Ordinal) &&
-			lblTitle.Text.StartsWith(FunctionCallDisplay.GetTitle(functionCall), StringComparison.Ordinal);
+			string.Equals(lblTitle.Text, FunctionCallDisplay.GetTitle(functionCall), StringComparison.Ordinal);
 	}
 
 	private void UpdateDisplayCore()
@@ -300,8 +310,9 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 		}
 
 		lblIcon.Text = FunctionCallDisplay.GetIcon(fc);
+		lblTitle.Text = FunctionCallDisplay.GetTitle(fc);
+		UpdateStatus(fc);
 		ApplyIconColors();
-		lblTitle.Text = FunctionCallDisplay.GetHeader(fc);
 
 		var argumentsText = string.Empty;
 		if (fc.Arguments?.Count > 0)
@@ -385,7 +396,8 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 		Cursor = cursor;
 		tableLayout.Cursor = cursor;
 		lblTitle.Cursor = cursor;
-		lblIcon.Cursor = cursor;
+		lblStatus.Cursor = cursor;
+		headerPanel.Cursor = cursor;
 		lblArgs.Cursor = cursor;
 		lblResultIcon.Cursor = cursor;
 		lblResult.Cursor = cursor;
@@ -432,7 +444,7 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 			: Math.Max(0, MaximumSize.Width - ContentPadding.Horizontal);
 		var textWidth = contentWidth == 0 ? 0 : Math.Max(0, contentWidth - _iconColumnWidth);
 		lblSender.MaximumSize = new Size(contentWidth, 0);
-		lblTitle.MaximumSize = new Size(textWidth, 0);
+		lblTitle.MaximumSize = new Size(textWidth == 0 ? 0 : Math.Max(1, textWidth - lblStatus.PreferredSize.Width - lblStatus.Margin.Horizontal), 0);
 		lblArgs.MaximumSize = new Size(textWidth, 0);
 		lblResult.MaximumSize = new Size(textWidth, 0);
 	}
@@ -445,7 +457,7 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 		var backColor = GetOpaqueBackColor();
 		tableLayout.BackColor = backColor;
 		approvalPanel.BackColor = backColor;
-		foreach (var label in new Control[] { lblSender, lblIcon, lblTitle, lblArgs, lblResultIcon, lblResult })
+		foreach (var label in new Control[] { lblSender, lblIcon, lblTitle, lblStatus, headerPanel, lblArgs, lblResultIcon, lblResult })
 		{
 			label.BackColor = backColor;
 			label.ForeColor = ForeColor;
@@ -459,6 +471,41 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 		var accentColor = _message?.Content is FunctionCallMessageContent { Skill: not null } ? ChatIcons.SkillColor : ChatIcons.ToolColor;
 		lblIcon.ForeColor = ChatIcons.GetIconColor(accentColor, ForeColor);
 		lblResultIcon.ForeColor = ChatIcons.GetIconColor(ChatIcons.ResultColor, ForeColor);
+		lblStatus.ForeColor = GetStatusColor();
+	}
+
+	private bool UsesStatusIconFont => ChatIcons.IconFontName is not null && _statusIconFont is not null;
+
+	private void UpdateStatus(FunctionCallMessageContent content)
+	{
+		var status = FunctionCallDisplay.GetStatusKind(content);
+		var glyph = UsesStatusIconFont
+			? status switch
+			{
+				FunctionCallStatus.Succeeded => ChatIcons.StatusSucceeded,
+				FunctionCallStatus.Failed => ChatIcons.StatusFailed,
+				FunctionCallStatus.Rejected => ChatIcons.StatusRejected,
+				_ => null
+			}
+			: null;
+
+		lblStatus.Font = glyph is null ? Font : _statusIconFont;
+		lblStatus.Text = glyph ?? FunctionCallDisplay.GetStatus(content);
+		var offset = glyph is null ? 0 : Math.Max(0, (int)Math.Round((Font.GetHeight(DeviceDpi) - _statusIconFont!.GetHeight(DeviceDpi)) / 2f));
+		lblStatus.Margin = new Padding(0, offset, 0, 0);
+	}
+
+	private Color GetStatusColor()
+	{
+		if (!UsesStatusIconFont || _message?.Content is not FunctionCallMessageContent content)
+			return ForeColor;
+
+		return FunctionCallDisplay.GetStatusKind(content) switch
+		{
+			FunctionCallStatus.Succeeded => ChatIcons.ResultColor,
+			FunctionCallStatus.Failed or FunctionCallStatus.Rejected => ChatIcons.ErrorColor,
+			_ => ForeColor
+		};
 	}
 
 	/// <inheritdoc />
@@ -479,5 +526,9 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 	}
 
 	/// <inheritdoc/>
-	public override string ToString() => $"{lblTitle.Text}{Environment.NewLine}{lblArgs.Text}{Environment.NewLine}{lblResult.Text}";
+	public override string ToString()
+	{
+		var header = _message?.Content is FunctionCallMessageContent content ? FunctionCallDisplay.GetHeader(content) : lblTitle.Text;
+		return $"{header}{Environment.NewLine}{lblArgs.Text}{Environment.NewLine}{lblResult.Text}";
+	}
 }

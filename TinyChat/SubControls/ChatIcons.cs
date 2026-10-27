@@ -32,11 +32,18 @@ internal static class ChatIcons
 
 	internal static string Revert => IconFontName is null ? "\u21B6" : "\ue7a7";
 
+	internal static string StatusSucceeded => "\ue73e";
+
+	internal static string StatusFailed => "\ue814";
+
+	internal static string StatusRejected => "\ue711";
+
 	/// <summary>Gets the accent colors used for the icons, matching the DevExpress Fluent icons.</summary>
 	internal static readonly Color ToolColor = Color.FromArgb(0xFF, 0xB1, 0x15);
 	internal static readonly Color ReasoningColor = ToolColor;
 	internal static readonly Color SkillColor = Color.FromArgb(0x11, 0x77, 0xD7);
 	internal static readonly Color ResultColor = Color.FromArgb(0x03, 0x9C, 0x23);
+	internal static readonly Color ErrorColor = Color.FromArgb(0xD1, 0x1C, 0x1C);
 
 	/// <summary>
 	/// Returns the accent color for an icon glyph when an icon font is used. The fallback symbols keep

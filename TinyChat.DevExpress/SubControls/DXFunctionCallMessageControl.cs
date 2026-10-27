@@ -16,6 +16,10 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 	/// </summary>
 	private const int ICON_WIDTH = 20;
 	private const int ICON_SIZE = 14;
+	private const int STATUS_ICON_SIZE = 12;
+	private const string STATUS_SUCCESS = "success";
+	private const string STATUS_WARNING = "warning";
+	private const string STATUS_REJECTED = "rejected";
 
 
 	private bool? _displaysSkillIcon;
@@ -206,7 +210,7 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 			return;
 		}
 
-		lblTitle.Text = FunctionCallDisplay.GetHeader(fc);
+		lblTitle.Text = GetHeaderHtml(fc);
 		UpdateToolIcon(fc.Skill is not null);
 
 		var argumentsText = string.Empty;
@@ -268,6 +272,24 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 		}
 	}
 
+	private string GetHeaderHtml(FunctionCallMessageContent content)
+	{
+		var title = System.Net.WebUtility.HtmlEncode(FunctionCallDisplay.GetTitle(content));
+		var statusImage = FunctionCallDisplay.GetStatusKind(content) switch
+		{
+			FunctionCallStatus.Succeeded => STATUS_SUCCESS,
+			FunctionCallStatus.Failed => STATUS_WARNING,
+			FunctionCallStatus.Rejected => STATUS_REJECTED,
+			_ => null
+		};
+
+		if (statusImage is null)
+			return $"{title} {FunctionCallDisplay.GetStatus(content)}";
+
+		var size = ScaleLogicalPixels(STATUS_ICON_SIZE);
+		return $"{title} <image={statusImage};size={size},{size};align=center>";
+	}
+
 	private void UpdateToolIcon(bool isSkill)
 	{
 		if (_displaysSkillIcon == isSkill)
@@ -314,6 +336,8 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 		base.OnDpiChangedAfterParent(e);
 		UpdateIconLayout();
 		UpdateContentWidthConstraints();
+		if (_message?.Content is FunctionCallMessageContent content)
+			lblTitle.Text = GetHeaderHtml(content);
 		PerformLayout();
 	}
 
@@ -434,5 +458,9 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 	}
 
 	/// <inheritdoc/>
-	public override string ToString() => $"{lblTitle.Text}{Environment.NewLine}{lblArguments.Text}{Environment.NewLine}{lblResult.Text}";
+	public override string ToString()
+	{
+		var header = _message?.Content is FunctionCallMessageContent content ? FunctionCallDisplay.GetHeader(content) : string.Empty;
+		return $"{header}{Environment.NewLine}{lblArguments.Text}{Environment.NewLine}{lblResult.Text}";
+	}
 }
