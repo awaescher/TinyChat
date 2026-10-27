@@ -11,6 +11,7 @@ namespace TinyChat;
 internal sealed class DXWelcomeControl : PanelControl
 {
 	private readonly LabelControl _label;
+	private string _welcomeText = string.Empty;
 	private ContentAlignment _textAlign = ContentAlignment.MiddleCenter;
 
 	/// <summary>
@@ -57,9 +58,9 @@ internal sealed class DXWelcomeControl : PanelControl
 	/// <param name="text">The unformatted welcome text.</param>
 	internal void SetWelcomeText(string text)
 	{
-		var plainText = text ?? string.Empty;
-		_label.AccessibleDescription = plainText;
-		_label.Text = FormatWelcomeText(plainText);
+		_welcomeText = text ?? string.Empty;
+		_label.AccessibleDescription = _welcomeText;
+		ApplyWelcomeText();
 	}
 
 	/// <inheritdoc />
@@ -118,5 +119,9 @@ internal sealed class DXWelcomeControl : PanelControl
 		_label.Appearance.Options.UseTextOptions = true;
 	}
 
-	private static string FormatWelcomeText(string text) => WebUtility.HtmlEncode(text);
+	private void ApplyWelcomeText()
+	{
+		if (_label is not null)
+			_label.Text = WebUtility.HtmlEncode(_welcomeText);
+	}
 }

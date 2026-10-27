@@ -14,7 +14,7 @@ namespace TinyChat;
 /// </summary>
 public partial class ChatControl : UserControl
 {
-	private const string ROBOT_WELCOME = "●\n┌─┴─┐\n◉‿◉\n└───┘\n\nGreetings human.\nHow can I help you today?";
+	private const string ROBOT_WELCOME = "●\n┌─┴─┐\n●‿●\n└───┘\n\nGreetings human.\nHow can I help you today?";
 
 	private const long DEFAULT_MAXIMUM_ATTACHMENT_FILE_SIZE = 20 * 1024 * 1024;
 	private static readonly Font _defaultWelcomeFont = new("Tahoma", 14f);

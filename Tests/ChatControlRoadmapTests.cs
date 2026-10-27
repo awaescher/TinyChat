@@ -244,10 +244,21 @@ public class ChatControlRoadmapTests
 				.Single();
 
 			welcomeLabel.AllowHtmlString.ShouldBeTrue();
-			welcomeLabel.Text.ShouldNotContain("<font");
-			welcomeLabel.Text.ShouldContain("◉‿◉");
-			welcomeLabel.Text.ShouldContain("How can I help you today?");
 			welcomeLabel.Appearance.Font.Name.ShouldBe(control.WelcomeFont.Name);
+			welcomeLabel.Text.ShouldNotContain("<font");
+			welcomeLabel.Text.ShouldContain("●‿●");
+			welcomeLabel.Text.ShouldContain("How can I help you today?");
+		}
+
+		[Test]
+		public void Leaves_Characters_Of_The_Welcome_Font_Untouched()
+		{
+			using var control = CreateChatControl(useDevExpress: true);
+
+			control.WelcomeMessage = "Hello & welcome";
+
+			DescendantsAndSelf(control.WelcomeControl!).OfType<LabelControl>().Single().Text
+				.ShouldBe("Hello &amp; welcome");
 		}
 
 		[Explicit("Writes screenshots for a visual check")]
