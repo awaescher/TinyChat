@@ -88,7 +88,7 @@ public partial class ChatControl : UserControl
 
 	/// <summary>
 	/// Occurs when an error is thrown during message processing, either from the <see cref="IChatClient"/>
-	/// or from a streaming operation started via AddStreamingMessage.
+	/// or from a streaming operation started via AddStreamingMessage, or when the client returns <see cref="ErrorContent"/>.
 	/// Set <see cref="Helper.ChatErrorEventArgs.Handled"/> to <see langword="true"/> to suppress the default
 	/// "System" error message and any pending re-throw.
 	/// </summary>
@@ -2842,7 +2842,13 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 					if (cancellationToken.IsCancellationRequested)
 						break;
 
-					if (item is FunctionCallContent or FunctionResultContent or ToolApprovalRequestContent)
+					if (item is ErrorContent errorContent)
+					{
+						CompleteReasoningMessage();
+						ReportErrorContent(errorContent);
+						hadNonTextContentSinceLastText = true;
+					}
+					else if (item is FunctionCallContent or FunctionResultContent or ToolApprovalRequestContent)
 					{
 						if (ProcessToolContent(sender, item, pendingCalls, approvalRequests))
 							hadNonTextContentSinceLastText = true;
@@ -2946,7 +2952,14 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 		{
 			foreach (var item in responseMessage.Contents)
 			{
-				if (item is FunctionCallContent or FunctionResultContent or ToolApprovalRequestContent)
+				if (item is ErrorContent errorContent)
+				{
+					reasoningMessageContent?.SetDone();
+					reasoningMessageContent = null;
+					ReportErrorContent(errorContent);
+					addedContent = true;
+				}
+				else if (item is FunctionCallContent or FunctionResultContent or ToolApprovalRequestContent)
 				{
 					reasoningMessageContent?.SetDone();
 					reasoningMessageContent = null;
@@ -2983,6 +2996,19 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 
 		if (!addedContent)
 			AddMessage(sender, new StringMessageContent(response.Text ?? string.Empty));
+	}
+
+	/// <summary>
+	/// Reports client-supplied error content using the same event and default display as exceptions.
+	/// </summary>
+	private void ReportErrorContent(ErrorContent content)
+	{
+		var errorArgs = new Helper.ChatErrorEventArgs(new InvalidOperationException(content.Message));
+		ErrorOccurred?.Invoke(this, errorArgs);
+		if (!errorArgs.Handled)
+		{
+			AddMessage(new NamedSender("System"), new StringMessageContent($"Error: {content.Message}"));
+		}
 	}
 
 	/// <summary>

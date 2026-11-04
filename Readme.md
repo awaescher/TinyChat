@@ -154,6 +154,8 @@ var chatControl = new ChatControl
 
 The complete conversation is converted and passed to the client. Override `ConvertToChatMessages()` or `DetermineChatRole()` when the default sender-to-role mapping does not fit your application. `ChatOptions` and `ChatOptionsRequested` customize each request; `IncludeFunctionCalls` and `IncludeReasoning` control whether the corresponding captured response details are visible.
 
+Errors returned as `ErrorContent`, including AG-UI run errors, raise `ErrorOccurred` and appear as a System error message in both streaming and non-streaming responses. Set `Handled = true` on the event to suppress the default message. Error content does not stop the response; any subsequent content is still processed.
+
 Keyed clients are supported as well:
 
 ```csharp
