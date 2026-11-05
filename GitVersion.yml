@@ -1,0 +1,2 @@
+# Release versions come from Git history and +semver commit messages, not next-version.
+commit-message-incrementing: Enabled
