@@ -20,6 +20,7 @@ public partial class ChatControl : UserControl
 	private static readonly Padding _defaultInputPadding = new(8);
 	private static readonly Padding _defaultMessageMargin = new(3);
 	private static readonly Padding _defaultMessagePadding = new(8);
+	private const int DEFAULT_MESSAGE_GROUP_SPACING = -1;
 
 	private List<IChatMessage> _messages = [];
 	private readonly List<IChatMessageControl> _messageControls = [];
@@ -32,6 +33,7 @@ public partial class ChatControl : UserControl
 	private Padding _inputPadding = _defaultInputPadding;
 	private Padding _messageMargin = _defaultMessageMargin;
 	private Padding _messagePadding = _defaultMessagePadding;
+	private int _messageGroupSpacing = DEFAULT_MESSAGE_GROUP_SPACING;
 	private IMessageFormatter _messageFormatter = new PlainTextMessageFormatter();
 	private Font? _inputFont;
 	private Font? _messageFont;
@@ -363,6 +365,30 @@ public partial class ChatControl : UserControl
 			ApplyMessageLayout();
 		}
 	}
+
+	/// <summary>
+	/// Gets or sets the vertical spacing in pixels between consecutive messages of the same sender, such as text,
+	/// tool calls and reasoning of one answer. The default of -1 uses the height of an empty line of
+	/// <see cref="MessageFont"/>. The full <see cref="MessagePadding"/> and <see cref="MessageMargin"/>
+	/// remain around each group of messages.
+	/// </summary>
+	[Category("Chat Layout")]
+	[Description("Gets or sets the vertical spacing between consecutive messages of the same sender. -1 uses the height of an empty line of the message font.")]
+	[DefaultValue(DEFAULT_MESSAGE_GROUP_SPACING)]
+	public int MessageGroupSpacing
+	{
+		get => _messageGroupSpacing;
+		set
+		{
+			ArgumentOutOfRangeException.ThrowIfLessThan(value, DEFAULT_MESSAGE_GROUP_SPACING);
+			_messageGroupSpacing = value;
+			ApplyMessageLayout();
+		}
+	}
+
+	private int EffectiveMessageGroupSpacing => MessageGroupSpacing >= 0
+		? MessageGroupSpacing
+		: (int)Math.Ceiling(MessageFont.GetHeight(DeviceDpi));
 
 	/// <summary>
 	/// Gets or sets the padding between the input surface and its editor content.
@@ -810,14 +836,16 @@ public partial class ChatControl : UserControl
 
 	private void ApplyMessageFont()
 	{
-		if (MessageHistoryControl is null)
-			return;
-
-		foreach (var control in EnumerateDescendantControls(MessageHistoryControl))
+		if (MessageHistoryControl is not null)
 		{
-			if (control is IChatMessageControl)
-				ApplyMessageFont(control);
+			foreach (var control in EnumerateDescendantControls(MessageHistoryControl))
+			{
+				if (control is IChatMessageControl)
+					ApplyMessageFont(control);
+			}
 		}
+
+		ApplyMessageGroupSpacing();
 	}
 
 	private void ApplyInputFont()
@@ -939,14 +967,16 @@ public partial class ChatControl : UserControl
 
 	private void ApplyMessageLayout()
 	{
-		if (MessageHistoryControl is null)
-			return;
-
-		foreach (var control in EnumerateDescendantControls(MessageHistoryControl))
+		if (MessageHistoryControl is not null)
 		{
-			if (control is IChatMessageControl)
-				ApplyMessageLayout(control);
+			foreach (var control in EnumerateDescendantControls(MessageHistoryControl))
+			{
+				if (control is IChatMessageControl)
+					ApplyMessageLayout(control);
+			}
 		}
+
+		ApplyMessageGroupSpacing();
 	}
 
 	/// <summary>
@@ -960,6 +990,61 @@ public partial class ChatControl : UserControl
 			control.Margin = MessageMargin;
 			layoutControl.ContentPadding = MessagePadding;
 		}
+	}
+
+	/// <summary>
+	/// Moves consecutive messages of the same sender together, so that the text, tool calls and reasoning of one
+	/// answer read as a group while the full spacing remains between the groups.
+	/// </summary>
+	private void ApplyMessageGroupSpacing()
+	{
+		Control? previous = null;
+		IChatMessage? previousMessage = null;
+		var previousContinues = false;
+		foreach (var messageControl in _messageControls)
+		{
+			if (messageControl is not Control control || messageControl.Message is not { } message || !ShouldDisplayMessage(message))
+				continue;
+
+			var continues = previousMessage is not null && IsSameSender(previousMessage, message);
+			if (previous is not null)
+				SetGroupSpacing(previous, continuesPrevious: previousContinues, continuedByNext: continues);
+			SetGroupSpacing(control, continuesPrevious: continues, continuedByNext: false);
+
+			previous = control;
+			previousMessage = message;
+			previousContinues = continues;
+		}
+	}
+
+	private static bool IsSameSender(IChatMessage previous, IChatMessage message) =>
+		string.Equals(previous.Sender?.Name, message.Sender?.Name, StringComparison.Ordinal);
+
+	private void SetGroupSpacing(Control control, bool continuesPrevious, bool continuedByNext)
+	{
+		if (control is not IChatMessageLayoutControl layoutControl)
+			return;
+
+		var spacing = EffectiveMessageGroupSpacing;
+		var halfSpacing = spacing / 2;
+		var margin = MessageMargin;
+		var padding = MessagePadding;
+		if (continuesPrevious)
+		{
+			margin.Top = 0;
+			padding.Top = spacing - halfSpacing;
+		}
+
+		if (continuedByNext)
+		{
+			margin.Bottom = 0;
+			padding.Bottom = halfSpacing;
+		}
+
+		if (control.Margin != margin)
+			control.Margin = margin;
+		if (layoutControl.ContentPadding != padding)
+			layoutControl.ContentPadding = padding;
 	}
 
 	private void ApplyInputLayout()
@@ -1020,6 +1105,13 @@ public partial class ChatControl : UserControl
 			ApplyInputFont();
 		if (_welcomeFont is null)
 			ApplyWelcomeControlSettings();
+	}
+
+	/// <inheritdoc />
+	protected override void OnDpiChangedAfterParent(EventArgs e)
+	{
+		base.OnDpiChangedAfterParent(e);
+		ApplyMessageGroupSpacing();
 	}
 
 	/// <inheritdoc />
@@ -1494,6 +1586,8 @@ public partial class ChatControl : UserControl
 				if (visible)
 					previousVisibleMessage = message;
 			}
+
+			ApplyMessageGroupSpacing();
 		}
 		finally
 		{
@@ -1544,6 +1638,7 @@ public partial class ChatControl : UserControl
 		ApplyMessageColors(control);
 		ApplyMessageLayout(control);
 		_messageControls.Add(messageControl);
+		ApplyMessageGroupSpacing();
 
 		if (MessageHistoryControl is IChatMessageHistoryControl casted)
 		{

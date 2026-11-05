@@ -54,7 +54,7 @@ partial class DXFunctionCallMessageControl
 		lblSender.Dock = DockStyle.Top;
 		lblSender.Appearance.Font = new Font(Font, FontStyle.Bold);
 		lblSender.UseMnemonic = false;
-		lblSender.Padding = new Padding(3, 0, 0, 3);
+		lblSender.Padding = new Padding(0, 0, 0, 3);
 
 		// _callIconLabel
 		lblToolIcon.AutoSize = false;
