@@ -8,7 +8,7 @@ namespace TinyChat;
 /// <summary>
 /// Displays a thinking text, click-to-expand bubble.
 /// </summary>
-internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMessageFormattingControl, IChatMessageLayoutControl, IChatMessageRefreshControl, IReasoningMessageControl
+internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMessageFormattingControl, IChatMessageLayoutControl, IChatMessageRefreshControl, IReasoningMessageControl, IChatMessageTruncationControl, IChatPresentationControl
 {
 	/// <summary>Fixed pixel width reserved for the icon column.</summary>
 	private const int ICON_COLUMN_WIDTH = 20;
@@ -19,6 +19,11 @@ internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMes
 	private bool _isReceivingStream;
 	private bool _allowExpand = true;
 	private bool _detailTextDirty = true;
+	private bool _isTruncated;
+	private int _maximumDetailTextLength = DetailTextTruncation.DEFAULT_MAXIMUM_LENGTH;
+	private int _maximumDetailTextLines = DetailTextTruncation.DEFAULT_MAXIMUM_LINES;
+	private ChatDisplayTexts? _displayTexts;
+	private ChatControl? _owner;
 	private IMessageFormatter _messageFormatter = new PlainTextMessageFormatter();
 	private readonly CoalescedUiUpdate _streamingDisplayUpdate;
 
@@ -100,6 +105,7 @@ internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMes
 		WireMouseDown(paddingPanel, tableLayout, lblIcon, lblTitle, lblDetail);
 		ApplyAppearance();
 		UpdateExpandCursor();
+		ApplyPresentation(null);
 		Disposed += (_, _) => _streamingDisplayUpdate.Cancel();
 	}
 
@@ -181,6 +187,7 @@ internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMes
 			if (_expanded)
 				EnsureDetailTextCurrent();
 			lblDetail.Visible = _expanded && Message is not null;
+			btnFullText.Visible = lblDetail.Visible && _isTruncated;
 		}
 		finally
 		{
@@ -238,6 +245,7 @@ internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMes
 			if (detailVisible)
 				EnsureDetailTextCurrent();
 			lblDetail.Visible = detailVisible;
+			btnFullText.Visible = detailVisible && _isTruncated;
 		}
 		finally
 		{
@@ -250,10 +258,73 @@ internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMes
 		if (!_detailTextDirty)
 			return;
 
+		var fullText = GetFullText();
+		_isTruncated = DetailTextTruncation.TryTruncate(fullText, MaximumDetailTextLength, MaximumDetailTextLines, out var shortened);
 		lblDetail.Text = Message is null
 			? string.Empty
-			: MessageFormatter.Format(Message.Content);
+			: _isTruncated ? MessageFormatter.Format(shortened) : MessageFormatter.Format(Message.Content);
 		_detailTextDirty = false;
+	}
+
+	private string GetFullText() => Message?.Content is ReasoningMessageContent reasoningContent ? reasoningContent.ToString() : string.Empty;
+
+	/// <inheritdoc />
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	[Browsable(false)]
+	public int MaximumDetailTextLength
+	{
+		get => _maximumDetailTextLength;
+		set
+		{
+			ArgumentOutOfRangeException.ThrowIfNegative(value);
+			if (_maximumDetailTextLength == value)
+				return;
+
+			_maximumDetailTextLength = value;
+			_detailTextDirty = true;
+			ApplyVisibility();
+		}
+	}
+
+	/// <inheritdoc />
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	[Browsable(false)]
+	public int MaximumDetailTextLines
+	{
+		get => _maximumDetailTextLines;
+		set
+		{
+			ArgumentOutOfRangeException.ThrowIfNegative(value);
+			if (_maximumDetailTextLines == value)
+				return;
+
+			_maximumDetailTextLines = value;
+			_detailTextDirty = true;
+			ApplyVisibility();
+		}
+	}
+
+	/// <inheritdoc />
+	public void ApplyPresentation(ChatControl? owner)
+	{
+		_owner = owner;
+		_displayTexts = owner?.DisplayTexts;
+		var text = _displayTexts?.ShowFullText ?? ChatLocalization.GetString("ShowFullText");
+		btnFullText.AccessibleName = text;
+		toolTip.Set(btnFullText, string.Empty, text);
+	}
+
+	private void BtnFullText_Click(object? sender, EventArgs e)
+	{
+		var title = _displayTexts?.Reasoning ?? ChatLocalization.GetString("Reasoning");
+		if ((_owner ?? ChatControl.FindOwner(this)) is { } owner)
+		{
+			owner.OpenFullText(title, GetFullText());
+			return;
+		}
+
+		using var dialog = new DXFullTextDialog(title, GetFullText(), Font);
+		dialog.ShowDialog(FindForm());
 	}
 
 	private void MessageContent_PropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -369,6 +440,8 @@ internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMes
 
 		paddingPanel.BackColor = BackColor;
 		tableLayout.BackColor = BackColor;
+		btnFullText.Appearance.BackColor = BackColor;
+		btnFullText.Appearance.Options.UseBackColor = true;
 	}
 
 	private void UpdateIconLayout()
@@ -418,6 +491,8 @@ internal sealed partial class DXReasoningMessageControl : PanelControl, IChatMes
 	public override string ToString()
 	{
 		EnsureDetailTextCurrent();
-		return DXFormattedText.ToPlainText(lblDetail.Text);
+		return _isTruncated && Message is not null
+			? DXFormattedText.ToPlainText(MessageFormatter.Format(Message.Content))
+			: DXFormattedText.ToPlainText(lblDetail.Text);
 	}
 }

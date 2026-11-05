@@ -7,7 +7,7 @@ namespace TinyChat.SubControls;
 /// <summary>
 /// Displays a thinking text, click-to-expand bubble.
 /// </summary>
-internal partial class ReasoningMessageControl : Panel, IChatMessageFormattingControl, IChatMessageLayoutControl, IChatMessageRefreshControl, IReasoningMessageControl
+internal partial class ReasoningMessageControl : Panel, IChatMessageFormattingControl, IChatMessageLayoutControl, IChatMessageRefreshControl, IReasoningMessageControl, IChatMessageTruncationControl, IChatPresentationControl
 {
 	/// <summary>Fixed pixel width reserved for the icon column.</summary>
 	private const int IconColumnWidth = 20;
@@ -17,9 +17,15 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageFormattingCo
 	private bool _isReceivingStream;
 	private bool _allowExpand = true;
 	private bool _detailTextDirty = true;
+	private bool _isTruncated;
+	private int _maximumDetailTextLength = DetailTextTruncation.DEFAULT_MAXIMUM_LENGTH;
+	private int _maximumDetailTextLines = DetailTextTruncation.DEFAULT_MAXIMUM_LINES;
+	private ChatDisplayTexts? _displayTexts;
+	private ChatControl? _owner;
 	private IMessageFormatter _messageFormatter = new PlainTextMessageFormatter();
 	private readonly CoalescedUiUpdate _streamingDisplayUpdate;
 	private Font? _senderFont;
+	private Font? _fullTextIconFont;
 
 	/// <summary>
 	/// Indicates whether the detail panel (arguments and result) is currently visible.
@@ -95,10 +101,13 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageFormattingCo
 			_streamingDisplayUpdate.Cancel();
 			_senderFont?.Dispose();
 			_senderFont = null;
+			_fullTextIconFont?.Dispose();
+			_fullTextIconFont = null;
 		};
 
 		WireMouseDown(tableLayout, lblIcon, lblHeader, lblDetail);
 		UpdateExpandCursor();
+		ApplyPresentation(null);
 	}
 
 	/// <inheritdoc />
@@ -159,11 +168,15 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageFormattingCo
 	private void ApplyTextFont()
 	{
 		var oldSenderFont = _senderFont;
+		var oldFullTextIconFont = _fullTextIconFont;
 		_senderFont = new Font(Font, Font.Style | FontStyle.Bold);
+		_fullTextIconFont = ChatIcons.IconFontName is null ? null : ChatIcons.CreateFont(Math.Max(1f, Math.Min(Font.SizeInPoints, 9f)));
 		lblSender.Font = _senderFont;
 		lblHeader.Font = Font;
 		lblDetail.Font = Font;
+		btnFullText.Font = _fullTextIconFont ?? Font;
 		oldSenderFont?.Dispose();
+		oldFullTextIconFont?.Dispose();
 	}
 
 	private void WireMouseDown(params Control[] controls)
@@ -266,6 +279,7 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageFormattingCo
 			if (_expanded)
 				EnsureDetailTextCurrent();
 			lblDetail.Visible = _expanded;
+			btnFullText.Visible = _expanded && _isTruncated;
 		});
 	}
 
@@ -300,6 +314,7 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageFormattingCo
 			lblHeader.Text = headerText;
 			if (lblDetail.Visible)
 				EnsureDetailTextCurrent();
+			btnFullText.Visible = lblDetail.Visible && _isTruncated;
 		});
 	}
 
@@ -315,11 +330,75 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageFormattingCo
 		if (!_detailTextDirty)
 			return;
 
-		var text = _message?.Content is ReasoningMessageContent reasoningContent
-			? MessageFormatter.Format(reasoningContent)
-			: string.Empty;
-		lblDetail.Text = text;
+		var fullText = GetFullText();
+		_isTruncated = DetailTextTruncation.TryTruncate(fullText, MaximumDetailTextLength, MaximumDetailTextLines, out var shortened);
+		lblDetail.Text = _message?.Content is not ReasoningMessageContent reasoningContent
+			? string.Empty
+			: _isTruncated ? MessageFormatter.Format(shortened) : MessageFormatter.Format(reasoningContent);
 		_detailTextDirty = false;
+	}
+
+	private string GetFullText() => _message?.Content is ReasoningMessageContent reasoningContent ? reasoningContent.ToString() : string.Empty;
+
+	/// <inheritdoc />
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	[Browsable(false)]
+	public int MaximumDetailTextLength
+	{
+		get => _maximumDetailTextLength;
+		set
+		{
+			ArgumentOutOfRangeException.ThrowIfNegative(value);
+			if (_maximumDetailTextLength == value)
+				return;
+
+			_maximumDetailTextLength = value;
+			_detailTextDirty = true;
+			ApplyVisibility();
+		}
+	}
+
+	/// <inheritdoc />
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	[Browsable(false)]
+	public int MaximumDetailTextLines
+	{
+		get => _maximumDetailTextLines;
+		set
+		{
+			ArgumentOutOfRangeException.ThrowIfNegative(value);
+			if (_maximumDetailTextLines == value)
+				return;
+
+			_maximumDetailTextLines = value;
+			_detailTextDirty = true;
+			ApplyVisibility();
+		}
+	}
+
+	/// <inheritdoc />
+	public void ApplyPresentation(ChatControl? owner)
+	{
+		_owner = owner;
+		_displayTexts = owner?.DisplayTexts;
+		var text = _displayTexts?.ShowFullText ?? ChatLocalization.GetString("ShowFullText");
+		btnFullText.AccessibleName = text;
+		if (ChatIcons.IconFontName is null)
+			btnFullText.Text = ChatIcons.ShowFullText + " " + text;
+		toolTip.SetToolTip(btnFullText, text);
+	}
+
+	private void BtnFullText_Click(object? sender, EventArgs e)
+	{
+		var title = _displayTexts?.Reasoning ?? ChatLocalization.GetString("Reasoning");
+		if ((_owner ?? ChatControl.FindOwner(this)) is { } owner)
+		{
+			owner.OpenFullText(title, GetFullText());
+			return;
+		}
+
+		using var dialog = new FullTextDialog(title, GetFullText(), Font);
+		dialog.ShowDialog(FindForm());
 	}
 
 	private void ApplyLayoutUpdate(Action updateControls)
@@ -410,7 +489,7 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageFormattingCo
 
 		var backColor = GetOpaqueBackColor();
 		tableLayout.BackColor = backColor;
-		foreach (var label in new Control[] { lblSender, lblIcon, lblHeader, lblDetail })
+		foreach (var label in new Control[] { lblSender, lblIcon, lblHeader, lblDetail, btnFullText })
 		{
 			label.BackColor = backColor;
 			label.ForeColor = ForeColor;
@@ -434,6 +513,8 @@ internal partial class ReasoningMessageControl : Panel, IChatMessageFormattingCo
 	public override string ToString()
 	{
 		EnsureDetailTextCurrent();
-		return lblDetail.Text;
+		return _isTruncated && _message?.Content is ReasoningMessageContent reasoningContent
+			? MessageFormatter.Format(reasoningContent)
+			: lblDetail.Text;
 	}
 }

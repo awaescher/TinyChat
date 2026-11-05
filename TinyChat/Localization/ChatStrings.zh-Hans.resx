@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="GeneralError" xml:space="preserve"><value>无法完成请求。</value></data>
+  <data name="BinaryAttachment" xml:space="preserve"><value>“{0}”将以二进制数据发送。是否支持取决于模型和提供商。</value></data>
+  <data name="AttachmentRejected" xml:space="preserve"><value>无法附加或处理“{0}”。</value></data>
+  <data name="AttachmentsDisabled" xml:space="preserve"><value>文件附件已禁用。</value></data>
+  <data name="AttachmentTooLarge" xml:space="preserve"><value>“{0}”超过了附件大小上限 {1:N0} 字节。</value></data>
+  <data name="NoExtractableText" xml:space="preserve"><value>无法从“{0}”中提取可读文本。扫描文档需要 OCR。</value></data>
+  <data name="DocumentTruncated" xml:space="preserve"><value>仅包含“{0}”的前 {1:N0} 个字符。后续的工作表或页面可能缺失。</value></data>
+  <data name="PreviewUnavailable" xml:space="preserve"><value>图像预览不可用。</value></data>
+  <data name="Assistant" xml:space="preserve"><value>助手</value></data>
+  <data name="ToolResult" xml:space="preserve"><value>工具结果</value></data>
+  <data name="Welcome" xml:space="preserve"><value>●
+┌─┴─┐
+●‿●
+└───┘
+
+今天有什么可以帮你的吗?</value></data>
+  <data name="RemoveAttachment" xml:space="preserve"><value>移除附件</value></data>
+  <data name="OpenAttachment" xml:space="preserve"><value>打开附件</value></data>
+  <data name="ShowFullText" xml:space="preserve"><value>显示全文</value></data>
+  <data name="Reasoning" xml:space="preserve"><value>推理过程</value></data>
+  <data name="FunctionArguments" xml:space="preserve"><value>参数</value></data>
+  <data name="FunctionResult" xml:space="preserve"><value>结果</value></data>
+</root>

@@ -108,17 +108,41 @@ public class AttachmentContentProviderTests
 
 	[TestCase(false)]
 	[TestCase(true)]
-	public void Renders_Images_Inside_Tool_Results(bool devExpress)
+	public void Renders_Images_Inside_Tool_Results_Inline(bool devExpress)
 	{
 		using var chat = devExpress ? (ChatControl)new DXChatControl() : new ChatControl();
 		var result = new FunctionCallMessageContent("call", "screenshot", null, new AIContent[] { CreateImage() });
 		var control = (System.Windows.Forms.Control)chat.AddMessage(new NamedSender("Assistant"), result);
 		var preview = FindPreviews(control).Single();
-		preview.Visible.ShouldBeFalse();
+		preview.Visible.ShouldBeTrue();
+		preview.Controls[0].AccessibleName.ShouldBe("screenshot.png");
 		control.GetType().GetMethod("Toggle", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(control, [null, EventArgs.Empty]);
 		preview.Visible.ShouldBeTrue();
-		control.GetType().GetMethod("Toggle", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(control, [null, EventArgs.Empty]);
-		preview.Visible.ShouldBeFalse();
+	}
+
+	[TestCase(false)]
+	[TestCase(true)]
+	public void Renders_Images_From_Model_Context_Protocol_Tool_Results(bool devExpress)
+	{
+		using var chat = devExpress ? (ChatControl)new DXChatControl() : new ChatControl();
+		var image = CreateImage();
+		var json = $"{{\"content\":[{{\"type\":\"text\",\"text\":\"Captured\"}},{{\"type\":\"image\",\"data\":\"{Convert.ToBase64String(image.Data.ToArray())}\",\"mimeType\":\"image/png\"}}]}}";
+		var control = (System.Windows.Forms.Control)chat.AddMessage(new NamedSender("Assistant"), new FunctionCallMessageContent("call", "screenshot", null, json));
+		FindPreviews(control).Single().Controls.Count.ShouldBe(1);
+		control.ToString().ShouldContain("Captured");
+		control.ToString().ShouldNotContain("base64");
+	}
+
+	[Test]
+	public void Recognizes_Model_Context_Protocol_Content_Blocks()
+	{
+		var image = Convert.ToBase64String(CreateImage().Data.ToArray());
+		var content = AIMessageContent.FromDisplayResult(JsonSerializer.SerializeToElement(new object[] { new { type = "image", data = image, mimeType = "image/png" } })).ShouldNotBeNull();
+		content.Contents.OfType<DataContent>().Single().MediaType.ShouldBe("image/png");
+		AIMessageContent.FromDisplayResult($"data:image/png;base64,{image}").ShouldNotBeNull().Contents.OfType<DataContent>().Count().ShouldBe(1);
+		AIMessageContent.FromDisplayResult("{\"ordinary\":\"object\"}").ShouldBeNull();
+		AIMessageContent.FromDisplayResult("[{\"type\":\"text\",\"text\":\"only text\"}]").ShouldBeNull();
+		AIMessageContent.FromDisplayResult("plain text").ShouldBeNull();
 	}
 
 	[Test]

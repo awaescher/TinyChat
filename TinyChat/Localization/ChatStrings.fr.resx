@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="GeneralError" xml:space="preserve"><value>La demande n’a pas pu aboutir.</value></data>
+  <data name="BinaryAttachment" xml:space="preserve"><value>« {0} » sera envoyé sous forme de données binaires. La prise en charge dépend du modèle et du fournisseur.</value></data>
+  <data name="AttachmentRejected" xml:space="preserve"><value>« {0} » n’a pas pu être joint ou traité.</value></data>
+  <data name="AttachmentsDisabled" xml:space="preserve"><value>Les pièces jointes sont désactivées.</value></data>
+  <data name="AttachmentTooLarge" xml:space="preserve"><value>« {0} » dépasse la taille maximale de pièce jointe de {1:N0} octets.</value></data>
+  <data name="NoExtractableText" xml:space="preserve"><value>Aucun texte lisible n’a pu être extrait de « {0} ». Les documents numérisés nécessitent une OCR.</value></data>
+  <data name="DocumentTruncated" xml:space="preserve"><value>Seuls les {1:N0} premiers caractères de « {0} » sont inclus. Des feuilles ou pages suivantes peuvent manquer.</value></data>
+  <data name="PreviewUnavailable" xml:space="preserve"><value>L’aperçu de l’image n’est pas disponible.</value></data>
+  <data name="Assistant" xml:space="preserve"><value>Assistant</value></data>
+  <data name="ToolResult" xml:space="preserve"><value>Résultat de l’outil</value></data>
+  <data name="Welcome" xml:space="preserve"><value>●
+┌─┴─┐
+●‿●
+└───┘
+
+Comment puis-je vous aider aujourd’hui ?</value></data>
+  <data name="RemoveAttachment" xml:space="preserve"><value>Supprimer la pièce jointe</value></data>
+  <data name="OpenAttachment" xml:space="preserve"><value>Ouvrir la pièce jointe</value></data>
+  <data name="ShowFullText" xml:space="preserve"><value>Afficher le texte complet</value></data>
+  <data name="Reasoning" xml:space="preserve"><value>Raisonnement</value></data>
+  <data name="FunctionArguments" xml:space="preserve"><value>Arguments</value></data>
+  <data name="FunctionResult" xml:space="preserve"><value>Résultat</value></data>
+</root>

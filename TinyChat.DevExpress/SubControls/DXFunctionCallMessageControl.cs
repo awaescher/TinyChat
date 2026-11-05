@@ -9,7 +9,7 @@ namespace TinyChat;
 /// the function name (bold), the arguments, and the result.
 /// Clicking anywhere on the control toggles the detail rows (arguments + result).
 /// </summary>
-internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChatMessageLayoutControl, IChatMessageRefreshControl, IFunctionCallMessageControl
+internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChatMessageLayoutControl, IChatMessageRefreshControl, IFunctionCallMessageControl, IChatMessageTruncationControl, IChatPresentationControl
 {
 	/// <summary>
 	/// Fixed pixel width reserved for the icon column.
@@ -28,6 +28,13 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 	private IChatMessage? _message;
 	private FileAttachmentPreviewPanel? _resultPreview;
 	private object? _displayedResult;
+	private string _argumentsText = string.Empty;
+	private string _resultText = string.Empty;
+	private bool _isTruncated;
+	private int _maximumDetailTextLength = DetailTextTruncation.DEFAULT_MAXIMUM_LENGTH;
+	private int _maximumDetailTextLines = DetailTextTruncation.DEFAULT_MAXIMUM_LINES;
+	private ChatDisplayTexts? _displayTexts;
+	private ChatControl? _owner;
 
 	/// <summary>
 	/// Whether the detail panel (arguments + result) is currently visible.
@@ -62,11 +69,13 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 	public DXFunctionCallMessageControl()
 	{
 		InitializeComponent();
+		LookAndFeel.StyleChanged += (_, _) => statusImages[STATUS_WARNING] = FluentIcons.AttachmentNotice(ChatNoticeSeverity.Error, LookAndFeel);
 
 
 		WireMouseDown(paddingPanel, tableLayout, lblToolIcon, lblTitle, lblArguments, lblResultIcon, lblResult);
 		ApplyAppearance();
 		UpdateExpandCursor();
+		ApplyPresentation(null);
 	}
 
 	/// <inheritdoc/>
@@ -201,8 +210,8 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 	/// </summary>
 	private void UpdateResultDisplay(object? result)
 	{
-		var structured = AIMessageContent.FromResult(result);
-		lblResult.Text = structured?.Text ?? result?.ToString() ?? string.Empty;
+		var structured = AIMessageContent.FromDisplayResult(result);
+		_resultText = structured?.Text ?? result?.ToString() ?? string.Empty;
 		if (ReferenceEquals(result, _displayedResult))
 			return;
 		_displayedResult = result;
@@ -211,13 +220,96 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 		if (structured is not null && FileAttachmentPreviewPanel.HasAttachments(structured))
 		{
 			_resultPreview = new DXFileAttachmentPreviewPanel(structured);
-			tableLayout.RowCount = Math.Max(5, tableLayout.RowCount);
-			while (tableLayout.RowStyles.Count < 5)
-				tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+			WireMouseDown(_resultPreview);
 			tableLayout.Controls.Add(_resultPreview, 1, 4);
-			_resultPreview.Visible = _expanded;
+			_resultPreview.Visible = false;
+			UpdateContentWidthConstraints();
+			if (ChatControl.FindOwner(this) is { } owner)
+				_resultPreview.ApplyPresentation(owner);
 		}
 	}
+
+	private void ApplyDetailTexts()
+	{
+		var argumentsTruncated = DetailTextTruncation.TryTruncate(_argumentsText, MaximumDetailTextLength, MaximumDetailTextLines, out var arguments);
+		var resultTruncated = DetailTextTruncation.TryTruncate(_resultText, MaximumDetailTextLength, MaximumDetailTextLines, out var result);
+		lblArguments.Text = arguments;
+		lblResult.Text = result;
+		_isTruncated = argumentsTruncated || resultTruncated;
+	}
+
+	/// <inheritdoc />
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	[Browsable(false)]
+	public int MaximumDetailTextLength
+	{
+		get => _maximumDetailTextLength;
+		set
+		{
+			ArgumentOutOfRangeException.ThrowIfNegative(value);
+			if (_maximumDetailTextLength == value)
+				return;
+
+			_maximumDetailTextLength = value;
+			ApplyDetailTexts();
+			ApplyVisibility(force: true);
+		}
+	}
+
+	/// <inheritdoc />
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	[Browsable(false)]
+	public int MaximumDetailTextLines
+	{
+		get => _maximumDetailTextLines;
+		set
+		{
+			ArgumentOutOfRangeException.ThrowIfNegative(value);
+			if (_maximumDetailTextLines == value)
+				return;
+
+			_maximumDetailTextLines = value;
+			ApplyDetailTexts();
+			ApplyVisibility(force: true);
+		}
+	}
+
+	/// <inheritdoc />
+	public void ApplyPresentation(ChatControl? owner)
+	{
+		_owner = owner;
+		_displayTexts = owner?.DisplayTexts;
+		var text = _displayTexts?.ShowFullText ?? ChatLocalization.GetString("ShowFullText");
+		btnFullText.AccessibleName = text;
+		toolTip.Set(btnFullText, string.Empty, text);
+	}
+
+	internal string GetFullText()
+	{
+		var title = _message?.Content is FunctionCallMessageContent content ? FunctionCallDisplay.GetTitle(content) : string.Empty;
+		var argumentsHeading = _displayTexts?.FunctionArguments ?? ChatLocalization.GetString("FunctionArguments");
+		var resultHeading = _displayTexts?.FunctionResult ?? ChatLocalization.GetString("FunctionResult");
+		var sections = new List<string> { title };
+		if (_argumentsText.Length > 0)
+			sections.Add($"{argumentsHeading}:{Environment.NewLine}{_argumentsText}");
+		if (_resultText.Length > 0)
+			sections.Add($"{resultHeading}:{Environment.NewLine}{_resultText}");
+		return string.Join(Environment.NewLine + Environment.NewLine, sections);
+	}
+
+	private void BtnFullText_Click(object? sender, EventArgs e)
+	{
+		var title = _message?.Content is FunctionCallMessageContent content ? FunctionCallDisplay.GetTitle(content) : string.Empty;
+		if ((_owner ?? ChatControl.FindOwner(this)) is { } owner)
+		{
+			owner.OpenFullText(title, GetFullText());
+			return;
+		}
+
+		using var dialog = new DXFullTextDialog(title, GetFullText(), Font);
+		dialog.ShowDialog(FindForm());
+	}
+
 	private void UpdateDisplay()
 	{
 		lblSender.Text = Message?.Sender?.Name ?? string.Empty;
@@ -225,8 +317,10 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 		if (_message?.Content is not FunctionCallMessageContent fc)
 		{
 			lblTitle.Text = string.Empty;
-			lblArguments.Text = string.Empty;
-			lblResult.Text = string.Empty;
+			_argumentsText = string.Empty;
+			_resultText = string.Empty;
+			UpdateResultDisplay(null);
+			ApplyDetailTexts();
 			_expanded = false;
 			ApplyVisibility();
 			return;
@@ -241,8 +335,9 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 			var maxKeyLen = fc.Arguments.Keys.Max(k => k.Length);
 			argumentsText = string.Join(Environment.NewLine, fc.Arguments.Select(kv => $"{(kv.Key + ":").PadRight(maxKeyLen + 1)} {kv.Value}"));
 		}
-		lblArguments.Text = argumentsText;
+		_argumentsText = argumentsText;
 		UpdateResultDisplay(fc.Result);
+		ApplyDetailTexts();
 
 		ApplyVisibility();
 	}
@@ -251,16 +346,22 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 	/// Shows or hides the argument and result rows based on <see cref="_expanded"/>
 	/// and whether the data is actually present, and updates the chevron glyph.
 	/// </summary>
-	private void ApplyVisibility()
+	private void ApplyVisibility(bool force = false)
 	{
 		var hasArgs = _message?.Content is FunctionCallMessageContent { Arguments.Count: > 0 };
 		var hasResult = _message?.Content is FunctionCallMessageContent { Result: not null };
 		var isPending = _message?.Content is FunctionCallMessageContent { ApprovalState: ToolApprovalState.Pending };
 		var showArguments = (_expanded || isPending) && hasArgs;
-		var showResult = _expanded && hasResult;
-		if (lblArguments.Visible == showArguments &&
+		var showResult = _expanded && hasResult && _resultText.Length > 0;
+		// Images and files returned by the tool stay visible while collapsed, like attachments of a message.
+		var showPreview = _resultPreview is not null && hasResult;
+		var showFullText = _isTruncated && (showArguments || showResult);
+		if (!force &&
+			lblArguments.Visible == showArguments &&
 			lblResultIcon.Visible == showResult &&
 			lblResult.Visible == showResult &&
+			(_resultPreview is null || _resultPreview.Visible == showPreview) &&
+			btnFullText.Visible == showFullText &&
 			approvalPanel.Visible == isPending)
 		{
 			return;
@@ -275,7 +376,8 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 			lblResultIcon.Visible = showResult;
 			lblResult.Visible = showResult;
 			if (_resultPreview is not null)
-				_resultPreview.Visible = showResult;
+				_resultPreview.Visible = showPreview;
+			btnFullText.Visible = showFullText;
 			approvalPanel.Visible = isPending;
 		}
 		finally
@@ -395,6 +497,8 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 		paddingPanel.BackColor = BackColor;
 		tableLayout.BackColor = BackColor;
 		approvalPanel.BackColor = BackColor;
+		btnFullText.Appearance.BackColor = BackColor;
+		btnFullText.Appearance.Options.UseBackColor = true;
 		btnApprove.Appearance.Font = Font;
 		btnApprove.Appearance.Options.UseFont = true;
 		btnReject.Appearance.Font = Font;
@@ -487,6 +591,6 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 	public override string ToString()
 	{
 		var header = _message?.Content is FunctionCallMessageContent content ? FunctionCallDisplay.GetHeader(content) : string.Empty;
-		return $"{header}{Environment.NewLine}{lblArguments.Text}{Environment.NewLine}{lblResult.Text}";
+		return $"{header}{Environment.NewLine}{_argumentsText}{Environment.NewLine}{_resultText}";
 	}
 }

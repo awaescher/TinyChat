@@ -10,6 +10,8 @@ partial class FunctionCallMessageControl
 			content.PropertyChanged -= OnContentPropertyChanged;
 		if (disposing && (components != null))
 			components.Dispose();
+		if (disposing)
+			toolTip?.Dispose();
 		base.Dispose(disposing);
 	}
 
@@ -26,6 +28,8 @@ partial class FunctionCallMessageControl
 		approvalPanel = new FlowLayoutPanel();
 		btnApprove = new Button();
 		btnReject = new Button();
+		btnFullText = new Button();
+		toolTip = new ToolTip();
 		tableLayout = new TableLayoutPanel();
 		tableLayout.SuspendLayout();
 		approvalPanel.SuspendLayout();
@@ -115,6 +119,19 @@ partial class FunctionCallMessageControl
 		btnReject.UseMnemonic = false;
 		btnReject.Click += BtnReject_Click;
 
+		// btnFullText
+		btnFullText.AutoSize = true;
+		btnFullText.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+		btnFullText.Cursor = Cursors.Hand;
+		btnFullText.FlatStyle = FlatStyle.Flat;
+		btnFullText.FlatAppearance.BorderSize = 0;
+		btnFullText.Margin = new Padding(0, 2, 0, 0);
+		btnFullText.TabStop = true;
+		btnFullText.Text = ChatIcons.ShowFullText;
+		btnFullText.UseMnemonic = false;
+		btnFullText.Visible = false;
+		btnFullText.Click += BtnFullText_Click;
+
 		// approvalPanel
 		approvalPanel.AutoSize = true;
 		approvalPanel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
@@ -151,11 +168,17 @@ partial class FunctionCallMessageControl
 		tableLayout.Controls.Add(lblResult, 1, 2);
 		// Row 3: approval buttons, only visible while an approval is pending.
 		tableLayout.Controls.Add(approvalPanel, 1, 3);
+		// Row 4: inline previews of images and files returned by the tool, visible while collapsed.
+		// Row 5: the button that shows shortened arguments and results in full.
+		tableLayout.Controls.Add(btnFullText, 1, 5);
 
 		tableLayout.Dock = DockStyle.Fill;
 		tableLayout.Margin = Padding.Empty;
 		tableLayout.Padding = Padding.Empty;
-		tableLayout.RowCount = 4;
+		tableLayout.RowCount = 6;
+		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -201,4 +224,6 @@ partial class FunctionCallMessageControl
 	private FlowLayoutPanel approvalPanel;
 	private Button btnApprove;
 	private Button btnReject;
+	private Button btnFullText;
+	private ToolTip toolTip;
 }

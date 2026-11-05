@@ -23,5 +23,8 @@ public partial class ChatControl
 			preview.ApplyPresentation(this);
 		foreach (var notice in EnumerateDescendantControls(parent ?? this).OfType<ChatNoticeControl>())
 			notice.Message = notice.Message;
+		foreach (var control in (parent is IChatPresentationControl self ? [self] : Enumerable.Empty<IChatPresentationControl>())
+			.Concat(EnumerateDescendantControls(parent ?? this).OfType<IChatPresentationControl>()))
+			control.ApplyPresentation(this);
 	}
 }

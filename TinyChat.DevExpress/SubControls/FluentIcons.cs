@@ -1,3 +1,5 @@
+using DevExpress.LookAndFeel;
+using DevExpress.Utils.Colors;
 using DevExpress.Utils.Svg;
 
 namespace TinyChat;
@@ -26,6 +28,8 @@ internal static class FluentIcons
 	private const string CHECKMARK_PATH = "M14.0458 3.4856C14.3299 3.78703 14.3158 4.26169 14.0144 4.54579L6.08456 12.0197C5.74829 12.3366 5.22042 12.3269 4.89609 11.9977L2.21576 9.27737C1.92504 8.98231 1.92856 8.50745 2.22361 8.21674C2.51867 7.92602 2.99353 7.92954 3.28424 8.22459L5.51839 10.4921L12.9856 3.45421C13.287 3.17011 13.7617 3.18416 14.0458 3.4856Z";
 
 	private const string DISMISS_PATH = "M2.46967 2.46967C2.76256 2.17678 3.23744 2.17678 3.53033 2.46967L8 6.939L12.4697 2.46967C12.7626 2.17678 13.2374 2.17678 13.5303 2.46967C13.8232 2.76256 13.8232 3.23744 13.5303 3.53033L9.061 8L13.5303 12.4697C13.8232 12.7626 13.8232 13.2374 13.5303 13.5303C13.2374 13.8232 12.7626 13.8232 12.4697 13.5303L8 9.061L3.53033 13.5303C3.23744 13.8232 2.76256 13.8232 2.46967 13.5303C2.17678 13.2374 2.17678 12.7626 2.46967 12.4697L6.939 8L2.46967 3.53033C2.17678 3.23744 2.17678 2.76256 2.46967 2.46967Z";
+
+	private const string OPEN_PATH = "M4.75 3.5C4.05964 3.5 3.5 4.05964 3.5 4.75V11.25C3.5 11.9404 4.05964 12.5 4.75 12.5H11.25C11.9404 12.5 12.5 11.9404 12.5 11.25V9.75C12.5 9.33579 12.8358 9 13.25 9C13.6642 9 14 9.33579 14 9.75V11.25C14 12.7688 12.7688 14 11.25 14H4.75C3.23122 14 2 12.7688 2 11.25V4.75C2 3.23122 3.23122 2 4.75 2H6.25C6.66421 2 7 2.33579 7 2.75C7 3.16421 6.66421 3.5 6.25 3.5H4.75ZM7.99976 2.75C7.99976 2.33579 8.33554 2 8.74976 2H13.2498C13.664 2 13.9998 2.33579 13.9998 2.75V7.25C13.9998 7.66421 13.664 8 13.2498 8C12.8355 8 12.4998 7.66421 12.4998 7.25V4.56095L9.28008 7.78056C8.98719 8.07345 8.51231 8.07345 8.21942 7.78055C7.92653 7.48766 7.92653 7.01278 8.21943 6.71989L11.4394 3.5H8.74976C8.33554 3.5 7.99976 3.16421 7.99976 2.75Z";
 
 	// Regular "Copy", "Arrow Undo" and the "A" of "Text Color", in the sizes Microsoft draws them for.
 	// Picking the size that matches the device pixels keeps the 1 px lines and the rounding crisp.
@@ -66,13 +70,25 @@ internal static class FluentIcons
 
 	internal static SvgImage Stop => Create(STOP_PATH, "Black", "#727272");
 
-	internal static SvgImage AttachmentNotice(ChatNoticeSeverity severity) => severity == ChatNoticeSeverity.Error ? Warning : Create(WARNING_PATH, "Yellow", "#FFB115");
+	private const string ERROR_PATH = "M8 1A7 7 0 1 1 8 15A7 7 0 1 1 8 1ZM5 4L8 7L11 4L12 5L9 8L12 11L11 12L8 9L5 12L4 11L7 8L4 5Z";
 
-	internal static SvgImage Warning => Create(WARNING_PATH, "Red", "#D11C1C");
+	internal static SvgImage AttachmentNotice(ChatNoticeSeverity severity, UserLookAndFeel? lookAndFeel = null)
+	{
+		lookAndFeel ??= UserLookAndFeel.Default;
+		var semanticColor = severity == ChatNoticeSeverity.Error ? DXSkinColors.FillColors.Danger : DXSkinColors.FillColors.Warning;
+		var color = DXSkinColorHelper.GetDXSkinColor(semanticColor, lookAndFeel.ActiveSkinName, lookAndFeel.ActiveSvgPaletteName);
+		var path = severity == ChatNoticeSeverity.Error ? ERROR_PATH : WARNING_PATH;
+		return CreateSvg($"<svg viewBox=\"0 0 16 16\"><path fill=\"{ColorTranslator.ToHtml(color)}\" fill-rule=\"evenodd\" d=\"{path}\" /></svg>");
+	}
+
+	internal static SvgImage Warning => AttachmentNotice(ChatNoticeSeverity.Warning);
+	internal static SvgImage Error => AttachmentNotice(ChatNoticeSeverity.Error);
 
 	internal static SvgImage Success => Create(CHECKMARK_PATH, "Green", "#039C23");
 
 	internal static SvgImage Rejected => Create(DISMISS_PATH, "Red", "#D11C1C");
+
+	internal static SvgImage ShowFullText => Create(OPEN_PATH, "Black", "#727272");
 
 	/// <summary>Gets the regular "Copy" icon drawn for <paramref name="pixelSize"/> device pixels.</summary>
 	internal static SvgImage Copy(int pixelSize)

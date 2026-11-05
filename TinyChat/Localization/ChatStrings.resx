@@ -22,4 +22,8 @@
 How can I help you today?</value></data>
   <data name="RemoveAttachment" xml:space="preserve"><value>Remove attachment</value></data>
   <data name="OpenAttachment" xml:space="preserve"><value>Open attachment</value></data>
+  <data name="ShowFullText" xml:space="preserve"><value>Show full text</value></data>
+  <data name="Reasoning" xml:space="preserve"><value>Reasoning</value></data>
+  <data name="FunctionArguments" xml:space="preserve"><value>Arguments</value></data>
+  <data name="FunctionResult" xml:space="preserve"><value>Result</value></data>
 </root>

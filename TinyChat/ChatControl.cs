@@ -1535,6 +1535,7 @@ public partial class ChatControl : UserControl
 			functionCallMessageControl.AllowExpand = AllowExpandFunctionCalls;
 		if (messageControl is IReasoningMessageControl reasoningMessageControl)
 			reasoningMessageControl.AllowExpand = AllowExpandReasoning;
+		ApplyDetailTextLimits(messageControl);
 
 		var control = (Control)messageControl;
 		control.Visible = ShouldDisplayMessage(message);

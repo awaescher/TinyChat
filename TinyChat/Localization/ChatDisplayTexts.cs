@@ -79,6 +79,30 @@ public sealed class ChatDisplayTexts
 	private bool ShouldSerializeOpenAttachment() => _overrides.ContainsKey(nameof(OpenAttachment));
 	private void ResetOpenAttachment() => Set(nameof(OpenAttachment), null);
 
+	/// <summary>Gets or sets the tooltip and accessible name of the button that shows shortened reasoning or tool results in full.</summary>
+	[Localizable(true)]
+	public string ShowFullText { get => Get(nameof(ShowFullText)); set => Set(nameof(ShowFullText), value); }
+	private bool ShouldSerializeShowFullText() => _overrides.ContainsKey(nameof(ShowFullText));
+	private void ResetShowFullText() => Set(nameof(ShowFullText), null);
+
+	/// <summary>Gets or sets the title of the full text dialog for reasoning.</summary>
+	[Localizable(true)]
+	public string Reasoning { get => Get(nameof(Reasoning)); set => Set(nameof(Reasoning), value); }
+	private bool ShouldSerializeReasoning() => _overrides.ContainsKey(nameof(Reasoning));
+	private void ResetReasoning() => Set(nameof(Reasoning), null);
+
+	/// <summary>Gets or sets the heading of the function arguments in the full text dialog.</summary>
+	[Localizable(true)]
+	public string FunctionArguments { get => Get(nameof(FunctionArguments)); set => Set(nameof(FunctionArguments), value); }
+	private bool ShouldSerializeFunctionArguments() => _overrides.ContainsKey(nameof(FunctionArguments));
+	private void ResetFunctionArguments() => Set(nameof(FunctionArguments), null);
+
+	/// <summary>Gets or sets the heading of the function result in the full text dialog.</summary>
+	[Localizable(true)]
+	public string FunctionResult { get => Get(nameof(FunctionResult)); set => Set(nameof(FunctionResult), value); }
+	private bool ShouldSerializeFunctionResult() => _overrides.ContainsKey(nameof(FunctionResult));
+	private void ResetFunctionResult() => Set(nameof(FunctionResult), null);
+
 	internal string Format(ChatNotice notice) => string.Format(CultureInfo.CurrentCulture, Get(notice.Code.ToString()), notice.FileName ?? string.Empty, notice.Limit ?? 0);
 	/// <inheritdoc />
 	public override string ToString() => string.Empty;

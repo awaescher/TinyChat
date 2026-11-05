@@ -8,7 +8,7 @@ namespace TinyChat;
 /// the function name (bold), the arguments, and the result.
 /// Clicking anywhere on the control toggles the detail rows (arguments + result).
 /// </summary>
-internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLayoutControl, IChatMessageRefreshControl, IFunctionCallMessageControl
+internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLayoutControl, IChatMessageRefreshControl, IFunctionCallMessageControl, IChatMessageTruncationControl, IChatPresentationControl
 {
 	/// <summary>Fixed pixel width reserved for the icon column.</summary>
 	private const int ICON_WIDTH = 20;
@@ -20,7 +20,15 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 	private Font? _senderFont;
 	private Font? _iconFont;
 	private Font? _statusIconFont;
+	private Font? _fullTextIconFont;
 	private int _iconColumnWidth = ICON_WIDTH;
+	private string _argumentsText = string.Empty;
+	private string _resultText = string.Empty;
+	private bool _isTruncated;
+	private int _maximumDetailTextLength = DetailTextTruncation.DEFAULT_MAXIMUM_LENGTH;
+	private int _maximumDetailTextLines = DetailTextTruncation.DEFAULT_MAXIMUM_LINES;
+	private ChatDisplayTexts? _displayTexts;
+	private ChatControl? _owner;
 
 	/// <summary>
 	/// Whether the detail panel (arguments + result) is currently visible.
@@ -67,10 +75,13 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 			_iconFont = null;
 			_statusIconFont?.Dispose();
 			_statusIconFont = null;
+			_fullTextIconFont?.Dispose();
+			_fullTextIconFont = null;
 		};
 
 		WireMouseDown(tableLayout, lblIcon, headerPanel, lblTitle, lblStatus, lblArgs, lblResultIcon, lblResult);
 		UpdateExpandCursor();
+		ApplyPresentation(null);
 	}
 
 	/// <inheritdoc />
@@ -133,15 +144,18 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 		var oldSenderFont = _senderFont;
 		var oldIconFont = _iconFont;
 		var oldStatusIconFont = _statusIconFont;
+		var oldFullTextIconFont = _fullTextIconFont;
 		_senderFont = new Font(Font, Font.Style | FontStyle.Bold);
 		_iconFont = ChatIcons.CreateFont(Math.Max(1f, Math.Min(Font.SizeInPoints, 9f)));
 		_statusIconFont = ChatIcons.IconFontName is null ? null : ChatIcons.CreateFont(Math.Max(1f, Font.SizeInPoints * 0.8f));
+		_fullTextIconFont = ChatIcons.IconFontName is null ? null : ChatIcons.CreateFont(Math.Max(1f, Math.Min(Font.SizeInPoints, 9f)));
 		lblSender.Font = _senderFont;
 		lblTitle.Font = Font;
 		lblArgs.Font = Font;
 		lblResult.Font = Font;
 		btnApprove.Font = Font;
 		btnReject.Font = Font;
+		btnFullText.Font = _fullTextIconFont ?? Font;
 		lblIcon.Font = _iconFont;
 		lblResultIcon.Font = _iconFont;
 		if (_message?.Content is FunctionCallMessageContent content)
@@ -152,6 +166,7 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 		oldSenderFont?.Dispose();
 		oldIconFont?.Dispose();
 		oldStatusIconFont?.Dispose();
+		oldFullTextIconFont?.Dispose();
 	}
 
 	/// <inheritdoc />
@@ -277,8 +292,8 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 	/// </summary>
 	private void UpdateResultDisplay(object? result)
 	{
-		var structured = AIMessageContent.FromResult(result);
-		lblResult.Text = structured?.Text ?? result?.ToString() ?? string.Empty;
+		var structured = AIMessageContent.FromDisplayResult(result);
+		_resultText = structured?.Text ?? result?.ToString() ?? string.Empty;
 		if (ReferenceEquals(result, _displayedResult))
 			return;
 		_displayedResult = result;
@@ -287,13 +302,103 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 		if (structured is not null && FileAttachmentPreviewPanel.HasAttachments(structured))
 		{
 			_resultPreview = new FileAttachmentPreviewPanel(structured);
-			tableLayout.RowCount = Math.Max(5, tableLayout.RowCount);
-			while (tableLayout.RowStyles.Count < 5)
-				tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+			WireMouseDown(_resultPreview);
 			tableLayout.Controls.Add(_resultPreview, 1, 4);
-			_resultPreview.Visible = _expanded;
+			UpdateContentWidthConstraints();
+			if (ChatControl.FindOwner(this) is { } owner)
+				_resultPreview.ApplyPresentation(owner);
 		}
 	}
+
+	private void ApplyDetailTexts()
+	{
+		var argumentsTruncated = DetailTextTruncation.TryTruncate(_argumentsText, MaximumDetailTextLength, MaximumDetailTextLines, out var arguments);
+		var resultTruncated = DetailTextTruncation.TryTruncate(_resultText, MaximumDetailTextLength, MaximumDetailTextLines, out var result);
+		lblArgs.Text = arguments;
+		lblResult.Text = result;
+		_isTruncated = argumentsTruncated || resultTruncated;
+	}
+
+	/// <inheritdoc />
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	[Browsable(false)]
+	public int MaximumDetailTextLength
+	{
+		get => _maximumDetailTextLength;
+		set
+		{
+			ArgumentOutOfRangeException.ThrowIfNegative(value);
+			if (_maximumDetailTextLength == value)
+				return;
+
+			_maximumDetailTextLength = value;
+			ApplyLayoutUpdate(() =>
+			{
+				ApplyDetailTexts();
+				ApplyVisibilityCore();
+			});
+		}
+	}
+
+	/// <inheritdoc />
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	[Browsable(false)]
+	public int MaximumDetailTextLines
+	{
+		get => _maximumDetailTextLines;
+		set
+		{
+			ArgumentOutOfRangeException.ThrowIfNegative(value);
+			if (_maximumDetailTextLines == value)
+				return;
+
+			_maximumDetailTextLines = value;
+			ApplyLayoutUpdate(() =>
+			{
+				ApplyDetailTexts();
+				ApplyVisibilityCore();
+			});
+		}
+	}
+
+	/// <inheritdoc />
+	public void ApplyPresentation(ChatControl? owner)
+	{
+		_owner = owner;
+		_displayTexts = owner?.DisplayTexts;
+		var text = _displayTexts?.ShowFullText ?? ChatLocalization.GetString("ShowFullText");
+		btnFullText.AccessibleName = text;
+		if (ChatIcons.IconFontName is null)
+			btnFullText.Text = ChatIcons.ShowFullText + " " + text;
+		toolTip.SetToolTip(btnFullText, text);
+	}
+
+	internal string GetFullText()
+	{
+		var title = _message?.Content is FunctionCallMessageContent content ? FunctionCallDisplay.GetTitle(content) : lblTitle.Text;
+		var argumentsHeading = _displayTexts?.FunctionArguments ?? ChatLocalization.GetString("FunctionArguments");
+		var resultHeading = _displayTexts?.FunctionResult ?? ChatLocalization.GetString("FunctionResult");
+		var sections = new List<string> { title };
+		if (_argumentsText.Length > 0)
+			sections.Add($"{argumentsHeading}:{Environment.NewLine}{_argumentsText}");
+		if (_resultText.Length > 0)
+			sections.Add($"{resultHeading}:{Environment.NewLine}{_resultText}");
+		return string.Join(Environment.NewLine + Environment.NewLine, sections);
+	}
+
+	private void BtnFullText_Click(object? sender, EventArgs e)
+	{
+		var title = _message?.Content is FunctionCallMessageContent content ? FunctionCallDisplay.GetTitle(content) : lblTitle.Text;
+		if ((_owner ?? ChatControl.FindOwner(this)) is { } owner)
+		{
+			owner.OpenFullText(title, GetFullText());
+			return;
+		}
+
+		using var dialog = new FullTextDialog(title, GetFullText(), Font);
+		dialog.ShowDialog(FindForm());
+	}
+
 	private void UpdateDisplay()
 	{
 		if (CanUpdateCollapsedContentWithoutLayout())
@@ -312,6 +417,7 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 			!lblResultIcon.Visible &&
 			!lblResult.Visible &&
 			_message?.Content is FunctionCallMessageContent functionCall &&
+			ReferenceEquals(functionCall.Result, _displayedResult) &&
 			approvalPanel.Visible == (functionCall.ApprovalState == ToolApprovalState.Pending) &&
 			string.Equals(lblSender.Text, Message?.Sender?.Name ?? string.Empty, StringComparison.Ordinal) &&
 			string.Equals(lblTitle.Text, FunctionCallDisplay.GetTitle(functionCall), StringComparison.Ordinal);
@@ -324,8 +430,10 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 		if (_message?.Content is not FunctionCallMessageContent fc)
 		{
 			lblTitle.Text = string.Empty;
-			lblArgs.Text = string.Empty;
-			lblResult.Text = string.Empty;
+			_argumentsText = string.Empty;
+			_resultText = string.Empty;
+			UpdateResultDisplay(null);
+			ApplyDetailTexts();
 			_expanded = false;
 			ApplyVisibilityCore();
 			return;
@@ -342,9 +450,10 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 			var maxKeyLen = fc.Arguments.Keys.Max(k => k.Length);
 			argumentsText = string.Join(Environment.NewLine, fc.Arguments.Select(kv => $"{(kv.Key + ":").PadRight(maxKeyLen + 1)} {kv.Value}"));
 		}
-		lblArgs.Text = argumentsText;
+		_argumentsText = argumentsText;
 
 		UpdateResultDisplay(fc.Result);
+		ApplyDetailTexts();
 		ApplyVisibilityCore();
 	}
 
@@ -363,11 +472,14 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 		var hasResult = _message?.Content is FunctionCallMessageContent { Result: not null };
 		var isPending = _message?.Content is FunctionCallMessageContent { ApprovalState: ToolApprovalState.Pending };
 
+		var hasResultText = hasResult && _resultText.Length > 0;
 		lblArgs.Visible = (_expanded || isPending) && hasArgs;
-		lblResultIcon.Visible = _expanded && hasResult;
-		lblResult.Visible = _expanded && hasResult;
+		lblResultIcon.Visible = _expanded && hasResultText;
+		lblResult.Visible = _expanded && hasResultText;
+		// Images and files returned by the tool stay visible while collapsed, like attachments of a message.
 		if (_resultPreview is not null)
-			_resultPreview.Visible = _expanded && hasResult;
+			_resultPreview.Visible = hasResult;
+		btnFullText.Visible = _isTruncated && (lblArgs.Visible || lblResult.Visible);
 		approvalPanel.Visible = isPending;
 	}
 
@@ -483,7 +595,7 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 		var backColor = GetOpaqueBackColor();
 		tableLayout.BackColor = backColor;
 		approvalPanel.BackColor = backColor;
-		foreach (var label in new Control[] { lblSender, lblIcon, lblTitle, lblStatus, headerPanel, lblArgs, lblResultIcon, lblResult })
+		foreach (var label in new Control[] { lblSender, lblIcon, lblTitle, lblStatus, headerPanel, lblArgs, lblResultIcon, lblResult, btnFullText })
 		{
 			label.BackColor = backColor;
 			label.ForeColor = ForeColor;
@@ -555,6 +667,6 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 	public override string ToString()
 	{
 		var header = _message?.Content is FunctionCallMessageContent content ? FunctionCallDisplay.GetHeader(content) : lblTitle.Text;
-		return $"{header}{Environment.NewLine}{lblArgs.Text}{Environment.NewLine}{lblResult.Text}";
+		return $"{header}{Environment.NewLine}{_argumentsText}{Environment.NewLine}{_resultText}";
 	}
 }

@@ -11,6 +11,12 @@ public static class ChatLocalization
 	/// <summary>Gets a resource for the current UI culture, with the neutral resource as fallback.</summary>
 	public static string GetString(string key, CultureInfo? culture = null) => _resources.GetString(key, culture ?? CultureInfo.CurrentUICulture) ?? key;
 
+	internal static string IncludeException(string explanation, ChatNotice notice)
+	{
+		var detail = notice.Exception?.GetBaseException().Message;
+		return string.IsNullOrWhiteSpace(detail) || explanation.Contains(detail, StringComparison.Ordinal) ? explanation : explanation + Environment.NewLine + detail;
+	}
+
 	/// <summary>Formats a diagnostic using localized resources and structured arguments.</summary>
 	public static string Format(ChatNotice notice) => string.Format(CultureInfo.CurrentCulture, GetString(notice.Code.ToString()), notice.FileName ?? string.Empty, notice.Limit ?? 0);
 }

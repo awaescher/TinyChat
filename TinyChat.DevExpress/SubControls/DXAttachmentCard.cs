@@ -8,10 +8,16 @@ namespace TinyChat;
 internal sealed class DXAttachmentCard : AttachmentCard
 {
 	internal DXAttachmentCard(ChatFileAttachment attachment, Action? remove = null)
-		: base(attachment, new PanelControl { BorderStyle = BorderStyles.NoBorder }, CreatePreview(attachment), CreateRemoveButton(remove), new DXAttachmentToolTip(), remove) { }
+		: base(attachment, new PanelControl { BorderStyle = BorderStyles.NoBorder }, CreatePreview(attachment), CreateRemoveButton(remove), new DXAttachmentToolTip(), remove)
+	{
+		((PictureEdit)PreviewControl).LookAndFeel.StyleChanged += SkinStyleChanged;
+	}
 
 	internal DXAttachmentCard(ChatNotice notice, Func<ChatNotice, string> localize, Action? remove)
-		: base(null, new PanelControl { BorderStyle = BorderStyles.NoBorder }, CreatePreview(null), CreateRemoveButton(remove), new DXAttachmentToolTip(), remove, notice, localize) { }
+		: base(null, new PanelControl { BorderStyle = BorderStyles.NoBorder }, CreatePreview(null), CreateRemoveButton(remove), new DXAttachmentToolTip(), remove, notice, localize)
+	{
+		((PictureEdit)PreviewControl).LookAndFeel.StyleChanged += SkinStyleChanged;
+	}
 
 	private static Control? CreateRemoveButton(Action? remove)
 	{
@@ -39,8 +45,17 @@ internal sealed class DXAttachmentCard : AttachmentCard
 
 	protected override Image CreateNoticeBadge(Size size, ChatNoticeSeverity severity)
 	{
-		var svg = new SvgBitmap(FluentIcons.AttachmentNotice(severity));
+		var svg = new SvgBitmap(FluentIcons.AttachmentNotice(severity, ((PictureEdit)PreviewControl).LookAndFeel));
 		return svg.Render(size, null, DefaultBoolean.Default, DefaultBoolean.False);
+	}
+
+	private void SkinStyleChanged(object? sender, EventArgs e) => RefreshPreview();
+
+	protected override void Dispose(bool disposing)
+	{
+		if (disposing)
+			((PictureEdit)PreviewControl).LookAndFeel.StyleChanged -= SkinStyleChanged;
+		base.Dispose(disposing);
 	}
 
 	protected override void ReplacePreviewImage(Image image)

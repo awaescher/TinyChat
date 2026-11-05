@@ -67,11 +67,18 @@ public class FileAttachmentPreviewPanel : FlowLayoutPanel
 	private Control CreateUnavailablePreview()
 	{
 		var explanation = ChatLocalization.GetString("PreviewUnavailable");
-		var font = ChatIcons.CreateFont(Font.SizeInPoints);
-		var icon = new Label { AutoSize = true, Text = ChatIcons.IconFontName is null ? "\u26a0" : ChatIcons.StatusFailed, Font = font, ForeColor = ChatIcons.ErrorColor, AccessibleName = explanation };
-		icon.Disposed += (_, _) => font.Dispose();
+		var icon = CreateUnavailableIcon();
+		icon.AccessibleName = explanation;
 		_previewToolTip.Set(icon, string.Empty, explanation);
 		_unavailablePreviews.Add(icon);
+		return icon;
+	}
+
+	internal virtual Control CreateUnavailableIcon()
+	{
+		var image = ChatStatusImage.CreateError(new Size(16, 16), ChatIcons.ErrorColor);
+		var icon = new PictureBox { Image = image, Size = new Size(18, 18), SizeMode = PictureBoxSizeMode.CenterImage };
+		icon.Disposed += (_, _) => image.Dispose();
 		return icon;
 	}
 

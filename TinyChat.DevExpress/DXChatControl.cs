@@ -15,12 +15,15 @@ public class DXChatControl : ChatControl
 	internal override IAttachmentToolTip CreateToolTip() => new DXAttachmentToolTip();
 
 	/// <inheritdoc />
-	protected override Control CreateNoticeIcon(ChatNoticeSeverity severity)
+	protected override Control CreateNoticeIcon(ChatNoticeSeverity severity) => new DXStatusIcon(severity);
+
+	/// <inheritdoc />
+	protected override IChatMessageControl CreateNoticeMessageControl(IChatMessage message)
 	{
-		var icon = new LabelControl { AutoSizeMode = LabelAutoSizeMode.None, Size = new Size(18, 18), Margin = new Padding(0, 0, 6, 0) };
-		icon.ImageOptions.SvgImage = FluentIcons.Warning;
-		icon.ImageOptions.SvgImageSize = new Size(16, 16);
-		return icon;
+		var notice = ((ChatNoticeMessageContent)message.Content).Notice;
+		var text = new LabelControl { AutoSizeMode = LabelAutoSizeMode.Vertical, AllowHtmlString = false, UseMnemonic = false, Margin = Padding.Empty };
+		text.Appearance.TextOptions.WordWrap = DevExpress.Utils.WordWrap.Wrap;
+		return new ChatNoticeControl(message, CreateNoticeIcon(notice.Severity), value => NoticeTextProvider(value), CreateToolTip(), text);
 	}
 
 	/// <inheritdoc />
@@ -60,6 +63,9 @@ public class DXChatControl : ChatControl
 
 	/// <inheritdoc />
 	protected override IChatInputControl CreateChatInputControl() => new DXChatInputControl();
+
+	/// <inheritdoc />
+	protected override Form CreateFullTextDialog(string title, string text) => new DXFullTextDialog(title, text, MessageFont);
 
 	/// <inheritdoc />
 	protected override ISplitContainerControl CreateSplitContainerControl() => new DXChatSplitContainerControl();

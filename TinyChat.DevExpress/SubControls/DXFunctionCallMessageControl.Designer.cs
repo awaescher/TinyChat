@@ -18,7 +18,10 @@ partial class DXFunctionCallMessageControl
 		if (disposing && (components != null))
 			components.Dispose();
 		if (disposing)
+		{
 			statusImages?.Dispose();
+			toolTip?.Dispose();
+		}
 		base.Dispose(disposing);
 	}
 
@@ -33,11 +36,13 @@ partial class DXFunctionCallMessageControl
 		approvalPanel = new FlowLayoutPanel();
 		btnApprove = new SimpleButton();
 		btnReject = new SimpleButton();
+		btnFullText = new SimpleButton();
+		toolTip = new DXAttachmentToolTip();
 		tableLayout = new TableLayoutPanel();
 		paddingPanel = new PanelControl();
 		statusImages = new DevExpress.Utils.SvgImageCollection();
 		statusImages.Add(STATUS_SUCCESS, FluentIcons.Success);
-		statusImages.Add(STATUS_WARNING, FluentIcons.Warning);
+		statusImages.Add(STATUS_WARNING, FluentIcons.Error);
 		statusImages.Add(STATUS_REJECTED, FluentIcons.Rejected);
 		approvalPanel.SuspendLayout();
 		tableLayout.SuspendLayout();
@@ -111,6 +116,18 @@ partial class DXFunctionCallMessageControl
 		btnReject.Text = FunctionCallDisplay.REJECT_GLYPH;
 		btnReject.Click += BtnReject_Click;
 
+		// btnFullText
+		btnFullText.AllowFocus = true;
+		btnFullText.Cursor = Cursors.Hand;
+		btnFullText.ImageOptions.Location = DevExpress.XtraEditors.ImageLocation.MiddleCenter;
+		btnFullText.ImageOptions.SvgImage = FluentIcons.ShowFullText;
+		btnFullText.ImageOptions.SvgImageSize = new Size(ICON_SIZE, ICON_SIZE);
+		btnFullText.Margin = new Padding(0, 2, 0, 0);
+		btnFullText.PaintStyle = DevExpress.XtraEditors.Controls.PaintStyles.Light;
+		btnFullText.Size = new Size(24, 22);
+		btnFullText.Visible = false;
+		btnFullText.Click += BtnFullText_Click;
+
 		// approvalPanel
 		approvalPanel.AutoSize = true;
 		approvalPanel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
@@ -147,10 +164,16 @@ partial class DXFunctionCallMessageControl
 		tableLayout.Controls.Add(lblResult, 1, 2);
 		// Row 3: approval buttons, only visible while an approval is pending.
 		tableLayout.Controls.Add(approvalPanel, 1, 3);
+		// Row 4: inline previews of images and files returned by the tool, visible while collapsed.
+		// Row 5: the button that shows shortened arguments and results in full.
+		tableLayout.Controls.Add(btnFullText, 1, 5);
 		tableLayout.Dock = DockStyle.Fill;
 		tableLayout.Margin = Padding.Empty;
 		tableLayout.Padding = Padding.Empty;
-		tableLayout.RowCount = 4;
+		tableLayout.RowCount = 6;
+		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -203,5 +226,7 @@ partial class DXFunctionCallMessageControl
 	private FlowLayoutPanel approvalPanel;
 	private SimpleButton btnApprove;
 	private SimpleButton btnReject;
+	private SimpleButton btnFullText;
+	private DXAttachmentToolTip toolTip;
 	private DevExpress.Utils.SvgImageCollection statusImages;
 }

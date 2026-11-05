@@ -23,4 +23,8 @@ Hallo Mensch.
 Wie kann ich dir helfen?</value></data>
   <data name="RemoveAttachment" xml:space="preserve"><value>Anhang entfernen</value></data>
   <data name="OpenAttachment" xml:space="preserve"><value>Anhang öffnen</value></data>
+  <data name="ShowFullText" xml:space="preserve"><value>Vollständigen Text anzeigen</value></data>
+  <data name="Reasoning" xml:space="preserve"><value>Gedankengang</value></data>
+  <data name="FunctionArguments" xml:space="preserve"><value>Argumente</value></data>
+  <data name="FunctionResult" xml:space="preserve"><value>Ergebnis</value></data>
 </root>

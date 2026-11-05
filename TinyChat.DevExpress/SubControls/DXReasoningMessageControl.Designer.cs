@@ -17,6 +17,8 @@ partial class DXReasoningMessageControl
 			content.PropertyChanged -= MessageContent_PropertyChanged;
 		if (disposing && (components != null))
 			components.Dispose();
+		if (disposing)
+			toolTip?.Dispose();
 		base.Dispose(disposing);
 	}
 
@@ -26,6 +28,8 @@ partial class DXReasoningMessageControl
 		lblIcon = new LabelControl();
 		lblTitle = new LabelControl();
 		lblDetail = new LabelControl();
+		btnFullText = new SimpleButton();
+		toolTip = new DXAttachmentToolTip();
 		tableLayout = new TableLayoutPanel();
 		paddingPanel = new PanelControl();
 		tableLayout.SuspendLayout();
@@ -65,6 +69,18 @@ partial class DXReasoningMessageControl
 		lblDetail.UseMnemonic = false;
 		lblDetail.Visible = false;
 
+		// btnFullText
+		btnFullText.AllowFocus = true;
+		btnFullText.Cursor = Cursors.Hand;
+		btnFullText.ImageOptions.Location = DevExpress.XtraEditors.ImageLocation.MiddleCenter;
+		btnFullText.ImageOptions.SvgImage = FluentIcons.ShowFullText;
+		btnFullText.ImageOptions.SvgImageSize = new Size(ICON_SIZE, ICON_SIZE);
+		btnFullText.Margin = new Padding(0, 0, 0, 2);
+		btnFullText.PaintStyle = DevExpress.XtraEditors.Controls.PaintStyles.Light;
+		btnFullText.Size = new Size(24, 22);
+		btnFullText.Visible = false;
+		btnFullText.Click += BtnFullText_Click;
+
 		// _table
 		// Col 0: fixed icon width | Col 1: remaining text
 		// Row 0: icon | header / status text
@@ -82,11 +98,14 @@ partial class DXReasoningMessageControl
 		// Row 1, col 0 intentionally left empty - no spacer, so the row fully
 		// collapses when _detailLabel is hidden.
 		tableLayout.Controls.Add(lblDetail, 1, 1);
+		// Row 2: the button that shows shortened reasoning in full.
+		tableLayout.Controls.Add(btnFullText, 1, 2);
 		tableLayout.Cursor = Cursors.Hand;
 		tableLayout.Dock = DockStyle.Fill;
 		tableLayout.Margin = Padding.Empty;
 		tableLayout.Padding = Padding.Empty;
-		tableLayout.RowCount = 2;
+		tableLayout.RowCount = 3;
+		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
@@ -127,5 +146,7 @@ partial class DXReasoningMessageControl
 	private LabelControl lblIcon;
 	private LabelControl lblTitle;
 	private LabelControl lblDetail;
+	private SimpleButton btnFullText;
+	private DXAttachmentToolTip toolTip;
 	private PanelControl paddingPanel;
 }

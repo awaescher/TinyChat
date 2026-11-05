@@ -273,7 +273,7 @@ public class SkillAndApprovalTests
 			var messageControl = (Control)FindMessageControl(control, approvalMessage);
 			messageControl.Visible.ShouldBeTrue();
 			var buttons = DescendantsAndSelf(messageControl).OfType<ButtonBase>().Concat<Control>(
-				DescendantsAndSelf(messageControl).Where(c => c is DevExpress.XtraEditors.SimpleButton)).ToArray();
+				DescendantsAndSelf(messageControl).Where(c => c is DevExpress.XtraEditors.SimpleButton)).Where(button => button.Parent?.Visible == true && button.Parent is FlowLayoutPanel).ToArray();
 			buttons.Length.ShouldBe(2);
 			buttons.ShouldAllBe(button => button.Visible);
 			chatClient.RequestCount.ShouldBe(1);

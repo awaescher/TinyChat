@@ -32,6 +32,8 @@ internal static class ChatIcons
 
 	internal static string Revert => IconFontName is null ? "\u21B6" : "\ue7a7";
 
+	internal static string ShowFullText => IconFontName is null ? "\u2197" : "\ue8a7";
+
 	internal static string StatusSucceeded => "\ue73e";
 
 	internal static string StatusFailed => "\ue814";

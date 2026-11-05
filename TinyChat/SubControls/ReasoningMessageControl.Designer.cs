@@ -12,6 +12,8 @@ partial class ReasoningMessageControl
 			content.PropertyChanged -= OnContentPropertyChanged;
 		if (disposing && (components != null))
 			components.Dispose();
+		if (disposing)
+			toolTip?.Dispose();
 		base.Dispose(disposing);
 	}
 
@@ -21,6 +23,8 @@ partial class ReasoningMessageControl
 		lblIcon = new Label();
 		lblHeader = new Label();
 		lblDetail = new Label();
+		btnFullText = new Button();
+		toolTip = new ToolTip();
 		tableLayout = new TableLayoutPanel();
 		tableLayout.SuspendLayout();
 		SuspendLayout();
@@ -56,6 +60,18 @@ partial class ReasoningMessageControl
 		lblDetail.UseMnemonic = false;
 		lblDetail.Visible = false;
 
+		// btnFullText
+		btnFullText.AutoSize = true;
+		btnFullText.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+		btnFullText.Cursor = Cursors.Hand;
+		btnFullText.FlatStyle = FlatStyle.Flat;
+		btnFullText.FlatAppearance.BorderSize = 0;
+		btnFullText.Margin = new Padding(0, 0, 0, 2);
+		btnFullText.Text = ChatIcons.ShowFullText;
+		btnFullText.UseMnemonic = false;
+		btnFullText.Visible = false;
+		btnFullText.Click += BtnFullText_Click;
+
 		// tableLayout
 		// Col 0: fixed icon width | Col 1: remaining text
 		// Row 0: icon | header / status text
@@ -74,11 +90,14 @@ partial class ReasoningMessageControl
 		// Row 1, col 0 intentionally left empty - no spacer, so the row fully
 		// collapses when _detailLabel is hidden.
 		tableLayout.Controls.Add(lblDetail, 1, 1);
+		// Row 2: the button that shows shortened reasoning in full.
+		tableLayout.Controls.Add(btnFullText, 1, 2);
 		tableLayout.Cursor = Cursors.Hand;
 		tableLayout.Dock = DockStyle.Top;
 		tableLayout.Margin = Padding.Empty;
 		tableLayout.Padding = Padding.Empty;
-		tableLayout.RowCount = 2;
+		tableLayout.RowCount = 3;
+		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 		tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
@@ -109,4 +128,6 @@ partial class ReasoningMessageControl
 	private Label lblIcon;
 	private Label lblHeader;
 	private Label lblDetail;
+	private Button btnFullText;
+	private ToolTip toolTip;
 }

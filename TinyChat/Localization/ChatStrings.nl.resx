@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="GeneralError" xml:space="preserve"><value>Het verzoek kon niet worden voltooid.</value></data>
+  <data name="BinaryAttachment" xml:space="preserve"><value>‘{0}’ wordt als binaire gegevens verzonden. Ondersteuning is afhankelijk van het model en de provider.</value></data>
+  <data name="AttachmentRejected" xml:space="preserve"><value>‘{0}’ kon niet worden bijgevoegd of verwerkt.</value></data>
+  <data name="AttachmentsDisabled" xml:space="preserve"><value>Bijlagen zijn uitgeschakeld.</value></data>
+  <data name="AttachmentTooLarge" xml:space="preserve"><value>‘{0}’ overschrijdt de maximale bijlagegrootte van {1:N0} bytes.</value></data>
+  <data name="NoExtractableText" xml:space="preserve"><value>Uit ‘{0}’ kon geen leesbare tekst worden gehaald. Gescande documenten vereisen OCR.</value></data>
+  <data name="DocumentTruncated" xml:space="preserve"><value>Alleen de eerste {1:N0} tekens van ‘{0}’ worden gebruikt. Latere werkbladen of pagina’s kunnen ontbreken.</value></data>
+  <data name="PreviewUnavailable" xml:space="preserve"><value>Het afbeeldingsvoorbeeld is niet beschikbaar.</value></data>
+  <data name="Assistant" xml:space="preserve"><value>Assistent</value></data>
+  <data name="ToolResult" xml:space="preserve"><value>Toolresultaat</value></data>
+  <data name="Welcome" xml:space="preserve"><value>●
+┌─┴─┐
+●‿●
+└───┘
+
+Waarmee kan ik je vandaag helpen?</value></data>
+  <data name="RemoveAttachment" xml:space="preserve"><value>Bijlage verwijderen</value></data>
+  <data name="OpenAttachment" xml:space="preserve"><value>Bijlage openen</value></data>
+  <data name="ShowFullText" xml:space="preserve"><value>Volledige tekst weergeven</value></data>
+  <data name="Reasoning" xml:space="preserve"><value>Redenering</value></data>
+  <data name="FunctionArguments" xml:space="preserve"><value>Argumenten</value></data>
+  <data name="FunctionResult" xml:space="preserve"><value>Resultaat</value></data>
+</root>

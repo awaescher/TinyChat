@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="GeneralError" xml:space="preserve"><value>Не удалось выполнить запрос.</value></data>
+  <data name="BinaryAttachment" xml:space="preserve"><value>«{0}» будет отправлен как двоичные данные. Поддержка зависит от модели и поставщика.</value></data>
+  <data name="AttachmentRejected" xml:space="preserve"><value>Не удалось прикрепить или обработать «{0}».</value></data>
+  <data name="AttachmentsDisabled" xml:space="preserve"><value>Вложения отключены.</value></data>
+  <data name="AttachmentTooLarge" xml:space="preserve"><value>«{0}» превышает максимальный размер вложения ({1:N0} байт).</value></data>
+  <data name="NoExtractableText" xml:space="preserve"><value>Не удалось извлечь читаемый текст из «{0}». Для отсканированных документов требуется OCR.</value></data>
+  <data name="DocumentTruncated" xml:space="preserve"><value>Используются только первые {1:N0} символов из «{0}». Последующие листы или страницы могут отсутствовать.</value></data>
+  <data name="PreviewUnavailable" xml:space="preserve"><value>Предварительный просмотр изображения недоступен.</value></data>
+  <data name="Assistant" xml:space="preserve"><value>Ассистент</value></data>
+  <data name="ToolResult" xml:space="preserve"><value>Результат инструмента</value></data>
+  <data name="Welcome" xml:space="preserve"><value>●
+┌─┴─┐
+●‿●
+└───┘
+
+Чем я могу помочь сегодня?</value></data>
+  <data name="RemoveAttachment" xml:space="preserve"><value>Удалить вложение</value></data>
+  <data name="OpenAttachment" xml:space="preserve"><value>Открыть вложение</value></data>
+  <data name="ShowFullText" xml:space="preserve"><value>Показать полный текст</value></data>
+  <data name="Reasoning" xml:space="preserve"><value>Рассуждение</value></data>
+  <data name="FunctionArguments" xml:space="preserve"><value>Аргументы</value></data>
+  <data name="FunctionResult" xml:space="preserve"><value>Результат</value></data>
+</root>

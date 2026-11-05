@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="GeneralError" xml:space="preserve"><value>No se pudo completar la solicitud.</value></data>
+  <data name="BinaryAttachment" xml:space="preserve"><value>«{0}» se enviará como datos binarios. La compatibilidad depende del modelo y del proveedor.</value></data>
+  <data name="AttachmentRejected" xml:space="preserve"><value>No se pudo adjuntar ni procesar «{0}».</value></data>
+  <data name="AttachmentsDisabled" xml:space="preserve"><value>Los archivos adjuntos están desactivados.</value></data>
+  <data name="AttachmentTooLarge" xml:space="preserve"><value>«{0}» supera el tamaño máximo de adjunto de {1:N0} bytes.</value></data>
+  <data name="NoExtractableText" xml:space="preserve"><value>No se pudo extraer texto legible de «{0}». Los documentos escaneados requieren OCR.</value></data>
+  <data name="DocumentTruncated" xml:space="preserve"><value>Solo se incluyen los primeros {1:N0} caracteres de «{0}». Puede que falten hojas o páginas posteriores.</value></data>
+  <data name="PreviewUnavailable" xml:space="preserve"><value>La vista previa de la imagen no está disponible.</value></data>
+  <data name="Assistant" xml:space="preserve"><value>Asistente</value></data>
+  <data name="ToolResult" xml:space="preserve"><value>Resultado de la herramienta</value></data>
+  <data name="Welcome" xml:space="preserve"><value>●
+┌─┴─┐
+●‿●
+└───┘
+
+¿En qué puedo ayudarte hoy?</value></data>
+  <data name="RemoveAttachment" xml:space="preserve"><value>Quitar adjunto</value></data>
+  <data name="OpenAttachment" xml:space="preserve"><value>Abrir adjunto</value></data>
+  <data name="ShowFullText" xml:space="preserve"><value>Mostrar texto completo</value></data>
+  <data name="Reasoning" xml:space="preserve"><value>Razonamiento</value></data>
+  <data name="FunctionArguments" xml:space="preserve"><value>Argumentos</value></data>
+  <data name="FunctionResult" xml:space="preserve"><value>Resultado</value></data>
+</root>

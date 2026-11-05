@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="GeneralError" xml:space="preserve"><value>リクエストを完了できませんでした。</value></data>
+  <data name="BinaryAttachment" xml:space="preserve"><value>「{0}」はバイナリ データとして送信されます。対応状況はモデルとプロバイダーによって異なります。</value></data>
+  <data name="AttachmentRejected" xml:space="preserve"><value>「{0}」を添付または処理できませんでした。</value></data>
+  <data name="AttachmentsDisabled" xml:space="preserve"><value>ファイルの添付は無効になっています。</value></data>
+  <data name="AttachmentTooLarge" xml:space="preserve"><value>「{0}」は添付ファイルの最大サイズ ({1:N0} バイト) を超えています。</value></data>
+  <data name="NoExtractableText" xml:space="preserve"><value>「{0}」から読み取り可能なテキストを抽出できませんでした。スキャンした文書には OCR が必要です。</value></data>
+  <data name="DocumentTruncated" xml:space="preserve"><value>「{0}」の先頭 {1:N0} 文字のみが含まれます。後続のシートやページが欠けている可能性があります。</value></data>
+  <data name="PreviewUnavailable" xml:space="preserve"><value>画像のプレビューは利用できません。</value></data>
+  <data name="Assistant" xml:space="preserve"><value>アシスタント</value></data>
+  <data name="ToolResult" xml:space="preserve"><value>ツールの結果</value></data>
+  <data name="Welcome" xml:space="preserve"><value>●
+┌─┴─┐
+●‿●
+└───┘
+
+今日はどのようなご用件ですか?</value></data>
+  <data name="RemoveAttachment" xml:space="preserve"><value>添付ファイルを削除</value></data>
+  <data name="OpenAttachment" xml:space="preserve"><value>添付ファイルを開く</value></data>
+  <data name="ShowFullText" xml:space="preserve"><value>全文を表示</value></data>
+  <data name="Reasoning" xml:space="preserve"><value>推論</value></data>
+  <data name="FunctionArguments" xml:space="preserve"><value>引数</value></data>
+  <data name="FunctionResult" xml:space="preserve"><value>結果</value></data>
+</root>

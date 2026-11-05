@@ -159,7 +159,7 @@ internal class AttachmentCard : Panel
 			_previewDirty = true;
 		}
 		if (notices.Count > 0)
-			text += Environment.NewLine + string.Join(Environment.NewLine, notices.Select(notice => owner?.NoticeTextProvider(notice) ?? _localizeNotice?.Invoke(notice) ?? ChatLocalization.Format(notice)));
+			text += Environment.NewLine + string.Join(Environment.NewLine, notices.Select(notice => ChatLocalization.IncludeException(owner?.NoticeTextProvider(notice) ?? _localizeNotice?.Invoke(notice) ?? ChatLocalization.Format(notice), notice)));
 		AccessibleDescription = text;
 		_preview.AccessibleDescription = text;
 		foreach (var control in new[] { this, _surface, _preview })
@@ -182,6 +182,12 @@ internal class AttachmentCard : Panel
 
 		if (_remove is not null)
 			_remove.Bounds = new Rectangle(Width - Scale(22), 0, Scale(22), Scale(22));
+		RenderPreview();
+	}
+
+	protected void RefreshPreview()
+	{
+		_previewDirty = true;
 		RenderPreview();
 	}
 
@@ -215,6 +221,8 @@ internal class AttachmentCard : Panel
 
 	protected virtual Image CreateNoticeBadge(Size size, ChatNoticeSeverity severity)
 	{
+		if (severity == ChatNoticeSeverity.Error)
+			return ChatStatusImage.CreateError(size, ChatIcons.ErrorColor);
 		var bitmap = new Bitmap(size.Width, size.Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
 		using var graphics = Graphics.FromImage(bitmap);
 		graphics.Clear(Color.Transparent);

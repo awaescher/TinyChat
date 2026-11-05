@@ -39,7 +39,7 @@ public partial class ChatControl
 		ShowNotice(new ChatNotice(ChatNoticeCode.GeneralError, Exception: exception));
 	}
 
-	/// <summary>Creates the shared icon-only diagnostic row.</summary>
+	/// <summary>Creates a diagnostic row with visible request-error text.</summary>
 	protected virtual IChatMessageControl CreateNoticeMessageControl(IChatMessage message)
 	{
 		var notice = ((ChatNoticeMessageContent)message.Content).Notice;
@@ -51,6 +51,13 @@ public partial class ChatControl
 	/// <summary>Creates an error or warning icon, replaceable by alternate control suites.</summary>
 	protected virtual Control CreateNoticeIcon(ChatNoticeSeverity severity)
 	{
+		if (severity == ChatNoticeSeverity.Error)
+		{
+			var image = ChatStatusImage.CreateError(new Size(16, 16), ChatIcons.ErrorColor);
+			var error = new PictureBox { Image = image, Size = new Size(18, 18), SizeMode = PictureBoxSizeMode.CenterImage, Margin = new Padding(0, 0, 6, 0) };
+			error.Disposed += (_, _) => image.Dispose();
+			return error;
+		}
 		var font = ChatIcons.CreateFont(Font.SizeInPoints);
 		var icon = new Label
 		{

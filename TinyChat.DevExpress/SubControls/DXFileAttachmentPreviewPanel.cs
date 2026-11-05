@@ -7,6 +7,8 @@ public class DXFileAttachmentPreviewPanel : FileAttachmentPreviewPanel
 	public DXFileAttachmentPreviewPanel(FileAttachmentMessageContent content) : base(content) { }
 	/// <inheritdoc />
 	public DXFileAttachmentPreviewPanel(AIMessageContent content) : base(content) { }
+	internal override Control CreateUnavailableIcon() => new DXStatusIcon(ChatNoticeSeverity.Error);
+
 	internal override IAttachmentToolTip CreateToolTip() => new DXAttachmentToolTip();
 
 	/// <inheritdoc />
