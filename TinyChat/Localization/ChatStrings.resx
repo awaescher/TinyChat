@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="GeneralError" xml:space="preserve"><value>The request could not be completed.</value></data>
+  <data name="BinaryAttachment" xml:space="preserve"><value>“{0}” will be sent as binary data. Support depends on the model and provider.</value></data>
+  <data name="AttachmentRejected" xml:space="preserve"><value>“{0}” could not be attached or processed.</value></data>
+  <data name="AttachmentsDisabled" xml:space="preserve"><value>File attachments are disabled.</value></data>
+  <data name="AttachmentTooLarge" xml:space="preserve"><value>“{0}” exceeds the maximum attachment size of {1:N0} bytes.</value></data>
+  <data name="NoExtractableText" xml:space="preserve"><value>No readable text could be extracted from “{0}”. Scanned documents require OCR.</value></data>
+  <data name="DocumentTruncated" xml:space="preserve"><value>Only the first {1:N0} characters from “{0}” are included. Later sheets or pages may be missing.</value></data>
+  <data name="PreviewUnavailable" xml:space="preserve"><value>The image preview is unavailable.</value></data>
+  <data name="Assistant" xml:space="preserve"><value>Assistant</value></data>
+  <data name="ToolResult" xml:space="preserve"><value>Tool result</value></data>
+  <data name="Welcome" xml:space="preserve"><value>●
+┌─┴─┐
+●‿●
+└───┘
+
+How can I help you today?</value></data>
+  <data name="RemoveAttachment" xml:space="preserve"><value>Remove attachment</value></data>
+  <data name="OpenAttachment" xml:space="preserve"><value>Open attachment</value></data>
+</root>

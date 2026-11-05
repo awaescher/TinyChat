@@ -30,8 +30,8 @@ public class ErrorContentTests
 
 			reportedError.ShouldNotBeNull().Message.ShouldBe("Server unavailable");
 			control.Messages.Count().ShouldBe(2);
-			control.Messages.Last().Sender.Name.ShouldBe("System");
-			control.Messages.Last().Content.Content.ShouldBe("Error: Server unavailable");
+			control.Messages.Last().Sender.Name.ShouldBeEmpty();
+			control.Messages.Last().Content.ShouldBeOfType<ChatNoticeMessageContent>().Notice.Code.ShouldBe(ChatNoticeCode.GeneralError);
 		}
 
 		[TestCase(false)]

@@ -9,45 +9,10 @@ namespace TinyChat;
 /// </summary>
 public sealed class ChatFileAttachment
 {
-	private const string DEFAULT_MEDIA_TYPE = "application/octet-stream";
 	private readonly object _openPathLock = new();
 	private readonly string? _sourcePath;
 	private string? _temporaryFilePath;
 
-	private static readonly IReadOnlyDictionary<string, string> _mediaTypes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-	{
-		[".avif"] = "image/avif",
-		[".bmp"] = "image/bmp",
-		[".csv"] = "text/csv",
-		[".doc"] = "application/msword",
-		[".docx"] = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-		[".gif"] = "image/gif",
-		[".heic"] = "image/heic",
-		[".htm"] = "text/html",
-		[".html"] = "text/html",
-		[".jpeg"] = "image/jpeg",
-		[".jpg"] = "image/jpeg",
-		[".json"] = "application/json",
-		[".md"] = "text/markdown",
-		[".mp3"] = "audio/mpeg",
-		[".mp4"] = "video/mp4",
-		[".pdf"] = "application/pdf",
-		[".png"] = "image/png",
-		[".ppt"] = "application/vnd.ms-powerpoint",
-		[".pptx"] = "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-		[".rtf"] = "application/rtf",
-		[".svg"] = "image/svg+xml",
-		[".tif"] = "image/tiff",
-		[".tiff"] = "image/tiff",
-		[".tsv"] = "text/tab-separated-values",
-		[".txt"] = "text/plain",
-		[".wav"] = "audio/wav",
-		[".webp"] = "image/webp",
-		[".xls"] = "application/vnd.ms-excel",
-		[".xlsx"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-		[".xml"] = "application/xml",
-		[".zip"] = "application/zip"
-	};
 	private static readonly HashSet<string> _textMediaTypes = new(StringComparer.OrdinalIgnoreCase)
 	{
 		"application/json",
@@ -109,7 +74,13 @@ public sealed class ChatFileAttachment
 	/// <summary>
 	/// Gets whether this attachment contains text that can be passed directly to a language model.
 	/// </summary>
-	public bool IsText => MediaType.StartsWith("text/", StringComparison.OrdinalIgnoreCase) || _textMediaTypes.Contains(MediaType);
+	public bool IsText => IsTextMediaType(MediaType);
+
+	/// <summary>Determines whether a media type can be decoded as text.</summary>
+	public static bool IsTextMediaType(string mediaType) => mediaType.StartsWith("text/", StringComparison.OrdinalIgnoreCase) || _textMediaTypes.Contains(mediaType);
+
+	/// <summary>Gets the known media type of a file, or application/octet-stream.</summary>
+	public static string GetMediaType(string fileName) => MimeMapping.MimeUtility.GetMimeMapping(fileName);
 
 	/// <summary>
 	/// Loads an attachment from disk. The local path is retained privately so that the file can be opened later.
@@ -138,7 +109,7 @@ public sealed class ChatFileAttachment
 		if (maximumFileSize is { } actualMaximum && data.LongLength > actualMaximum)
 			throw new IOException($"The file '{fileInfo.Name}' exceeds the maximum attachment size of {actualMaximum:N0} bytes.");
 
-		var mediaType = _mediaTypes.GetValueOrDefault(fileInfo.Extension, DEFAULT_MEDIA_TYPE);
+		var mediaType = GetMediaType(fileInfo.Name);
 		return new ChatFileAttachment(fileInfo.Name, mediaType, data, fileInfo.FullName);
 	}
 

@@ -5,9 +5,9 @@ namespace TinyChat;
 /// <summary>
 /// A text input control that allows users to compose messages with optional file attachments.
 /// </summary>
-public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInputControl, IChatInputDraftControl, IChatInputDraftEditorControl, IChatInputLayoutControl, IChatInputAppearanceControl
+public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInputControl, IChatInputDraftControl, IChatInputDraftEditorControl, IChatInputLayoutControl, IChatInputAppearanceControl, IChatAttachmentNoticeInput
 {
-	private const int ATTACHMENT_DISPLAY_HEIGHT = 60;
+	private const int ATTACHMENT_DISPLAY_HEIGHT = 72;
 	private const int DEFAULT_CONTENT_PADDING = 8;
 	private const int SEND_BUTTON_INSET = 6;
 
@@ -44,7 +44,7 @@ public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInput
 	public IReadOnlyList<ChatFileAttachment> PendingAttachments => _attachments.AsReadOnly();
 
 	/// <inheritdoc />
-	public int AttachmentDisplayHeight => ATTACHMENT_DISPLAY_HEIGHT;
+	public int AttachmentDisplayHeight => ScaleLogicalPixels(ATTACHMENT_DISPLAY_HEIGHT);
 
 	/// <inheritdoc />
 	[Browsable(false)]
@@ -233,6 +233,7 @@ public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInput
 	protected override void OnLayout(LayoutEventArgs levent)
 	{
 		base.OnLayout(levent);
+		UpdateAttachmentRowHeight();
 		PositionSendButton();
 	}
 
@@ -351,70 +352,26 @@ public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInput
 		_sendButton.Enabled = !_isReceivingStream || _allowCancellation;
 	}
 
-	private Control CreateAttachmentTile(ChatFileAttachment attachment)
+	bool IChatAttachmentNoticeInput.HasAttachmentNotices => _attachmentPanel.Controls.OfType<AttachmentCard>().Any(card => card.InputNotice is not null);
+
+	void IChatAttachmentNoticeInput.AddAttachmentNotice(Control notice)
 	{
-		var tile = new Panel
-		{
-			AccessibleName = attachment.Name,
-			BorderStyle = BorderStyle.FixedSingle,
-			Margin = new Padding(0, 0, 6, 0),
-			Size = new Size(attachment.IsImage ? 64 : 180, 40)
-		};
-		var removeButton = new Button
-		{
-			Cursor = Cursors.Hand,
-			Dock = DockStyle.Right,
-			FlatStyle = FlatStyle.Flat,
-			TabStop = false,
-			Text = "×",
-			Width = 24
-		};
-		removeButton.FlatAppearance.BorderSize = 0;
-		removeButton.Click += (_, _) => RemoveAttachment(attachment, tile);
-
-		tile.Controls.Add(removeButton);
-		if (!attachment.IsImage)
-		{
-			var nameLabel = new Label
-			{
-				AutoEllipsis = true,
-				Dock = DockStyle.Fill,
-				Padding = new Padding(4, 0, 0, 0),
-				Text = attachment.Name,
-				TextAlign = ContentAlignment.MiddleLeft,
-				UseMnemonic = false
-			};
-			tile.Controls.Add(nameLabel);
-			nameLabel.BringToFront();
-		}
-
-		tile.Controls.Add(CreateAttachmentIcon(attachment));
-		ApplyAttachmentTileAppearance(tile);
-		return tile;
+		_attachmentPanel.Controls.Add(notice);
+		UpdateAttachmentPanel();
 	}
 
-	private static Control CreateAttachmentIcon(ChatFileAttachment attachment)
+	void IChatAttachmentNoticeInput.ClearAttachmentNotices(string? fileName)
 	{
-		if (!attachment.IsImage)
-		{
-			return new FileAttachmentIconControl
-			{
-				Dock = DockStyle.Left,
-				Width = 34
-			};
-		}
+		foreach (var notice in _attachmentPanel.Controls.OfType<AttachmentCard>().Where(card => card.InputNotice is { } notice && (fileName is null || string.Equals(notice.FileName, fileName, StringComparison.OrdinalIgnoreCase))).ToArray())
+			notice.Dispose();
+		UpdateAttachmentPanel();
+	}
 
-		var image = FileAttachmentImageFactory.Create(attachment);
-		var preview = new PictureBox
-		{
-			Dock = DockStyle.Left,
-			Image = image,
-			Padding = new Padding(2),
-			SizeMode = PictureBoxSizeMode.Zoom,
-			Width = 34
-		};
-		preview.Disposed += (_, _) => image.Dispose();
-		return preview;
+	private Control CreateAttachmentTile(ChatFileAttachment attachment)
+	{
+		AttachmentCard? card = null;
+		card = new AttachmentCard(attachment, () => RemoveAttachment(attachment, card!));
+		return card;
 	}
 
 	private void RemoveAttachment(ChatFileAttachment attachment, Control tile)
@@ -426,10 +383,20 @@ public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInput
 
 	private void UpdateAttachmentPanel()
 	{
-		var hasAttachments = _attachments.Count > 0;
-		_contentLayout.RowStyles[0].Height = hasAttachments ? ATTACHMENT_DISPLAY_HEIGHT : 0;
+		var hasAttachments = _attachmentPanel.Controls.Count > 0;
+		UpdateAttachmentRowHeight();
 		_attachmentPanel.Visible = hasAttachments;
 		AttachmentsChanged?.Invoke(this, EventArgs.Empty);
+	}
+
+	private void UpdateAttachmentRowHeight()
+	{
+		if (_contentLayout is null || _sendButton is null)
+			return;
+		var availableHeight = Math.Max(0, _contentLayout.ClientSize.Height - _sendButton.Height - ScaleLogicalPixels(12));
+		var height = _attachmentPanel.Controls.Count > 0 ? Math.Min(AttachmentDisplayHeight, availableHeight) : 0;
+		if (_contentLayout.RowStyles[0].Height != height)
+			_contentLayout.RowStyles[0].Height = height;
 	}
 
 	private void PositionSendButton()
@@ -507,16 +474,10 @@ public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInput
 		_textBox.ReadOnly = false;
 	}
 
-	private void ApplyAttachmentTileAppearance(Control tile)
+	private static void ApplyAttachmentTileAppearance(Control tile)
 	{
-		var backColor = GetOpaqueBackColor();
-		tile.BackColor = backColor;
-		foreach (var label in tile.Controls.OfType<Label>())
-		{
-			label.BackColor = backColor;
-			label.Font = Font;
-			label.ForeColor = ForeColor;
-		}
+		if (tile is AttachmentCard card)
+			card.ApplyPresentation(null);
 	}
 
 	private Color GetOpaqueBackColor()

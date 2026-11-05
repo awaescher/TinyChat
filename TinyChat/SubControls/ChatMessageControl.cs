@@ -342,10 +342,15 @@ public class ChatMessageControl : Panel, IChatMessageControl, IChatMessageFormat
 		_attachmentPreviewPanel?.Dispose();
 		_attachmentPreviewPanel = null;
 
-		if (Message?.Content is not FileAttachmentMessageContent attachmentContent)
+		var previewPanel = Message?.Content switch
+		{
+			FileAttachmentMessageContent attachmentContent => new FileAttachmentPreviewPanel(attachmentContent),
+			AIMessageContent aiContent when FileAttachmentPreviewPanel.HasAttachments(aiContent) => new FileAttachmentPreviewPanel(aiContent),
+			_ => null
+		};
+		if (previewPanel is null)
 			return;
-
-		var previewPanel = new FileAttachmentPreviewPanel(attachmentContent) { Dock = DockStyle.Top };
+		previewPanel.Dock = DockStyle.Top;
 		if (!previewPanel.HasPreviews)
 		{
 			previewPanel.Dispose();

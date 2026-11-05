@@ -9,6 +9,20 @@ namespace TinyChat;
 /// </summary>
 public class DXChatControl : ChatControl
 {
+	internal override AttachmentCard CreateInputAttachmentNotice(ChatNotice notice) =>
+		new DXAttachmentCard(notice, value => NoticeTextProvider(value), () => ClearInputAttachmentNotices(notice.FileName));
+
+	internal override IAttachmentToolTip CreateToolTip() => new DXAttachmentToolTip();
+
+	/// <inheritdoc />
+	protected override Control CreateNoticeIcon(ChatNoticeSeverity severity)
+	{
+		var icon = new LabelControl { AutoSizeMode = LabelAutoSizeMode.None, Size = new Size(18, 18), Margin = new Padding(0, 0, 6, 0) };
+		icon.ImageOptions.SvgImage = FluentIcons.Warning;
+		icon.ImageOptions.SvgImageSize = new Size(16, 16);
+		return icon;
+	}
+
 	/// <inheritdoc />
 	protected override IChatMessageHistoryControl CreateMessageHistoryControl() => new StackPanelMessageHistoryControl();
 

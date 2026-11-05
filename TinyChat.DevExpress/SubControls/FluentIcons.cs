@@ -66,6 +66,8 @@ internal static class FluentIcons
 
 	internal static SvgImage Stop => Create(STOP_PATH, "Black", "#727272");
 
+	internal static SvgImage AttachmentNotice(ChatNoticeSeverity severity) => severity == ChatNoticeSeverity.Error ? Warning : Create(WARNING_PATH, "Yellow", "#FFB115");
+
 	internal static SvgImage Warning => Create(WARNING_PATH, "Red", "#D11C1C");
 
 	internal static SvgImage Success => Create(CHECKMARK_PATH, "Green", "#039C23");

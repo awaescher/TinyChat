@@ -12,7 +12,7 @@ public class ChatErrorEventArgs : EventArgs
 
 	/// <summary>
 	/// Gets or sets a value indicating whether the error has been handled.
-	/// When set to <see langword="true"/>, the default error message will not be added to the chat history
+	/// When set to <see langword="true"/>, the default diagnostic icon will not be added to the chat history
 	/// and any pending re-throw will be suppressed.
 	/// </summary>
 	public bool Handled { get; set; }
