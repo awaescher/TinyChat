@@ -21,4 +21,15 @@ public interface IChatMessageHistoryControl
 	/// </summary>
 	/// <param name="message">The message to remove the control for</param>
 	void RemoveMessageControl(IChatMessage message);
+
+	/// <summary>
+	/// Scrolls to the last message, for example after a whole conversation was loaded at once.
+	/// Following a streamed answer starts again from there.
+	/// </summary>
+	void ScrollToEnd() { }
+
+	/// <summary>
+	/// Gets whether the history follows new content, because the user has not scrolled away from its end.
+	/// </summary>
+	bool IsFollowingEnd => true;
 }

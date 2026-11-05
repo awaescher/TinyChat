@@ -41,7 +41,11 @@ public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHist
 		control.MarginChanged += MessageControlMarginChanged;
 
 		SetSizeConstraints(control);
-		ScrollControlIntoView(control);
+		if (_shouldFollowStreamScroll)
+		{
+			ScrollControlIntoView(control);
+			MessageControlStreamingSizeUpdate(control, EventArgs.Empty);
+		}
 
 		messageControl.SizeUpdatedWhileStreaming += MessageControlStreamingSizeUpdate;
 		messageControl.BeforeLayoutChange += BeforeMessageLayoutChange;
@@ -162,6 +166,7 @@ public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHist
 		SetSizeConstraints(control);
 		ResumeLayout(performLayout: false);
 		PerformLayout();
+		MessageControlStreamingSizeUpdate(control, EventArgs.Empty);
 	}
 
 	/// <inheritdoc />
@@ -253,9 +258,26 @@ public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHist
 		if (IsDisposed || Disposing || !_shouldFollowStreamScroll)
 			return;
 
-		var scrollValue = MaxVerticalScroll;
+		// Lay out first: the message may have grown since the scroll was queued, for example by the final chunk.
+		PerformLayout();
+		var scrollValue = Math.Max(VerticalScroll.Minimum, MaxVerticalScroll);
 		if (VerticalScroll.Value != scrollValue)
 			VerticalScroll.Value = scrollValue;
+	}
+
+	/// <inheritdoc />
+	public bool IsFollowingEnd => _shouldFollowStreamScroll;
+
+	/// <inheritdoc />
+	public void ScrollToEnd()
+	{
+		_shouldFollowStreamScroll = true;
+		PerformLayout();
+		if (Controls.Count > 0)
+			ScrollControlIntoView(Controls[^1]);
+		if (VerticalScroll.Visible && VerticalScroll.Value != MaxVerticalScroll)
+			VerticalScroll.Value = Math.Max(VerticalScroll.Minimum, MaxVerticalScroll);
+		ViewportChanged?.Invoke(this, EventArgs.Empty);
 	}
 
 	private void BeforeMessageLayoutChange(object? sender, EventArgs e)
@@ -266,5 +288,7 @@ public class FlowLayoutMessageHistoryControl : FlowLayoutPanel, IChatMessageHist
 	private void AfterMessageLayoutChange(object? sender, EventArgs e)
 	{
 		ResumeLayout();
+		if (_shouldFollowStreamScroll && sender is Control control)
+			MessageControlStreamingSizeUpdate(control, EventArgs.Empty);
 	}
 }

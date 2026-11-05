@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
 using System.Threading.Channels;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,6 +17,7 @@ public partial class ChatControl : UserControl
 {
 
 	private const long DEFAULT_MAXIMUM_ATTACHMENT_FILE_SIZE = 20 * 1024 * 1024;
+	private const int WM_SETREDRAW = 0x000B;
 	private static readonly Font _defaultWelcomeFont = new("Tahoma", 14f);
 	private static readonly Padding _defaultInputPadding = new(8);
 	private static readonly Padding _defaultMessageMargin = new(3);
@@ -65,6 +67,7 @@ public partial class ChatControl : UserControl
 	private System.Windows.Forms.Timer? _messageActionsHideTimer;
 	private bool _showMessageActions = true;
 	private int _streamingMessageCount;
+	private int _messageBatchDepth;
 	private bool _isWaitingForApproval;
 
 	/// <summary>
@@ -998,23 +1001,70 @@ public partial class ChatControl : UserControl
 	/// </summary>
 	private void ApplyMessageGroupSpacing()
 	{
-		Control? previous = null;
+		// Decide every message first and set each value once, as every margin change lays out the history again.
+		var displayed = new List<(Control Control, bool ContinuesPrevious)>();
 		IChatMessage? previousMessage = null;
-		var previousContinues = false;
 		foreach (var messageControl in _messageControls)
 		{
 			if (messageControl is not Control control || messageControl.Message is not { } message || !ShouldDisplayMessage(message))
 				continue;
 
-			var continues = previousMessage is not null && IsSameSender(previousMessage, message);
-			if (previous is not null)
-				SetGroupSpacing(previous, continuesPrevious: previousContinues, continuedByNext: continues);
-			SetGroupSpacing(control, continuesPrevious: continues, continuedByNext: false);
-
-			previous = control;
+			displayed.Add((control, previousMessage is not null && IsSameSender(previousMessage, message)));
 			previousMessage = message;
-			previousContinues = continues;
 		}
+
+		MessageHistoryControl?.SuspendLayout();
+		try
+		{
+			for (var index = 0; index < displayed.Count; index++)
+			{
+				var continuedByNext = index + 1 < displayed.Count && displayed[index + 1].ContinuesPrevious;
+				SetGroupSpacing(displayed[index].Control, displayed[index].ContinuesPrevious, continuedByNext);
+			}
+		}
+		finally
+		{
+			MessageHistoryControl?.ResumeLayout(performLayout: true);
+		}
+	}
+
+	/// <summary>
+	/// Gives a new message the spacing of its group before it is laid out the first time, and closes the gap
+	/// to the previous message of the same sender, so the other messages are not laid out again.
+	/// </summary>
+	private void ApplyAppendedMessageGroupSpacing(IChatMessageControl appended)
+	{
+		if (appended is not Control control || appended.Message is not { } message || !ShouldDisplayMessage(message))
+			return;
+
+		for (var index = _messageControls.Count - 1; index >= 0; index--)
+		{
+			var candidate = _messageControls[index];
+			if (ReferenceEquals(candidate, appended) || candidate is not Control previous || candidate.Message is not { } previousMessage || !ShouldDisplayMessage(previousMessage))
+				continue;
+
+			var continues = IsSameSender(previousMessage, message);
+			SetGroupSpacing(control, continuesPrevious: continues, continuedByNext: false);
+			if (continues)
+				SetGroupSpacing(previous, continuesPrevious: ContinuesPreviousMessage(index), continuedByNext: true);
+			return;
+		}
+
+		SetGroupSpacing(control, continuesPrevious: false, continuedByNext: false);
+	}
+
+	private bool ContinuesPreviousMessage(int index)
+	{
+		if (_messageControls[index].Message is not { } message)
+			return false;
+
+		for (var previousIndex = index - 1; previousIndex >= 0; previousIndex--)
+		{
+			if (_messageControls[previousIndex].Message is { } previousMessage && ShouldDisplayMessage(previousMessage))
+				return IsSameSender(previousMessage, message);
+		}
+
+		return false;
 	}
 
 	private static bool IsSameSender(IChatMessage previous, IChatMessage message) =>
@@ -1354,7 +1404,8 @@ public partial class ChatControl : UserControl
 			control.Dispose();
 		}
 
-		ApplyMessageVisibilityAndHeaders();
+		if (!IsInMessageBatch)
+			ApplyMessageVisibilityAndHeaders();
 	}
 
 	/// <summary>
@@ -1409,8 +1460,11 @@ public partial class ChatControl : UserControl
 		var isUserMessage = IsUserMessage(message);
 		var firstRemovedIndex = isUserMessage ? messageIndex : messageIndex + 1;
 		var removedMessages = _messages.Skip(firstRemovedIndex).ToArray();
-		for (var index = removedMessages.Length - 1; index >= 0; index--)
-			RemoveMessage(removedMessages[index]);
+		RunMessageBatch(() =>
+		{
+			for (var index = removedMessages.Length - 1; index >= 0; index--)
+				RemoveMessage(removedMessages[index]);
+		});
 
 		if (isUserMessage)
 			SetInputDraft(message.Content);
@@ -1503,6 +1557,61 @@ public partial class ChatControl : UserControl
 	private void PopulateMessages()
 	{
 		HideMessageActionBar(clearTarget: true);
+		RunMessageBatch(PopulateMessagesCore);
+		UpdateWelcomeControlVisibility();
+	}
+
+	/// <summary>Gets whether several messages are being added or removed at once.</summary>
+	private bool IsInMessageBatch => _messageBatchDepth > 0;
+
+	/// <summary>
+	/// Adds or removes several messages at once. The history is laid out and painted once at the end,
+	/// instead of once for every message, and then shows its last message.
+	/// </summary>
+	private void RunMessageBatch(Action update)
+	{
+		var history = MessageHistoryControl;
+		var redrawSuspended = false;
+		_messageBatchDepth++;
+		try
+		{
+			if (_messageBatchDepth == 1 && history is { IsHandleCreated: true, Visible: true })
+			{
+				SendMessage(history.Handle, WM_SETREDRAW, IntPtr.Zero, IntPtr.Zero);
+				redrawSuspended = true;
+			}
+
+			history?.SuspendLayout();
+			try
+			{
+				update();
+			}
+			finally
+			{
+				_messageBatchDepth--;
+				if (_messageBatchDepth == 0)
+					ApplyMessageVisibilityAndHeaders();
+				history?.ResumeLayout(performLayout: true);
+			}
+
+			if (_messageBatchDepth == 0 && history is IChatMessageHistoryControl historyControl)
+				historyControl.ScrollToEnd();
+		}
+		finally
+		{
+			if (redrawSuspended && history is { IsDisposed: false, IsHandleCreated: true })
+			{
+				SendMessage(history.Handle, WM_SETREDRAW, new IntPtr(1), IntPtr.Zero);
+				history.Invalidate(invalidateChildren: true);
+			}
+		}
+	}
+
+	[DllImport("user32.dll", EntryPoint = "SendMessageW")]
+	private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
+	private void PopulateMessagesCore()
+	{
 		var previousControls = _messageControls.ToArray();
 		_messageControls.Clear();
 
@@ -1520,15 +1629,10 @@ public partial class ChatControl : UserControl
 		}
 
 		if (messageHistory is null)
-		{
-			UpdateWelcomeControlVisibility();
 			return;
-		}
 
 		foreach (var message in _messages)
 			AppendMessageControl(message);
-
-		UpdateWelcomeControlVisibility();
 	}
 
 	private void SetMessageFormatter(IMessageFormatter messageFormatter)
@@ -1638,7 +1742,7 @@ public partial class ChatControl : UserControl
 		ApplyMessageColors(control);
 		ApplyMessageLayout(control);
 		_messageControls.Add(messageControl);
-		ApplyMessageGroupSpacing();
+		ApplyAppendedMessageGroupSpacing(messageControl);
 
 		if (MessageHistoryControl is IChatMessageHistoryControl casted)
 		{
@@ -3211,10 +3315,13 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 
 	/// <summary>
 	/// Scrolls a message into view once its layout has settled, so the approval buttons are not cut off.
+	/// Nothing moves while the user reads further up in the history.
 	/// </summary>
 	private void ScrollMessageIntoView(IChatMessageContent content)
 	{
 		if (MessageHistoryControl is not ScrollableControl history || !history.IsHandleCreated)
+			return;
+		if (MessageHistoryControl is IChatMessageHistoryControl { IsFollowingEnd: false })
 			return;
 
 		if (_messageControls.FirstOrDefault(messageControl => ReferenceEquals(messageControl.Message?.Content, content)) is not Control control)
@@ -3223,6 +3330,8 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 		void ScrollToBottom()
 		{
 			if (history.IsDisposed || control.IsDisposed || !control.Visible)
+				return;
+			if (history is IChatMessageHistoryControl { IsFollowingEnd: false })
 				return;
 
 			(control as IChatMessageRefreshControl)?.RefreshMessageDisplay();

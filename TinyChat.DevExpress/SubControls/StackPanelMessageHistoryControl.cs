@@ -11,6 +11,8 @@ namespace TinyChat;
 public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessageHistoryControl, IChatMessageHistoryViewport
 {
 	private readonly StackPanel _stackPanel = new();
+	private readonly List<Control> _pendingAppendedControls = [];
+	private bool _appendLayoutPending;
 	private int _messageLayoutSuspendCount;
 	private bool _resizeLayoutPending;
 	private bool _shouldFollowStreamScroll = true;
@@ -51,22 +53,62 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 		control.MarginChanged += MessageControlMarginChanged;
 		control.VisibleChanged += MessageControlVisibleChanged;
 		_stackPanel.Controls.Add(control);
+		SetSizeConstraints(control);
+		messageControl.SizeUpdatedWhileStreaming += MessageControlStreamingSizeUpdate;
+		messageControl.BeforeLayoutChange += BeforeMessageLayoutChange;
+		messageControl.AfterLayoutChange += AfterMessageLayoutChange;
 
-		// queue this to the UI thread to ensure it runs after the control is added
-		// otherwise the sizing of the labels will be incorrect if the scrollbar
-		// is not visible
-		BeginInvoke(() =>
+		// Size the controls once the history decided whether it needs a vertical scrollbar; otherwise the
+		// labels would be measured too wide. Controls appended together are sized and scrolled in one pass.
+		_pendingAppendedControls.Add(control);
+		if (_appendLayoutPending)
+			return;
+
+		_appendLayoutPending = true;
+		if (!IsHandleCreated)
+			return;
+
+		try
 		{
-			if (IsDisposed || Disposing || control.IsDisposed || !ReferenceEquals(control.Parent, _stackPanel))
-				return;
+			BeginInvoke(ApplyPendingAppendLayout);
+		}
+		catch (InvalidOperationException) when (IsDisposed || Disposing || !IsHandleCreated)
+		{
+			_appendLayoutPending = false;
+		}
+	}
 
-			SetSizeConstraints(control);
-			ScrollControlIntoView(control);
+	private void ApplyPendingAppendLayout()
+	{
+		_appendLayoutPending = false;
+		var controls = _pendingAppendedControls.Where(control => !control.IsDisposed && ReferenceEquals(control.Parent, _stackPanel)).ToArray();
+		_pendingAppendedControls.Clear();
+		if (IsDisposed || Disposing || controls.Length == 0)
+			return;
 
-			messageControl.SizeUpdatedWhileStreaming += MessageControlStreamingSizeUpdate;
-			messageControl.BeforeLayoutChange += BeforeMessageLayoutChange;
-			messageControl.AfterLayoutChange += AfterMessageLayoutChange;
-		});
+		SuspendLayout();
+		_stackPanel.SuspendLayout();
+		try
+		{
+			foreach (var control in controls)
+				SetSizeConstraints(control);
+		}
+		finally
+		{
+			_stackPanel.ResumeLayout(performLayout: true);
+			ResumeLayout(performLayout: true);
+		}
+
+		if (_shouldFollowStreamScroll)
+			ScrollControlIntoView(controls[^1]);
+	}
+
+	/// <inheritdoc />
+	protected override void OnHandleCreated(EventArgs e)
+	{
+		base.OnHandleCreated(e);
+		if (_appendLayoutPending)
+			BeginInvoke(ApplyPendingAppendLayout);
 	}
 
 	/// <summary>
@@ -88,6 +130,7 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 		}
 
 		_stackPanel.Controls.Clear();
+		_pendingAppendedControls.Clear();
 		_selectedMessageControl = null;
 		foreach (var messageControl in messageControls)
 		{
@@ -287,6 +330,38 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 		var scrollValue = MaxVerticalScroll;
 		if (VerticalScroll.Value != scrollValue)
 			VerticalScroll.Value = scrollValue;
+	}
+
+	/// <inheritdoc />
+	public bool IsFollowingEnd => _shouldFollowStreamScroll;
+
+	/// <inheritdoc />
+	public void ScrollToEnd()
+	{
+		_shouldFollowStreamScroll = true;
+		if (!IsHandleCreated)
+			return;
+
+		// The appended controls are sized after the history decided about its scrollbar, so scroll afterwards.
+		try
+		{
+			BeginInvoke(() =>
+			{
+				if (IsDisposed || Disposing || !_shouldFollowStreamScroll)
+					return;
+
+				if (_appendLayoutPending)
+					ApplyPendingAppendLayout();
+				if (_stackPanel.Controls.Count > 0)
+					ScrollControlIntoView(_stackPanel.Controls[_stackPanel.Controls.Count - 1]);
+				if (VerticalScroll.Value != MaxVerticalScroll)
+					VerticalScroll.Value = Math.Max(0, MaxVerticalScroll);
+				ViewportChanged?.Invoke(this, EventArgs.Empty);
+			});
+		}
+		catch (InvalidOperationException) when (IsDisposed || Disposing || !IsHandleCreated)
+		{
+		}
 	}
 
 	private void BeforeMessageLayoutChange(object? sender, EventArgs e)

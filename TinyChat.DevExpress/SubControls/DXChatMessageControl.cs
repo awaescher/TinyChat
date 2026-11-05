@@ -194,6 +194,8 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl, IChatMess
 		finally
 		{
 			_isReceivingStream = false;
+			// The final chunks can still change the height; let the history follow them a last time.
+			SizeUpdatedWhileStreaming?.Invoke(this, EventArgs.Empty);
 		}
 	}
 
