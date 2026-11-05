@@ -541,7 +541,7 @@ public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInput
 		protected override void OnKeyDown(KeyEventArgs e)
 		{
 			var isPasteCommand = (e.Control && e.KeyCode == Keys.V) || (e.Shift && e.KeyCode == Keys.Insert);
-			if (isPasteCommand && TryRequestAttachmentPaste())
+			if (isPasteCommand && (TryRequestAttachmentPaste() || TryPasteNormalizedText()))
 			{
 				e.Handled = true;
 				e.SuppressKeyPress = true;
@@ -565,7 +565,7 @@ public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInput
 
 		protected override void WndProc(ref Message m)
 		{
-			if (m.Msg == WM_PASTE && TryRequestAttachmentPaste())
+			if (m.Msg == WM_PASTE && (TryRequestAttachmentPaste() || TryPasteNormalizedText()))
 				return;
 
 			base.WndProc(ref m);
@@ -604,6 +604,18 @@ public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInput
 				return false;
 
 			AttachmentPasteRequested.Invoke(this, new AttachmentPasteRequestedEventArgs(data));
+			return true;
+		}
+
+		/// <summary>
+		/// Pastes text from other applications that only separate lines with LF, which the text box would show on a single line.
+		/// </summary>
+		private bool TryPasteNormalizedText()
+		{
+			if (ReadOnly || ClipboardText.GetTextToNormalize() is not { } text)
+				return false;
+
+			SelectedText = text;
 			return true;
 		}
 	}

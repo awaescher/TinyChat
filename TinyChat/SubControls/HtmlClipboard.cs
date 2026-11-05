@@ -24,7 +24,7 @@ internal static class HtmlClipboard
 	{
 		var data = new DataObject();
 		data.SetData(DataFormats.Html, CreateCfHtml(htmlFragment, font));
-		data.SetData(DataFormats.UnicodeText, plainText);
+		data.SetData(DataFormats.UnicodeText, ClipboardText.Normalize(plainText));
 		return data;
 	}
 

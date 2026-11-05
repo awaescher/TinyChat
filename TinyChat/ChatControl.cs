@@ -2212,8 +2212,7 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 	protected void CopyMessage(IChatMessageControl messageControl)
 	{
 		var text = GetMessagePlainText(messageControl);
-		if (!string.IsNullOrEmpty(text))
-			Clipboard.SetText(text);
+		ClipboardText.SetText(text);
 	}
 
 	/// <summary>

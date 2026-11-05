@@ -225,8 +225,7 @@ public class StackPanelMessageHistoryControl : XtraScrollableControl, IChatMessa
 			try
 			{
 				var text = _selectedMessageControl.ToString();
-				if (!string.IsNullOrEmpty(text))
-					Clipboard.SetText(text);
+				ClipboardText.SetText(text ?? string.Empty);
 			}
 			catch { }
 			return true;
