@@ -15,6 +15,8 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 
 	/// <summary>The chat message whose <see cref="FunctionCallMessageContent"/> is being displayed.</summary>
 	private IChatMessage? _message;
+	private FileAttachmentPreviewPanel? _resultPreview;
+	private object? _displayedResult;
 	private Font? _senderFont;
 	private Font? _iconFont;
 	private Font? _statusIconFont;
@@ -53,6 +55,7 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 	public FunctionCallMessageControl()
 	{
 		InitializeComponent();
+
 
 		ApplyTextFont();
 		ApplyColors();
@@ -272,6 +275,25 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 	/// Does nothing if <see cref="Message"/> is <see langword="null"/> or its content is not
 	/// a <see cref="FunctionCallMessageContent"/>.
 	/// </summary>
+	private void UpdateResultDisplay(object? result)
+	{
+		var structured = AIMessageContent.FromResult(result);
+		lblResult.Text = structured?.Text ?? result?.ToString() ?? string.Empty;
+		if (ReferenceEquals(result, _displayedResult))
+			return;
+		_displayedResult = result;
+		_resultPreview?.Dispose();
+		_resultPreview = null;
+		if (structured is not null && FileAttachmentPreviewPanel.HasAttachments(structured))
+		{
+			_resultPreview = new FileAttachmentPreviewPanel(structured);
+			tableLayout.RowCount = Math.Max(5, tableLayout.RowCount);
+			while (tableLayout.RowStyles.Count < 5)
+				tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+			tableLayout.Controls.Add(_resultPreview, 1, 4);
+			_resultPreview.Visible = _expanded;
+		}
+	}
 	private void UpdateDisplay()
 	{
 		if (CanUpdateCollapsedContentWithoutLayout())
@@ -322,7 +344,7 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 		}
 		lblArgs.Text = argumentsText;
 
-		lblResult.Text = fc.Result is null ? string.Empty : fc.Result + " ";
+		UpdateResultDisplay(fc.Result);
 		ApplyVisibilityCore();
 	}
 
@@ -344,6 +366,8 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 		lblArgs.Visible = (_expanded || isPending) && hasArgs;
 		lblResultIcon.Visible = _expanded && hasResult;
 		lblResult.Visible = _expanded && hasResult;
+		if (_resultPreview is not null)
+			_resultPreview.Visible = _expanded && hasResult;
 		approvalPanel.Visible = isPending;
 	}
 
@@ -447,6 +471,8 @@ internal sealed partial class FunctionCallMessageControl : Panel, IChatMessageLa
 		lblTitle.MaximumSize = new Size(textWidth == 0 ? 0 : Math.Max(1, textWidth - lblStatus.PreferredSize.Width - lblStatus.Margin.Horizontal), 0);
 		lblArgs.MaximumSize = new Size(textWidth, 0);
 		lblResult.MaximumSize = new Size(textWidth, 0);
+		if (_resultPreview is not null)
+			_resultPreview.MaximumSize = new Size(textWidth, 0);
 	}
 
 	private void ApplyColors()

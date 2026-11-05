@@ -14,7 +14,6 @@ namespace TinyChat;
 /// </summary>
 public partial class ChatControl : UserControl
 {
-	private const string ROBOT_WELCOME = "●\n┌─┴─┐\n●‿●\n└───┘\n\nGreetings human.\nHow can I help you today?";
 
 	private const long DEFAULT_MAXIMUM_ATTACHMENT_FILE_SIZE = 20 * 1024 * 1024;
 	private static readonly Font _defaultWelcomeFont = new("Tahoma", 14f);
@@ -28,7 +27,7 @@ public partial class ChatControl : UserControl
 	private readonly HashSet<IChatMessage> _reasoningVisualizationMessages = new(ReferenceEqualityComparer.Instance);
 	private readonly object _cancellationLock = new();
 	private readonly HashSet<Control> _fileDropTargets = [];
-	private readonly MutableSender _assistantSender = new("Assistant");
+	private readonly MutableSender _assistantSender = new(ChatLocalization.GetString("Assistant"));
 	private Padding _historyPadding = Padding.Empty;
 	private Padding _inputPadding = _defaultInputPadding;
 	private Padding _messageMargin = _defaultMessageMargin;
@@ -42,7 +41,7 @@ public partial class ChatControl : UserControl
 	private BorderStyle _inputEditorBorderStyle = BorderStyle.Fixed3D;
 	private string _inputPlaceholderText = string.Empty;
 	private ContentAlignment _welcomeTextAlign = ContentAlignment.MiddleCenter;
-	private string _welcomeMessage = ROBOT_WELCOME;
+	private string _welcomeMessage = ChatLocalization.GetString("Welcome");
 	private int _splitterPosition = 60;
 	private bool _isSplitterFixed;
 	private bool _allowExpandFunctionCalls = true;
@@ -145,6 +144,8 @@ public partial class ChatControl : UserControl
 	public ChatControl()
 	{
 		InitializeComponent();
+		DisplayTexts.Changed += (_, _) => RefreshAttachmentPresentation();
+		AttachmentAppearance.Changed += (_, _) => RefreshAttachmentPresentation();
 	}
 
 	/// <summary>
@@ -173,8 +174,8 @@ public partial class ChatControl : UserControl
 	/// Gets or sets the welcome message displayed when no messages are present in the chat history.
 	/// </summary>
 	[Category("Chat")]
+	[Localizable(true)]
 	[Description("Gets or sets the welcome message displayed when no messages are present in the chat history.")]
-	[DefaultValue(ROBOT_WELCOME)]
 	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
 	public string WelcomeMessage
 	{
@@ -185,6 +186,11 @@ public partial class ChatControl : UserControl
 			ApplyWelcomeControlSettings();
 		}
 	}
+
+	private bool ShouldSerializeWelcomeMessage() => WelcomeMessage != ChatLocalization.GetString("Welcome");
+	private void ResetWelcomeMessage() => WelcomeMessage = ChatLocalization.GetString("Welcome");
+	private bool ShouldSerializeAssistantSenderName() => AssistantSenderName != ChatLocalization.GetString("Assistant");
+	private void ResetAssistantSenderName() => AssistantSenderName = ChatLocalization.GetString("Assistant");
 
 	/// <summary>
 	/// Gets or sets the font used to display chat messages.
@@ -279,6 +285,7 @@ public partial class ChatControl : UserControl
 	/// Gets or sets the placeholder displayed while the chat input editor is empty.
 	/// </summary>
 	[Category("Chat Appearance")]
+	[Localizable(true)]
 	[Description("Gets or sets the placeholder displayed while the chat input editor is empty.")]
 	[DefaultValue("")]
 	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
@@ -678,8 +685,8 @@ public partial class ChatControl : UserControl
 	/// Gets or sets the sender name used for assistant responses when using <see cref="IChatClient"/>.
 	/// </summary>
 	[Category("Chat")]
+	[Localizable(true)]
 	[Description("Gets or sets the sender name used for assistant responses when using IChatClient.")]
-	[DefaultValue("Assistant")]
 	[DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
 	public string AssistantSenderName
 	{
@@ -1264,6 +1271,9 @@ public partial class ChatControl : UserControl
 	/// </summary>
 	public virtual void StartNewChat()
 	{
+		_attachmentNotices.Clear();
+		_pendingInputAttachmentNotices.Clear();
+		_preparedAttachments.Clear();
 		CancelCurrentOperation();
 		(InputControl as IChatInputControl)?.SetIsReceivingStream(false, allowCancellation: false);
 		HideMessageActionBar(clearTarget: true);
@@ -1340,6 +1350,8 @@ public partial class ChatControl : UserControl
 
 		if (content is FileAttachmentMessageContent attachmentContent)
 			draftEditor.SetDraft(attachmentContent.Text, attachmentContent.Attachments);
+		else if (content is AIMessageContent aiContent)
+			draftEditor.SetDraft(aiContent.Text, FileAttachmentPreviewPanel.GetAttachments(aiContent));
 		else
 			draftEditor.SetDraft(content.ToString() ?? string.Empty, []);
 
@@ -1386,6 +1398,7 @@ public partial class ChatControl : UserControl
 
 		splitContainer?.ChatInputPanel?.Controls.Add(InputControl);
 		LayoutChatInputControl(InputControl);
+		FlushInputAttachmentNotices();
 
 		ConfigureFileDropTarget(this);
 
@@ -1499,7 +1512,11 @@ public partial class ChatControl : UserControl
 	{
 		IChatMessageControl messageControl;
 
-		if (message.Content is FunctionCallMessageContent)
+		if (message.Content is ChatNoticeMessageContent)
+		{
+			messageControl = CreateNoticeMessageControl(message);
+		}
+		else if (message.Content is FunctionCallMessageContent)
 		{
 			messageControl = CreateFunctionCallMessageControl(message);
 		}
@@ -1535,6 +1552,7 @@ public partial class ChatControl : UserControl
 
 		if (control.Parent is not null)
 			AttachMessageActionBar(messageControl);
+		RefreshAttachmentPresentation(control);
 
 		return messageControl;
 	}
@@ -1736,9 +1754,10 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 		image.Save(stream, ImageFormat.Png);
 		var fileName = $"image-{DateTime.Now:yyyyMMdd-HHmmssfff}.png";
 		if (MaximumAttachmentFileSize > 0 && stream.Length > MaximumAttachmentFileSize)
-			throw new IOException($"The image exceeds the maximum attachment size of {MaximumAttachmentFileSize:N0} bytes.");
+			throw new AttachmentContentException(new ChatNotice(ChatNoticeCode.AttachmentTooLarge, fileName, MaximumAttachmentFileSize));
 
 		var attachment = new ChatFileAttachment(fileName, "image/png", stream.ToArray());
+		ValidateAttachment(attachment);
 		GetAttachmentInputControl().AddAttachments([attachment]);
 		return 1;
 	}
@@ -1774,7 +1793,21 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 		foreach (var filePath in filePaths.Distinct(StringComparer.OrdinalIgnoreCase))
 		{
 			cancellationToken.ThrowIfCancellationRequested();
-			attachments.Add(await ChatFileAttachment.LoadAsync(filePath, maximumFileSize, cancellationToken));
+			ClearInputAttachmentNotices(Path.GetFileName(filePath));
+			try
+			{
+				if (!AllowFileAttachments || !CanAttachFile(filePath))
+					throw new AttachmentContentException(new ChatNotice(ChatNoticeCode.AttachmentRejected, Path.GetFileName(filePath)));
+				if (maximumFileSize is { } limit && new FileInfo(filePath).Length > limit)
+					throw new AttachmentContentException(new ChatNotice(ChatNoticeCode.AttachmentTooLarge, Path.GetFileName(filePath), limit));
+				var attachment = await ChatFileAttachment.LoadAsync(filePath, maximumFileSize, cancellationToken);
+				ValidateAttachment(attachment);
+				attachments.Add(attachment);
+			}
+			catch (Exception ex) when (ex is not OperationCanceledException)
+			{
+				ReportRejectedAttachment(Path.GetFileName(filePath), ex);
+			}
 		}
 
 		return attachments;
@@ -1840,6 +1873,20 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 	public virtual void SendMessage(MessageSendingEventArgs e)
 	{
 		var sender = e.Sender ?? Sender;
+		if (e.Content is FileAttachmentMessageContent attachmentContent)
+		{
+			try
+			{
+				foreach (var attachment in attachmentContent.Attachments)
+					ValidateAttachment(attachment);
+			}
+			catch (Exception ex) when (ex is not OperationCanceledException)
+			{
+				e.Cancel = true;
+				ReportAttachmentError(ex);
+				return;
+			}
+		}
 
 		MessageSending?.Invoke(this, e);
 
@@ -1993,7 +2040,8 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 		if (sender is not IChatAttachmentInputControl attachmentInput)
 			return;
 
-		var hasAttachments = attachmentInput.PendingAttachments.Count > 0;
+		RefreshAttachmentPresentation(InputControl);
+		var hasAttachments = attachmentInput.PendingAttachments.Count > 0 || attachmentInput is IChatAttachmentNoticeInput { HasAttachmentNotices: true };
 		if (hasAttachments == _attachmentDraftVisible)
 			return;
 
@@ -2022,14 +2070,14 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 			?? throw new InvalidOperationException("The configured chat input control does not support attachment drafts.");
 	}
 
-	private void ReportAttachmentError(Exception exception)
+	private void ReportAttachmentError(Exception exception, string? fileName = null)
 	{
 		try
 		{
 			var errorArgs = new Helper.ChatErrorEventArgs(exception);
 			ErrorOccurred?.Invoke(this, errorArgs);
 			if (!errorArgs.Handled)
-				AddMessage(new NamedSender("System"), new StringMessageContent($"Could not attach file: {exception.Message}"));
+				ShowInputAttachmentError(exception, fileName);
 		}
 		catch
 		{
@@ -2100,6 +2148,8 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 	/// <returns>The actions in display order.</returns>
 	protected virtual IEnumerable<ChatMessageAction> GetMessageActions(IChatMessageControl messageControl)
 	{
+		if (messageControl.Message?.Content is ChatNoticeMessageContent)
+			yield break;
 		if (messageControl.Message is not { } message)
 			yield break;
 
@@ -2537,7 +2587,7 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 				// Approval requests end a turn; the decisions are sent back in a follow-up request.
 				while (true)
 				{
-					var chatMessages = ConvertToChatMessages();
+					var chatMessages = await ConvertToChatMessagesAsync(cancellationSource.Token).ConfigureAwait(true);
 
 					var chatOptionsArgs = new ChatOptionsRequestedEventArgs(ChatOptions);
 					ChatOptionsRequested?.Invoke(this, chatOptionsArgs);
@@ -2593,7 +2643,7 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 					var errorArgs = new Helper.ChatErrorEventArgs(ex);
 					ErrorOccurred?.Invoke(this, errorArgs);
 					if (!errorArgs.Handled)
-						AddMessage(new NamedSender("System"), new StringMessageContent($"Error: {ex.Message}"));
+						ShowErrorNotice(ex);
 				}
 			}
 			finally
@@ -2618,7 +2668,7 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 				var errorArgs = new Helper.ChatErrorEventArgs(ex);
 				ErrorOccurred?.Invoke(this, errorArgs);
 				if (!errorArgs.Handled)
-					AddMessage(new NamedSender("System"), new StringMessageContent($"Unexpected error: {ex.Message}"));
+					ShowErrorNotice(ex);
 			}
 			catch
 			{
@@ -2665,16 +2715,17 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 	/// Function call messages are converted to structured FunctionCallContent and FunctionResultContent.
 	/// Override this method to customize role determination logic.
 	/// </remarks>
-	protected virtual List<Microsoft.Extensions.AI.ChatMessage> ConvertToChatMessages()
+	protected virtual async Task<List<Microsoft.Extensions.AI.ChatMessage>> ConvertToChatMessagesAsync(CancellationToken cancellationToken = default)
 	{
 		var result = new List<Microsoft.Extensions.AI.ChatMessage>();
 
-		foreach (var message in _messages)
+		foreach (var message in _messages.ToArray())
 		{
+			cancellationToken.ThrowIfCancellationRequested();
 			var senderName = message.Sender?.Name ?? "User";
 
 			// Reasoning is presentation-only and must not be sent back as assistant output.
-			if (message.Content is ReasoningMessageContent)
+			if (message.Content is ReasoningMessageContent or ChatNoticeMessageContent)
 				continue;
 
 			// Handle function call messages separately to preserve structured tool call data
@@ -2714,7 +2765,7 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 				{
 					var functionResultMessage = new Microsoft.Extensions.AI.ChatMessage(
 						ChatRole.Tool,
-						[new FunctionResultContent(funcCallContent.CallId, funcCallContent.Result)]
+						[new FunctionResultContent(funcCallContent.CallId, AIMessageContent.FromResult(funcCallContent.Result)?.Contents ?? funcCallContent.Result)]
 					);
 					result.Add(functionResultMessage);
 				}
@@ -2726,10 +2777,14 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 					contents.Add(new TextContent(attachmentContent.Text));
 
 				foreach (var attachment in attachmentContent.Attachments)
-					contents.AddRange(ConvertFileAttachment(attachment));
+					contents.AddRange(await ConvertFileAttachmentAsync(attachment, cancellationToken).ConfigureAwait(true));
 
 				var role = DetermineChatRole(senderName);
 				result.Add(new Microsoft.Extensions.AI.ChatMessage(role, contents));
+			}
+			else if (message.Content is AIMessageContent aiContent)
+			{
+				result.Add(new Microsoft.Extensions.AI.ChatMessage(DetermineChatRole(senderName), aiContent.Contents.ToList()));
 			}
 			else
 			{
@@ -2742,39 +2797,6 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 		}
 
 		return result;
-	}
-
-	/// <summary>
-	/// Converts an attached file into one or more Microsoft.Extensions.AI content items.
-	/// </summary>
-	/// <remarks>
-	/// Text formats are decoded and sent as named text sections. Other formats are sent as typed binary data.
-	/// Override this method to extract PDF or Office text, upload files to provider-specific storage, or replace
-	/// large documents with RAG references.
-	/// </remarks>
-	/// <param name="attachment">The attachment to convert.</param>
-	/// <returns>The content items passed to the chat client.</returns>
-	protected virtual IEnumerable<AIContent> ConvertFileAttachment(ChatFileAttachment attachment)
-	{
-		if (attachment.IsText)
-		{
-			var lineBreak = Environment.NewLine;
-			var text = attachment.GetText();
-			yield return new TextContent(
-				$"--- BEGIN ATTACHED FILE: {attachment.Name} ({attachment.MediaType}) ---{lineBreak}" +
-				$"{text}{lineBreak}" +
-				$"--- END ATTACHED FILE: {attachment.Name} ---");
-			yield break;
-		}
-
-		if (!attachment.IsImage)
-		{
-			yield return new TextContent(
-				$"An attached file named '{attachment.Name}' with media type '{attachment.MediaType}' follows as binary content. " +
-				"Read it if this model and provider support that document format.");
-		}
-
-		yield return attachment.ToDataContent();
 	}
 
 	/// <summary>
@@ -2855,6 +2877,12 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 
 						// reset the reasoning to be able to start a new control
 						CompleteReasoningMessage();
+					}
+					else if (item is DataContent or UriContent)
+					{
+						CompleteReasoningMessage();
+						AddMessage(sender, new AIMessageContent([item]));
+						hadNonTextContentSinceLastText = true;
 					}
 					else if (item is TextReasoningContent reasoningContent)
 					{
@@ -2982,6 +3010,13 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 
 					addedContent = true;
 				}
+				else if (item is DataContent or UriContent)
+				{
+					reasoningMessageContent?.SetDone();
+					reasoningMessageContent = null;
+					AddMessage(sender, new AIMessageContent([item]));
+					addedContent = true;
+				}
 				else if (item is TextContent textContent && !string.IsNullOrEmpty(textContent.Text))
 				{
 					reasoningMessageContent?.SetDone();
@@ -3007,7 +3042,7 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 		ErrorOccurred?.Invoke(this, errorArgs);
 		if (!errorArgs.Handled)
 		{
-			AddMessage(new NamedSender("System"), new StringMessageContent($"Error: {content.Message}"));
+			ShowErrorNotice(errorArgs.Exception);
 		}
 	}
 

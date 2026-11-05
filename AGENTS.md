@@ -1,5 +1,17 @@
 # TinyChat – Agent Instructions
 
+Keep this AGENTS.md in English.
+
+## UI text and presentation
+
+- User-facing text must be localizable: use resources for defaults and do not hard-code messages or tooltips. Text must be customizable in the designer and by the host application.
+- Keep appearance, colors, and dimensions customizable through existing appearance/layout settings or suitable designer properties. Respect the active WinForms or DevExpress theme.
+- Prefer icons over additional labels. Follow existing icons, controls, and interaction patterns, and provide localizable tooltips and AccessibleNames.
+
+- In DevExpress controls, visible elements, including scrollbars, must use the active skin rather than unskinned native WinForms rendering. Nonvisual layout containers are allowed.
+
+- Display attachment errors and warnings in the input area or directly on the affected file preview. Do not create separate chat history messages for them.
+
 ## Project Overview
 
 TinyChat is a .NET Windows Forms class library (and optional DevExpress variant) that provides a ready-to-use chat UI control integrating with `Microsoft.Extensions.AI` (`IChatClient`). It ships as two NuGet packages: `TinyChat` (core WinForms) and `TinyChat.DevExpress`.
@@ -12,6 +24,12 @@ TinyChat is a .NET Windows Forms class library (and optional DevExpress variant)
 - `WinFormsDemo/` / `DevExpressDemo/` – placeholder directories (currently empty)
 
 ---
+
+## Versioning
+
+- Release versions are calculated by the existing GitVersion CI step from Git history and tags. Do not hard-code release versions in project files or set `next-version` in GitVersion.yml.
+- Request increments in commit messages with `+semver: major`, `+semver: minor`, or `+semver: patch`. Preserve the marker in the final squash/merge message.
+- Build and pack both TinyChat packages with the same GitVersion-derived version. Application package references select a concrete released version separately.
 
 ## Build Commands
 

@@ -298,10 +298,15 @@ public class DXChatMessageControl : PanelControl, IChatMessageControl, IChatMess
 		_attachmentPreviewPanel?.Dispose();
 		_attachmentPreviewPanel = null;
 
-		if (Message?.Content is not FileAttachmentMessageContent attachmentContent)
+		var previewPanel = Message?.Content switch
+		{
+			FileAttachmentMessageContent attachmentContent => new DXFileAttachmentPreviewPanel(attachmentContent),
+			AIMessageContent aiContent when FileAttachmentPreviewPanel.HasAttachments(aiContent) => new DXFileAttachmentPreviewPanel(aiContent),
+			_ => null
+		};
+		if (previewPanel is null)
 			return;
-
-		var previewPanel = new FileAttachmentPreviewPanel(attachmentContent) { Dock = DockStyle.Top };
+		previewPanel.Dock = DockStyle.Top;
 		if (!previewPanel.HasPreviews)
 		{
 			previewPanel.Dispose();

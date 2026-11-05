@@ -32,4 +32,13 @@
     <Using Include="NUnit.Framework" />
   </ItemGroup>
 
+  <!-- Source-only examples are compiled and tested only by licensed contributors who opt in. -->
+  <ItemGroup Condition="'$(TestDocumentAttachmentSamples)' != 'true'">
+    <Compile Remove="DocumentAttachmentProviderSampleTests.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TestDocumentAttachmentSamples)' == 'true'">
+    <PackageReference Include="DevExpress.Document.Processor" Version="$(DevExpressVersion)" PrivateAssets="all" />
+    <Compile Include="..\samples\DocumentAttachmentProviders\*.cs" Link="DocumentAttachmentProviders\%(Filename)%(Extension)" />
+  </ItemGroup>
+
 </Project>

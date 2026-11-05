@@ -26,6 +26,8 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 
 	/// <summary>The chat message whose <see cref="FunctionCallMessageContent"/> is being displayed.</summary>
 	private IChatMessage? _message;
+	private FileAttachmentPreviewPanel? _resultPreview;
+	private object? _displayedResult;
 
 	/// <summary>
 	/// Whether the detail panel (arguments + result) is currently visible.
@@ -60,6 +62,7 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 	public DXFunctionCallMessageControl()
 	{
 		InitializeComponent();
+
 
 		WireMouseDown(paddingPanel, tableLayout, lblToolIcon, lblTitle, lblArguments, lblResultIcon, lblResult);
 		ApplyAppearance();
@@ -196,6 +199,25 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 	/// Does nothing if <see cref="Message"/> is <see langword="null"/> or its content is not
 	/// a <see cref="FunctionCallMessageContent"/>.
 	/// </summary>
+	private void UpdateResultDisplay(object? result)
+	{
+		var structured = AIMessageContent.FromResult(result);
+		lblResult.Text = structured?.Text ?? result?.ToString() ?? string.Empty;
+		if (ReferenceEquals(result, _displayedResult))
+			return;
+		_displayedResult = result;
+		_resultPreview?.Dispose();
+		_resultPreview = null;
+		if (structured is not null && FileAttachmentPreviewPanel.HasAttachments(structured))
+		{
+			_resultPreview = new DXFileAttachmentPreviewPanel(structured);
+			tableLayout.RowCount = Math.Max(5, tableLayout.RowCount);
+			while (tableLayout.RowStyles.Count < 5)
+				tableLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+			tableLayout.Controls.Add(_resultPreview, 1, 4);
+			_resultPreview.Visible = _expanded;
+		}
+	}
 	private void UpdateDisplay()
 	{
 		lblSender.Text = Message?.Sender?.Name ?? string.Empty;
@@ -220,7 +242,7 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 			argumentsText = string.Join(Environment.NewLine, fc.Arguments.Select(kv => $"{(kv.Key + ":").PadRight(maxKeyLen + 1)} {kv.Value}"));
 		}
 		lblArguments.Text = argumentsText;
-		lblResult.Text = fc.Result?.ToString() ?? string.Empty;
+		UpdateResultDisplay(fc.Result);
 
 		ApplyVisibility();
 	}
@@ -252,6 +274,8 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 			lblArguments.Visible = showArguments;
 			lblResultIcon.Visible = showResult;
 			lblResult.Visible = showResult;
+			if (_resultPreview is not null)
+				_resultPreview.Visible = showResult;
 			approvalPanel.Visible = isPending;
 		}
 		finally
@@ -438,6 +462,8 @@ internal sealed partial class DXFunctionCallMessageControl : PanelControl, IChat
 		lblTitle.MaximumSize = new Size(textWidth, 0);
 		lblArguments.MaximumSize = new Size(textWidth, 0);
 		lblResult.MaximumSize = new Size(textWidth, 0);
+		if (_resultPreview is not null)
+			_resultPreview.MaximumSize = new Size(textWidth, 0);
 	}
 
 	private int ScaleLogicalPixels(int logicalPixels)

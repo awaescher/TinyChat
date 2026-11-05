@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using DevExpress.Utils;
+using DevExpress.Utils.Layout;
 using DevExpress.Utils.Svg;
 using DevExpress.XtraEditors;
 
@@ -8,13 +9,13 @@ namespace TinyChat;
 /// <summary>
 /// Provides a DevExpress-based chat input control for composing messages with optional file attachments.
 /// </summary>
-public class DXChatInputControl : Control, IChatInputControl, IChatAttachmentInputControl, IChatInputDraftControl, IChatInputDraftEditorControl, IChatInputLayoutControl, IChatInputAppearanceControl
+public class DXChatInputControl : Control, IChatInputControl, IChatAttachmentInputControl, IChatInputDraftControl, IChatInputDraftEditorControl, IChatInputLayoutControl, IChatInputAppearanceControl, IChatAttachmentNoticeInput
 {
-	private const int ATTACHMENT_DISPLAY_HEIGHT = 60;
+	private const int ATTACHMENT_DISPLAY_HEIGHT = 72;
 	private const int SEND_BUTTON_INSET = 6;
 
 	private readonly List<ChatFileAttachment> _attachments = [];
-	private readonly FlowLayoutPanel _attachmentPanel;
+	private readonly StackPanel _attachmentPanel;
 	private readonly PanelControl _contentPanel;
 	private readonly TableLayoutPanel _contentLayout;
 	private readonly PasteAwareMemoEdit _textBox;
@@ -46,7 +47,7 @@ public class DXChatInputControl : Control, IChatInputControl, IChatAttachmentInp
 	public IReadOnlyList<ChatFileAttachment> PendingAttachments => _attachments.AsReadOnly();
 
 	/// <inheritdoc />
-	public int AttachmentDisplayHeight => ATTACHMENT_DISPLAY_HEIGHT;
+	public int AttachmentDisplayHeight => ScaleLogicalPixels(ATTACHMENT_DISPLAY_HEIGHT);
 
 	/// <inheritdoc />
 	[Browsable(false)]
@@ -136,14 +137,15 @@ public class DXChatInputControl : Control, IChatInputControl, IChatAttachmentInp
 		_textBox.AttachmentPasteRequested += (_, e) => AttachmentPasteRequested?.Invoke(this, e);
 		_textBox.LocationChanged += (_, _) => PositionSendButton();
 		_textBox.SizeChanged += (_, _) => PositionSendButton();
-		_attachmentPanel = new FlowLayoutPanel
+		_attachmentPanel = new StackPanel
 		{
 			AutoScroll = true,
 			Dock = DockStyle.Fill,
-			FlowDirection = FlowDirection.LeftToRight,
+			LayoutDirection = StackPanelLayoutDirection.LeftToRight,
+			BorderStyle = DevExpress.XtraEditors.Controls.BorderStyles.NoBorder,
+			UseSkinIndents = false,
 			Margin = Padding.Empty,
-			Visible = false,
-			WrapContents = false
+			Visible = false
 		};
 		_contentLayout = new TableLayoutPanel
 		{
@@ -160,7 +162,7 @@ public class DXChatInputControl : Control, IChatInputControl, IChatAttachmentInp
 		_contentLayout.Controls.Add(_attachmentPanel, 0, 0);
 		_contentLayout.Controls.Add(_textBox, 0, 1);
 
-		_contentPanel = new PanelControl { Padding = new Padding(8), Dock = DockStyle.Fill, BorderStyle = DevExpress.XtraEditors.Controls.BorderStyles.NoBorder };
+		_contentPanel = new PanelControl { Padding = new Padding(0), Dock = DockStyle.Fill, BorderStyle = DevExpress.XtraEditors.Controls.BorderStyles.NoBorder };
 		Controls.Add(_contentPanel);
 		_contentPanel.Controls.Add(_contentLayout);
 
@@ -239,6 +241,7 @@ public class DXChatInputControl : Control, IChatInputControl, IChatAttachmentInp
 	protected override void OnLayout(LayoutEventArgs levent)
 	{
 		base.OnLayout(levent);
+		UpdateAttachmentRowHeight();
 		PositionSendButton();
 	}
 
@@ -343,67 +346,26 @@ public class DXChatInputControl : Control, IChatInputControl, IChatAttachmentInp
 		_sendButton.Enabled = !_isReceivingStream || _allowCancellation;
 	}
 
-	private Control CreateAttachmentTile(ChatFileAttachment attachment)
+	bool IChatAttachmentNoticeInput.HasAttachmentNotices => _attachmentPanel.Controls.OfType<AttachmentCard>().Any(card => card.InputNotice is not null);
+
+	void IChatAttachmentNoticeInput.AddAttachmentNotice(Control notice)
 	{
-		var tile = new PanelControl
-		{
-			AccessibleName = attachment.Name,
-			Margin = new Padding(0, 0, 6, 0),
-			Size = new Size(attachment.IsImage ? 64 : 180, 40)
-		};
-		var removeButton = new SimpleButton
-		{
-			Cursor = Cursors.Hand,
-			Dock = DockStyle.Right,
-			TabStop = false,
-			Text = "×",
-			Width = 24
-		};
-		removeButton.Click += (_, _) => RemoveAttachment(attachment, tile);
-
-		tile.Controls.Add(removeButton);
-		if (!attachment.IsImage)
-		{
-			var nameLabel = new LabelControl
-			{
-				AutoSizeMode = LabelAutoSizeMode.None,
-				Dock = DockStyle.Fill,
-				Padding = new Padding(4, 0, 0, 0),
-				Text = attachment.Name
-			};
-			nameLabel.Appearance.TextOptions.VAlignment = DevExpress.Utils.VertAlignment.Center;
-			nameLabel.Appearance.TextOptions.Trimming = DevExpress.Utils.Trimming.EllipsisCharacter;
-			tile.Controls.Add(nameLabel);
-			nameLabel.BringToFront();
-		}
-
-		tile.Controls.Add(CreateAttachmentIcon(attachment));
-		ApplyAttachmentTileAppearance(tile);
-		return tile;
+		_attachmentPanel.Controls.Add(notice);
+		UpdateAttachmentPanel();
 	}
 
-	private static Control CreateAttachmentIcon(ChatFileAttachment attachment)
+	void IChatAttachmentNoticeInput.ClearAttachmentNotices(string? fileName)
 	{
-		if (!attachment.IsImage)
-		{
-			return new FileAttachmentIconControl
-			{
-				Dock = DockStyle.Left,
-				Width = 34
-			};
-		}
+		foreach (var notice in _attachmentPanel.Controls.OfType<AttachmentCard>().Where(card => card.InputNotice is { } notice && (fileName is null || string.Equals(notice.FileName, fileName, StringComparison.OrdinalIgnoreCase))).ToArray())
+			notice.Dispose();
+		UpdateAttachmentPanel();
+	}
 
-		var image = FileAttachmentImageFactory.Create(attachment);
-		var preview = new PictureEdit
-		{
-			Dock = DockStyle.Left,
-			EditValue = image,
-			Width = 34
-		};
-		preview.Properties.BorderStyle = DevExpress.XtraEditors.Controls.BorderStyles.NoBorder;
-		preview.Properties.SizeMode = DevExpress.XtraEditors.Controls.PictureSizeMode.Zoom;
-		preview.Disposed += (_, _) => image.Dispose();
-		return preview;
+	private Control CreateAttachmentTile(ChatFileAttachment attachment)
+	{
+		DXAttachmentCard? card = null;
+		card = new DXAttachmentCard(attachment, () => RemoveAttachment(attachment, card!));
+		return card;
 	}
 
 	private void RemoveAttachment(ChatFileAttachment attachment, Control tile)
@@ -415,10 +377,20 @@ public class DXChatInputControl : Control, IChatInputControl, IChatAttachmentInp
 
 	private void UpdateAttachmentPanel()
 	{
-		var hasAttachments = _attachments.Count > 0;
-		_contentLayout.RowStyles[0].Height = hasAttachments ? ATTACHMENT_DISPLAY_HEIGHT : 0;
+		var hasAttachments = _attachmentPanel.Controls.Count > 0;
+		UpdateAttachmentRowHeight();
 		_attachmentPanel.Visible = hasAttachments;
 		AttachmentsChanged?.Invoke(this, EventArgs.Empty);
+	}
+
+	private void UpdateAttachmentRowHeight()
+	{
+		if (_contentLayout is null || _sendButton is null)
+			return;
+		var availableHeight = Math.Max(0, _contentLayout.ClientSize.Height - _sendButton.Height - ScaleLogicalPixels(12));
+		var height = _attachmentPanel.Controls.Count > 0 ? Math.Min(AttachmentDisplayHeight, availableHeight) : 0;
+		if (_contentLayout.RowStyles[0].Height != height)
+			_contentLayout.RowStyles[0].Height = height;
 	}
 
 	private void PositionSendButton()
@@ -461,23 +433,8 @@ public class DXChatInputControl : Control, IChatInputControl, IChatAttachmentInp
 
 		ApplyEditorAppearance();
 
-		foreach (var tile in _attachmentPanel.Controls.OfType<PanelControl>())
-			ApplyAttachmentTileAppearance(tile);
-	}
-
-	private void ApplyAttachmentTileAppearance(PanelControl tile)
-	{
-		ApplyPanelAppearance(tile);
-
-		foreach (var label in tile.Controls.OfType<LabelControl>())
-		{
-			label.Appearance.Font = Font;
-			label.Appearance.ForeColor = ForeColor;
-			label.Appearance.BackColor = BackColor;
-			label.Appearance.Options.UseFont = true;
-			label.Appearance.Options.UseForeColor = true;
-			label.Appearance.Options.UseBackColor = true;
-		}
+		foreach (var tile in _attachmentPanel.Controls.OfType<AttachmentCard>())
+			tile.ApplyPresentation(null);
 	}
 
 	private void ApplyPanelAppearance(PanelControl panel)

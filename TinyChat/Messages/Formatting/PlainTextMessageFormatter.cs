@@ -53,7 +53,7 @@ public partial class PlainTextMessageFormatter : IMessageFormatter
 		if (content is StringMessageContent stringContent)
 			return Format(stringContent.ToString());
 
-		if (content is FunctionCallMessageContent or ReasoningMessageContent or FileAttachmentMessageContent)
+		if (content is FunctionCallMessageContent or ReasoningMessageContent or FileAttachmentMessageContent or AIMessageContent)
 			return Format(content.ToString() ?? string.Empty);
 
 		throw new NotSupportedException($"Only {nameof(StringMessageContent)}, {nameof(ReasoningMessageContent)}, {nameof(FunctionCallMessageContent)} and {nameof(FileAttachmentMessageContent)} are supported by {nameof(PlainTextMessageFormatter)}.");

@@ -10,7 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="DevExpress.Win.Design" Version="20.1.*" />
+    <PackageReference Include="DevExpress.Win.Design" Version="$(DevExpressVersion)" />
     <PackageReference Include="Microsoft.Extensions.AI" Version="10.7.0" />
     <PackageReference Include="OllamaSharp" Version="5.4.25" />
   </ItemGroup>

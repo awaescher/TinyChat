@@ -4,10 +4,10 @@ on:
   push:
     branches: [ "main", "master" ]
     tags: [ "*" ]
-    paths: [ 'TinyChat/**', 'TinyChat.DevExpress/**', '.github/workflows/CI.yml' ]
+    paths: [ 'TinyChat/**', 'TinyChat.DevExpress/**', 'Directory.Build.props', 'GitVersion.yml', '.github/workflows/CI.yml' ]
   pull_request:
     branches: [ "main", "master" ]
-    paths: [ 'TinyChat/**', 'TinyChat.DevExpress/**' ]
+    paths: [ 'TinyChat/**', 'TinyChat.DevExpress/**', 'Directory.Build.props', 'GitVersion.yml', '.github/workflows/CI.yml' ]
 
 
 jobs:

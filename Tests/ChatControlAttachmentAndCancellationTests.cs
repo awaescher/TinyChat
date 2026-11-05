@@ -13,6 +13,16 @@ namespace Tests;
 [Apartment(ApartmentState.STA)]
 public class ChatControlAttachmentAndCancellationTests
 {
+	private static IEnumerable<Control> DescendantsOf(Control parent)
+	{
+		foreach (Control child in parent.Controls)
+		{
+			yield return child;
+			foreach (var descendant in DescendantsOf(child))
+				yield return descendant;
+		}
+	}
+
 	public class FileAttachments
 	{
 		[Test]
@@ -92,16 +102,17 @@ public class ChatControlAttachmentAndCancellationTests
 		}
 
 		[Test]
-		public void Keeps_Binary_Documents_As_Data_With_A_Textual_Notice()
+		public void Keeps_Binary_Documents_As_Data_With_A_Ui_Only_Warning()
 		{
 			using var control = new TestChatControl();
+			control.AttachmentContentProviders.Add(new BinaryAttachmentContentProvider());
 			var attachment = new ChatFileAttachment("report.pdf", "application/pdf", new byte[] { 1, 2, 3 });
 			control.AddForConversion(control.Sender, new FileAttachmentMessageContent([attachment], "Summarize the file"));
 
 			var message = control.ConvertMessages().Single();
 
-			message.Contents.OfType<TextContent>()
-				.ShouldContain(content => content.Text.Contains("report.pdf") && content.Text.Contains("application/pdf"));
+			message.Contents.OfType<TextContent>().Single().Text.ShouldBe("Summarize the file");
+			control.Messages.ShouldNotContain(message => message.Content is ChatNoticeMessageContent);
 			message.Contents.OfType<DataContent>().Single().Name.ShouldBe("report.pdf");
 		}
 
@@ -130,12 +141,12 @@ public class ChatControlAttachmentAndCancellationTests
 				: new ChatMessageControl { MessageFormatter = new PlainTextMessageFormatter(), Message = message };
 
 			var previewPanel = control.Controls.OfType<FileAttachmentPreviewPanel>().Single();
-			var preview = previewPanel.Controls.OfType<PictureBox>().Single();
+			var preview = DescendantsOf(previewPanel).Single(child => child is PictureBox or PictureEdit);
 			control.Size = new Size(300, 200);
 			control.PerformLayout();
 
-			preview.Image.ShouldNotBeNull();
-			preview.Size.ShouldBe(new Size(64, 64));
+			(preview is PictureBox picture ? picture.Image : ((PictureEdit)preview).Image).ShouldNotBeNull();
+			preview.Width.ShouldBeGreaterThanOrEqualTo(28);
 			control.Controls.Cast<Control>().ShouldContain(child => child.Text == "Caption");
 			control.Controls.Cast<Control>()
 				.Where(child => child != previewPanel)
@@ -156,10 +167,14 @@ public class ChatControlAttachmentAndCancellationTests
 
 			var previewPanel = control.Controls.OfType<FileAttachmentPreviewPanel>().Single();
 			var tile = previewPanel.Controls.Cast<Control>().Single();
+			control.Size = new Size(400, 200);
+			control.PerformLayout();
+			tile.Height.ShouldBeGreaterThanOrEqualTo(48);
+			previewPanel.Height.ShouldBeGreaterThanOrEqualTo(tile.Height);
 
 			tile.AccessibleName.ShouldBe("notes.md");
 			tile.Cursor.ShouldBe(Cursors.Hand);
-			tile.Controls.Cast<Control>().ShouldContain(child => child.Text == "notes.md");
+			DescendantsOf(tile).ShouldNotContain(child => child.Text == "notes.md");
 			control.Controls.Cast<Control>()
 				.Concat(tile.Controls.Cast<Control>())
 				.ShouldNotContain(child => child.Text.Contains("\U0001F4CE"));
@@ -210,7 +225,7 @@ public class ChatControlAttachmentAndCancellationTests
 			messageTextControl.Width.ShouldBeGreaterThan(300);
 			var previewPanel = messageControl.Controls.OfType<FileAttachmentPreviewPanel>().Single();
 			previewPanel.Width.ShouldBeGreaterThan(128);
-			previewPanel.Controls.OfType<PictureBox>().Count().ShouldBe(2);
+			DescendantsOf(previewPanel).OfType<PictureBox>().Count().ShouldBe(2);
 		}
 
 	}
@@ -222,6 +237,7 @@ public class ChatControlAttachmentAndCancellationTests
 		public void Shows_And_Removes_Pending_Attachments(bool useDevExpress)
 		{
 			using var inputControl = CreateInputControl(useDevExpress);
+			inputControl.Size = new Size(400, 180);
 			var attachmentInput = (IChatAttachmentInputControl)inputControl;
 			var image = new ChatFileAttachment("image.png", "image/png", CreatePngData());
 			var document = new ChatFileAttachment("notes.txt", "text/plain", "Hello"u8.ToArray());
@@ -229,20 +245,22 @@ public class ChatControlAttachmentAndCancellationTests
 			attachmentInput.AddAttachments([image, document]);
 
 			attachmentInput.PendingAttachments.Count.ShouldBe(2);
-			var attachmentPanel = Descendants(inputControl).OfType<FlowLayoutPanel>().Single();
+			var attachmentPanel = Descendants(inputControl).Single(control => useDevExpress ? control is DevExpress.Utils.Layout.StackPanel : control is FlowLayoutPanel);
 			attachmentPanel.Visible.ShouldBeTrue();
 			var contentLayout = Descendants(inputControl).OfType<TableLayoutPanel>().Single();
 			contentLayout.RowStyles[0].Height.ShouldBe(attachmentInput.AttachmentDisplayHeight);
 			Descendants(inputControl).ShouldNotContain(control => control.Text == "image.png");
 			Descendants(inputControl).ShouldNotContain(control => control.Text.Contains("\U0001F4CE"));
-			var removeButtons = Descendants(inputControl).Where(control => control.Text == "×").ToArray();
+			var removeButtons = Descendants(inputControl).Where(control => control.AccessibleName == ChatLocalization.GetString("RemoveAttachment")).ToArray();
 			removeButtons.Length.ShouldBe(2);
-			var fileNameControl = Descendants(inputControl).Single(control => control.Text == "notes.txt");
-			var documentTile = fileNameControl.Parent!;
+			var documentTile = Descendants(inputControl).OfType<AttachmentCard>().Single(control => control.AccessibleName == "notes.txt").Controls[0];
 			documentTile.PerformLayout();
-			var documentRemoveButton = documentTile.Controls.Cast<Control>().Single(control => control.Text == "×");
-			fileNameControl.Bounds.IntersectsWith(documentRemoveButton.Bounds).ShouldBeFalse();
-			PerformClick(removeButtons[0]);
+			var documentRemoveButton = documentTile.Controls.Cast<Control>().Single(control => control.AccessibleName == ChatLocalization.GetString("RemoveAttachment"));
+			Descendants(documentTile).ShouldNotContain(control => control.Text == "notes.txt");
+			removeButtons.ShouldAllBe(button => !button.Visible);
+			typeof(Control).GetMethod("OnMouseEnter", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(documentTile, [EventArgs.Empty]);
+			documentRemoveButton.Visible.ShouldBeTrue();
+			typeof(Control).GetMethod("OnClick", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(documentRemoveButton, [EventArgs.Empty]);
 			attachmentInput.PendingAttachments.Count.ShouldBe(1);
 		}
 
@@ -260,7 +278,7 @@ public class ChatControlAttachmentAndCancellationTests
 				: Descendants(inputControl).OfType<TextBox>().Single();
 			inputControl.Size = new Size(400, 120);
 			inputControl.PerformLayout();
-			var attachmentPanel = Descendants(inputControl).OfType<FlowLayoutPanel>().Single();
+			var attachmentPanel = Descendants(inputControl).Single(control => useDevExpress ? control is DevExpress.Utils.Layout.StackPanel : control is FlowLayoutPanel);
 			var contentLayout = Descendants(inputControl).OfType<TableLayoutPanel>().Single();
 			contentLayout.PerformLayout();
 			attachmentPanel.Bounds.IntersectsWith(textBox.Bounds).ShouldBeFalse();
@@ -312,6 +330,7 @@ public class ChatControlAttachmentAndCancellationTests
 			using var inputControl = CreateInputControl(useDevExpress);
 			typeof(ChatControl).GetProperty(nameof(ChatControl.InputControl))!.SetValue(chatControl, inputControl);
 			var attachmentInput = (IChatAttachmentInputControl)inputControl;
+			chatControl.AttachmentContentProviders.Add(new BinaryAttachmentContentProvider());
 			var data = new DataObject();
 			var filePath = Path.GetTempFileName();
 			using var bitmap = new Bitmap(2, 2);
@@ -327,7 +346,7 @@ public class ChatControlAttachmentAndCancellationTests
 
 				added.ShouldBe(1);
 				attachmentInput.PendingAttachments.Count.ShouldBe(1);
-				chatControl.Messages.ShouldBeEmpty();
+				chatControl.Messages.ShouldAllBe(message => message.Content is ChatNoticeMessageContent);
 				attachmentInput.PendingAttachments[0].MediaType.ShouldBe(useImage ? "image/png" : "application/octet-stream");
 			}
 			finally
@@ -434,7 +453,7 @@ public class ChatControlAttachmentAndCancellationTests
 	{
 		public void AddForConversion(ISender sender, IChatMessageContent content) => AddChatMessage(sender, content);
 
-		public List<Microsoft.Extensions.AI.ChatMessage> ConvertMessages() => ConvertToChatMessages();
+		public List<Microsoft.Extensions.AI.ChatMessage> ConvertMessages() => ConvertToChatMessagesAsync().GetAwaiter().GetResult();
 
 		public override IChatMessageControl AddStreamingMessage(
 			ISender sender,
