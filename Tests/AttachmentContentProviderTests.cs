@@ -89,6 +89,29 @@ public class AttachmentContentProviderTests
 		AIMessageContent.FromResult("{\"ordinary\":\"object\"}").ShouldBeNull();
 	}
 
+	[TestCase("[]")]
+	[TestCase(" [ ] ")]
+	[TestCase("{\"contents\":[]}")]
+	public void Keeps_Empty_Array_Tool_Results_As_Ordinary_Results(string json)
+	{
+		AIMessageContent.FromResult(json).ShouldBeNull();
+		AIMessageContent.FromResult(JsonDocument.Parse(json).RootElement).ShouldBeNull();
+	}
+
+	[Test]
+	public async Task Sends_Empty_Array_Tool_Results_Unchanged()
+	{
+		using var chat = new ConversionChatControl();
+		chat.LoadChatHistory([
+			new Microsoft.Extensions.AI.ChatMessage(ChatRole.Assistant, [new FunctionCallContent("call", "list")]),
+			new Microsoft.Extensions.AI.ChatMessage(ChatRole.Tool, [new FunctionResultContent("call", JsonDocument.Parse("[]").RootElement)])
+		]);
+
+		var toolResult = (await chat.ConvertAsync()).SelectMany(message => message.Contents).OfType<FunctionResultContent>().Single();
+
+		toolResult.Result.ShouldBeOfType<JsonElement>().GetArrayLength().ShouldBe(0);
+	}
+
 	[TestCase(false)]
 	[TestCase(true)]
 	public async Task Preserves_Image_History_And_Renders_The_Preview(bool devExpress)

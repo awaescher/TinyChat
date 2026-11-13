@@ -68,6 +68,10 @@ public sealed class AIMessageContent(IEnumerable<AIContent> contents) : IChatMes
 				}
 				if (element.ValueKind == JsonValueKind.Array)
 				{
+					// an empty array is an ordinary result (e.g. an empty list) and carries no content to restore
+					if (element.GetArrayLength() == 0)
+						return null;
+
 					var parts = new List<AIContent>();
 					foreach (var part in element.EnumerateArray())
 					{
