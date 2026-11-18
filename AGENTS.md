@@ -2,11 +2,20 @@
 
 Keep this AGENTS.md in English.
 
+## Feature parity and extensibility
+
+- Build every feature for both WinForms (`TinyChat`) and DevExpress (`TinyChat.DevExpress`) at the same time. A feature is not done until both variants offer the same behavior, and tests should cover both where practical.
+- In `TinyChat.DevExpress`, every visible control, menu, dialog, and tooltip must come from DevExpress (for example `SimpleButton`, `DXPopupMenu`, `XtraOpenFileDialog`, `XtraMessageBox`, `ToolTipController`) so the active skin applies everywhere.
+- Every optional extension of the control must be switchable on and off (designer property and code) and its texts must be localized and overridable through `ChatDisplayTexts`.
+- Menus, actions, and other extension points must be customizable in code, for example through virtual factory methods or events that let hosts add, remove, or replace entries.
+
 ## UI text and presentation
 
 - User-facing text must be localizable: use resources for defaults and do not hard-code messages or tooltips. Text must be customizable in the designer and by the host application.
 - Keep appearance, colors, and dimensions customizable through existing appearance/layout settings or suitable designer properties. Respect the active WinForms or DevExpress theme.
 - Prefer icons over additional labels. Follow existing icons, controls, and interaction patterns, and provide localizable tooltips and AccessibleNames.
+- Menu items that open a dialog end with a space and three periods, for example `Attach files ...`, never with a typographic ellipsis or without the space.
+- Icons come from the Windows icon fonts (`Segoe Fluent Icons` / `Segoe MDL2 Assets`, see `ChatIcons`) in WinForms and from Fluent SVG icons (see `FluentIcons`) in DevExpress. Language-neutral symbols such as `…`, `+`, or `@` are fine as fallbacks and need no localization.
 
 - In DevExpress controls, visible elements, including scrollbars, must use the active skin rather than unskinned native WinForms rendering. Nonvisual layout containers are allowed.
 

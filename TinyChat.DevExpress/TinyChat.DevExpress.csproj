@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <PackageReference Include="DevExpress.Win" Version="$(DevExpressVersion)" />
+    <PackageReference Include="DevExpress.Win.Dialogs" Version="$(DevExpressVersion)" />
   </ItemGroup>
 
   <ItemGroup>

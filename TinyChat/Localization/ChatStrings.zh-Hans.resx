@@ -26,4 +26,9 @@
   <data name="Reasoning" xml:space="preserve"><value>推理过程</value></data>
   <data name="FunctionArguments" xml:space="preserve"><value>参数</value></data>
   <data name="FunctionResult" xml:space="preserve"><value>结果</value></data>
+  <data name="InputMenu" xml:space="preserve"><value>更多选项</value></data>
+  <data name="AttachFiles" xml:space="preserve"><value>附加文件 ...</value></data>
+  <data name="AttachFilesDialogTitle" xml:space="preserve"><value>附加文件</value></data>
+  <data name="SupportedAttachmentFiles" xml:space="preserve"><value>支持的文件</value></data>
+  <data name="AllFiles" xml:space="preserve"><value>所有文件</value></data>
 </root>

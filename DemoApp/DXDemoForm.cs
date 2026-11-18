@@ -2,6 +2,7 @@ using System;
 using System.Windows.Forms;
 using DevExpress.LookAndFeel;
 using DevExpress.XtraBars.ToolbarForm;
+using DevExpress.XtraEditors;
 using TinyChat;
 
 namespace DemoApp;
@@ -40,6 +41,15 @@ public partial class DXDemoForm : ToolbarForm, IMessageFilter
 		Application.AddMessageFilter(this);
 
 		UserLookAndFeel.Default.SetSkinStyle(SkinStyle.Office2010Blue);
+
+		dxChatControl.InputMenuOpening += (_, e) => e.Items.Add(
+		new ChatInputMenuItem(
+			ChatInputMenuItemKind.Custom,
+			"Show example ...",
+			() => XtraMessageBox.Show("This entry was added by the demo application through the InputMenuOpening event."))
+		{
+			BeginGroup = true
+		});
 
 		dxChatControl.IncludeFunctionCalls = true;
 		dxChatControl.IncludeReasoning = true;

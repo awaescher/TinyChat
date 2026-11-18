@@ -26,4 +26,9 @@ W czym mogę dziś pomóc?</value></data>
   <data name="Reasoning" xml:space="preserve"><value>Rozumowanie</value></data>
   <data name="FunctionArguments" xml:space="preserve"><value>Argumenty</value></data>
   <data name="FunctionResult" xml:space="preserve"><value>Wynik</value></data>
+  <data name="InputMenu" xml:space="preserve"><value>Więcej opcji</value></data>
+  <data name="AttachFiles" xml:space="preserve"><value>Dołącz pliki ...</value></data>
+  <data name="AttachFilesDialogTitle" xml:space="preserve"><value>Dołącz pliki</value></data>
+  <data name="SupportedAttachmentFiles" xml:space="preserve"><value>Obsługiwane pliki</value></data>
+  <data name="AllFiles" xml:space="preserve"><value>Wszystkie pliki</value></data>
 </root>

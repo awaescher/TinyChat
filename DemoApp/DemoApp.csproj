@@ -11,8 +11,8 @@
 
   <ItemGroup>
     <PackageReference Include="DevExpress.Win.Design" Version="$(DevExpressVersion)" />
-    <PackageReference Include="Microsoft.Extensions.AI" Version="10.7.0" />
-    <PackageReference Include="OllamaSharp" Version="5.4.25" />
+    <PackageReference Include="Microsoft.Extensions.AI" Version="11.0.0" />
+    <PackageReference Include="OllamaSharp" Version="5.5.2" />
   </ItemGroup>
 
   <ItemGroup>

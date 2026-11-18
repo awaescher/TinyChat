@@ -28,6 +28,8 @@ internal static class ChatIcons
 
 	internal static string Stop => IconFontName is null ? "\u25A0" : "\ue73b";
 
+	internal static string Attach => IconFontName is null ? "\U0001f4ce" : "\ue723";
+
 	internal static string Copy => IconFontName is null ? "\u29C9" : "\ue8c8";
 
 	internal static string Revert => IconFontName is null ? "\u21B6" : "\ue7a7";
@@ -57,6 +59,21 @@ internal static class ChatIcons
 	/// Creates the font used to render the icon glyphs.
 	/// </summary>
 	internal static Font CreateFont(float size) => new(IconFontName ?? "Arial", size, FontStyle.Regular, GraphicsUnit.Point);
+
+	/// <summary>
+	/// Draws an icon glyph into a bitmap, for controls such as menu items that show images instead of text.
+	/// </summary>
+	internal static Bitmap CreateImage(string glyph, int pixelSize, Color color)
+	{
+		var bitmap = new Bitmap(pixelSize, pixelSize);
+		using var graphics = Graphics.FromImage(bitmap);
+		using var font = new Font(IconFontName ?? "Segoe UI Symbol", pixelSize * 0.75f, FontStyle.Regular, GraphicsUnit.Pixel);
+		graphics.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
+		using var brush = new SolidBrush(color);
+		using var format = new StringFormat(StringFormat.GenericTypographic) { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+		graphics.DrawString(glyph, font, brush, new RectangleF(0, 0, pixelSize, pixelSize), format);
+		return bitmap;
+	}
 
 	private static string? FindIconFontName()
 	{

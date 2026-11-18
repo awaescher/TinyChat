@@ -65,6 +65,21 @@ public class DXChatControl : ChatControl
 	protected override IChatInputControl CreateChatInputControl() => new DXChatInputControl();
 
 	/// <inheritdoc />
+	protected override IReadOnlyList<string>? ShowAttachFilesDialog(string title, string filter)
+	{
+		using var dialog = new XtraOpenFileDialog
+		{
+			CheckFileExists = true,
+			Filter = filter,
+			Multiselect = true,
+			RestoreDirectory = true,
+			Title = title
+		};
+
+		return dialog.ShowDialog(FindForm()) == DialogResult.OK ? dialog.FileNames : null;
+	}
+
+	/// <inheritdoc />
 	protected override Form CreateFullTextDialog(string title, string text) => new DXFullTextDialog(title, text, MessageFont);
 
 	/// <inheritdoc />

@@ -42,12 +42,12 @@ public class ChatInputSendButtonLayoutTests
 		PerformLayout(input);
 		var editorBounds = GetEditorBounds(input, useDevExpress);
 		var sendButton = useDevExpress
-			? (Control)input.Controls.OfType<SimpleButton>().Single()
-			: input.Controls.OfType<Button>().Single();
+			? (Control)input.Controls.OfType<SimpleButton>().Single(button => button.Anchor.HasFlag(AnchorStyles.Right))
+			: input.Controls.OfType<Button>().Single(button => button.Anchor.HasFlag(AnchorStyles.Right));
 		var expectedInset = Math.Max(1, (int)Math.Round(6 * input.DeviceDpi / 96f));
 
 		(editorBounds.Right - sendButton.Right).ShouldBe(expectedInset);
-		(editorBounds.Bottom - sendButton.Bottom).ShouldBe(expectedInset);
+		(editorBounds.Bottom - sendButton.Bottom).ShouldBe(Math.Clamp((editorBounds.Height - sendButton.Height) / 2, 0, expectedInset));
 	}
 
 	private static Rectangle GetEditorBounds(Control input, bool useDevExpress)

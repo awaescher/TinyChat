@@ -26,4 +26,9 @@ Waarmee kan ik je vandaag helpen?</value></data>
   <data name="Reasoning" xml:space="preserve"><value>Redenering</value></data>
   <data name="FunctionArguments" xml:space="preserve"><value>Argumenten</value></data>
   <data name="FunctionResult" xml:space="preserve"><value>Resultaat</value></data>
+  <data name="InputMenu" xml:space="preserve"><value>Meer opties</value></data>
+  <data name="AttachFiles" xml:space="preserve"><value>Bestanden bijvoegen ...</value></data>
+  <data name="AttachFilesDialogTitle" xml:space="preserve"><value>Bestanden bijvoegen</value></data>
+  <data name="SupportedAttachmentFiles" xml:space="preserve"><value>Ondersteunde bestanden</value></data>
+  <data name="AllFiles" xml:space="preserve"><value>Alle bestanden</value></data>
 </root>
