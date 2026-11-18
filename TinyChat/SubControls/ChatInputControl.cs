@@ -5,11 +5,13 @@ namespace TinyChat;
 /// <summary>
 /// A text input control that allows users to compose messages with optional file attachments.
 /// </summary>
-public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInputControl, IChatInputDraftControl, IChatInputDraftEditorControl, IChatInputLayoutControl, IChatInputAppearanceControl, IChatAttachmentNoticeInput
+public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInputControl, IChatInputDraftControl, IChatInputDraftEditorControl, IChatInputLayoutControl, IChatInputAppearanceControl, IChatAttachmentNoticeInput, IChatInputMenuControl, IChatInputMinimumHeightControl
 {
 	private const int ATTACHMENT_DISPLAY_HEIGHT = 72;
 	private const int DEFAULT_CONTENT_PADDING = 8;
 	private const int SEND_BUTTON_INSET = 6;
+	private const int MENU_ICON_SIZE = 16;
+	private const int MENU_GLYPH_SIZE = 20;
 
 	private readonly List<ChatFileAttachment> _attachments = [];
 	private readonly FlowLayoutPanel _attachmentPanel;
@@ -17,6 +19,13 @@ public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInput
 	private readonly TableLayoutPanel _contentLayout;
 	private readonly PasteAwareTextBox _textBox;
 	private readonly Button _sendButton;
+	private readonly InputMenuGlyph _menuGlyph;
+	private readonly ToolTip _toolTip = new();
+	private ContextMenuStrip? _menu;
+	private readonly List<Image> _menuImages = [];
+	private string _menuButtonText = string.Empty;
+	private bool _showMenuButton;
+	private bool _menuGlyphShown;
 	private Color _editorBackColor = Color.Empty;
 	private Color _editorForeColor = Color.Empty;
 	private BorderStyle _editorBorderStyle = BorderStyle.Fixed3D;
@@ -41,10 +50,47 @@ public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInput
 	public event EventHandler? AttachmentsChanged;
 
 	/// <inheritdoc />
+	public event EventHandler? MenuRequested;
+
+	/// <inheritdoc />
+	[Browsable(false)]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	public bool ShowMenuButton
+	{
+		get => _showMenuButton;
+		set
+		{
+			_showMenuButton = value;
+			UpdateMenuGlyphVisibility();
+			UpdateMenuToolTip();
+		}
+	}
+
+	/// <inheritdoc />
+	[Browsable(false)]
+	[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+	public string MenuButtonText
+	{
+		get => _menuButtonText;
+		set
+		{
+			_menuButtonText = value ?? string.Empty;
+			UpdateMenuToolTip();
+		}
+	}
+
+	/// <inheritdoc />
 	public IReadOnlyList<ChatFileAttachment> PendingAttachments => _attachments.AsReadOnly();
 
 	/// <inheritdoc />
 	public int AttachmentDisplayHeight => ScaleLogicalPixels(ATTACHMENT_DISPLAY_HEIGHT);
+
+	/// <inheritdoc />
+	public event EventHandler? MinimumHeightChanged;
+
+	/// <inheritdoc />
+	[Browsable(false)]
+	public int MinimumHeight => _contentPanel.Padding.Vertical + _textBox.Margin.Vertical + (_textBox.Height - _textBox.ClientSize.Height) + _sendButton.Height + 2 * ScaleLogicalPixels(SEND_BUTTON_INSET);
 
 	/// <inheritdoc />
 	[Browsable(false)]
@@ -57,6 +103,7 @@ public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInput
 			_contentPanel.Padding = value;
 			PerformLayout();
 			PositionSendButton();
+			MinimumHeightChanged?.Invoke(this, EventArgs.Empty);
 		}
 	}
 
@@ -167,9 +214,24 @@ public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInput
 			_sendButton.Font = ChatIcons.CreateFont(9f);
 		Controls.Add(_sendButton);
 		_sendButton.BringToFront();
+
+		_menuGlyph = new InputMenuGlyph(() => _textBox.BackColor, () => _textBox.ForeColor) { Visible = false };
+		_menuGlyph.HoverChanged += (_, _) =>
+		{
+			UpdateMenuToolTip();
+			UpdateMenuGlyphVisibility();
+		};
+		Controls.Add(_menuGlyph);
+		_menuGlyph.BringToFront();
+		// With text, the symbol only appears while the pointer is over its own area.
+		_textBox.TextChanged += (_, _) => UpdateMenuGlyphVisibility();
+		_textBox.MouseMove += (_, _) => UpdateMenuGlyphVisibility();
+		_textBox.MouseLeave += (_, _) => UpdateMenuGlyphVisibility();
+		_menuGlyph.MouseLeave += (_, _) => UpdateMenuGlyphVisibility();
 		PositionSendButton();
 
 		_sendButton.Click += (_, _) => SendOrStop();
+		_menuGlyph.Click += (_, _) => MenuRequested?.Invoke(this, EventArgs.Empty);
 		_textBox.KeyPress += TextBox_KeyPress;
 		ApplyAppearance();
 	}
@@ -242,6 +304,7 @@ public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInput
 	{
 		base.OnDpiChangedAfterParent(e);
 		PositionSendButton();
+		MinimumHeightChanged?.Invoke(this, EventArgs.Empty);
 	}
 
 	/// <inheritdoc />
@@ -256,6 +319,7 @@ public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInput
 	{
 		base.OnFontChanged(e);
 		ApplyFont();
+		MinimumHeightChanged?.Invoke(this, EventArgs.Empty);
 	}
 
 	/// <inheritdoc />
@@ -407,7 +471,122 @@ public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInput
 		var editorBounds = GetBoundsRelativeToInput(_textBox);
 		var inset = ScaleLogicalPixels(SEND_BUTTON_INSET);
 		_sendButton.Left = Math.Max(editorBounds.Left, editorBounds.Right - _sendButton.Width - inset);
-		_sendButton.Top = Math.Max(editorBounds.Top, editorBounds.Bottom - _sendButton.Height - inset);
+		_sendButton.Top = editorBounds.Bottom - _sendButton.Height - GetVerticalInset(editorBounds, _sendButton, inset);
+
+		if (_menuGlyph is null)
+			return;
+
+		// The symbol lies over the lower left corner of the editor, mirroring the send button, without changing the text layout.
+		var glyphSize = ScaleLogicalPixels(MENU_GLYPH_SIZE);
+		_menuGlyph.Size = new Size(glyphSize, glyphSize);
+		_menuGlyph.Left = Math.Min(editorBounds.Left + inset, Math.Max(editorBounds.Left, _sendButton.Left - glyphSize));
+		_menuGlyph.Top = _sendButton.Top + (_sendButton.Height - glyphSize) / 2;
+	}
+
+	/// <summary>
+	/// Shows the symbol while the draft is empty. With text, it only appears while the pointer is over its own area,
+	/// so it never covers the text otherwise.
+	/// </summary>
+	private void UpdateMenuGlyphVisibility()
+	{
+		if (_menuGlyph is null)
+			return;
+
+		var visible = _showMenuButton && (_textBox.TextLength == 0 || IsPointerOverMenuGlyph() || _menu?.Visible == true);
+		if (_menuGlyphShown == visible)
+			return;
+
+		_menuGlyphShown = visible;
+		_menuGlyph.Visible = visible;
+		if (visible)
+			_menuGlyph.BringToFront();
+	}
+
+	private bool IsPointerOverMenuGlyph() => IsHandleCreated && RectangleToScreen(_menuGlyph.Bounds).Contains(PointerPosition);
+
+	/// <summary>Gets the pointer position in screen coordinates; replaceable in tests.</summary>
+	internal Func<Point> _pointerPositionProvider = () => Cursor.Position;
+
+	private Point PointerPosition => _pointerPositionProvider();
+
+	/// <inheritdoc />
+	protected override void OnMouseLeave(EventArgs e)
+	{
+		base.OnMouseLeave(e);
+		UpdateMenuGlyphVisibility();
+	}
+
+	private void UpdateMenuToolTip()
+	{
+		_menuGlyph.AccessibleName = _menuButtonText;
+		_toolTip.SetToolTip(_menuGlyph, _menuButtonText);
+	}
+
+	/// <summary>
+	/// Keeps a button inside an editor that is too low for the regular inset by centering it vertically.
+	/// </summary>
+	private static int GetVerticalInset(Rectangle editorBounds, Control button, int inset) =>
+		Math.Clamp((editorBounds.Height - button.Height) / 2, 0, inset);
+
+	/// <inheritdoc />
+	public void ShowMenu(IReadOnlyList<ChatInputMenuItem> items)
+	{
+		ArgumentNullException.ThrowIfNull(items);
+		if (items.Count == 0 || !IsHandleCreated)
+			return;
+
+		_menu?.Dispose();
+		DisposeMenuImages();
+		_menu = new ContextMenuStrip { RightToLeft = RightToLeft };
+		var iconPixels = ScaleLogicalPixels(MENU_ICON_SIZE);
+		_menu.ImageScalingSize = new Size(iconPixels, iconPixels);
+		foreach (var item in items)
+		{
+			if (item.BeginGroup && _menu.Items.Count > 0)
+				_menu.Items.Add(new ToolStripSeparator());
+
+			var image = item.Image;
+			if (image is null && CreateMenuImage(item.Kind, iconPixels) is { } defaultImage)
+			{
+				_menuImages.Add(defaultImage);
+				image = defaultImage;
+			}
+
+			var menuItem = new ToolStripMenuItem(item.Text, image, (_, _) => item.Execute())
+			{
+				AccessibleName = item.Text,
+				Enabled = item.Enabled
+			};
+			_menu.Items.Add(menuItem);
+		}
+
+		_menu.Show(_menuGlyph, new Point(0, _menuGlyph.Height));
+	}
+
+	private void DisposeMenuImages()
+	{
+		foreach (var image in _menuImages)
+			image.Dispose();
+		_menuImages.Clear();
+	}
+
+	private static Image? CreateMenuImage(ChatInputMenuItemKind kind, int pixelSize) => kind switch
+	{
+		ChatInputMenuItemKind.AttachFiles => ChatIcons.CreateImage(ChatIcons.Attach, pixelSize, SystemColors.MenuText),
+		_ => null
+	};
+
+	/// <inheritdoc />
+	protected override void Dispose(bool disposing)
+	{
+		if (disposing)
+		{
+			_menu?.Dispose();
+			DisposeMenuImages();
+			_toolTip.Dispose();
+		}
+
+		base.Dispose(disposing);
 	}
 
 	private Rectangle GetBoundsRelativeToInput(Control descendant)
@@ -468,6 +647,7 @@ public class ChatInputControl : Control, IChatInputControl, IChatAttachmentInput
 
 		_textBox.BackColor = EditorBackColor.IsEmpty ? SystemColors.Window : EditorBackColor;
 		_textBox.ForeColor = EditorForeColor.IsEmpty ? SystemColors.WindowText : EditorForeColor;
+		_menuGlyph?.Invalidate();
 		_textBox.BorderStyle = EditorBorderStyle;
 		_textBox.PlaceholderText = PlaceholderText;
 		_textBox.CueText = PlaceholderText;

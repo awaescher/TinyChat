@@ -6,7 +6,7 @@ namespace TinyChat;
 /// A DevExpress-based split container control specifically designed for chat interfaces.
 /// Provides a vertical layout with a fixed bottom panel for chat input and a resizable top panel for chat history.
 /// </summary>
-public class DXChatSplitContainerControl : SplitContainerControl, ISplitContainerControl, IChatSplitContainerLayoutControl
+public class DXChatSplitContainerControl : SplitContainerControl, ISplitContainerControl, IChatSplitContainerLayoutControl, IChatSplitContainerMinimumInputHeight
 {
 	/// <summary>
 	/// Initializes a new instance of the <see cref="DXChatSplitContainerControl"/> class.
@@ -29,4 +29,10 @@ public class DXChatSplitContainerControl : SplitContainerControl, ISplitContaine
 	/// This is the bottom panel (Panel2) in the split container and is fixed in size.
 	/// </summary>
 	public Control ChatInputPanel => Panel2;
+
+	int IChatSplitContainerMinimumInputHeight.MinimumInputHeight
+	{
+		get => Panel2.MinSize;
+		set => Panel2.MinSize = value;
+	}
 }

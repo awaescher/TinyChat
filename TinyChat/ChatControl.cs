@@ -46,7 +46,7 @@ public partial class ChatControl : UserControl
 	private string _inputPlaceholderText = string.Empty;
 	private ContentAlignment _welcomeTextAlign = ContentAlignment.MiddleCenter;
 	private string _welcomeMessage = ChatLocalization.GetString("Welcome");
-	private int _splitterPosition = 60;
+	private int _splitterPosition = 70;
 	private bool _isSplitterFixed;
 	private bool _allowExpandFunctionCalls = true;
 	private bool _allowExpandReasoning = true;
@@ -149,7 +149,11 @@ public partial class ChatControl : UserControl
 	public ChatControl()
 	{
 		InitializeComponent();
-		DisplayTexts.Changed += (_, _) => RefreshAttachmentPresentation();
+		DisplayTexts.Changed += (_, _) =>
+		{
+			RefreshAttachmentPresentation();
+			UpdateInputMenuButton();
+		};
 		AttachmentAppearance.Changed += (_, _) => RefreshAttachmentPresentation();
 	}
 
@@ -752,6 +756,8 @@ public partial class ChatControl : UserControl
 				if (!fileDropTarget.IsDisposed)
 					fileDropTarget.AllowDrop = value;
 			}
+
+			UpdateInputMenuButton();
 		}
 	}
 
@@ -1117,6 +1123,34 @@ public partial class ChatControl : UserControl
 	{
 		if (SplitContainerControl is IChatSplitContainerLayoutControl layoutControl)
 			layoutControl.IsSplitterFixed = IsSplitterFixed;
+	}
+
+	/// <summary>
+	/// Keeps the input panel high enough for the editor to hold its buttons, so they never cover the text.
+	/// </summary>
+	private void ApplyMinimumInputHeight()
+	{
+		if (InputControl is not IChatInputMinimumHeightControl input ||
+			SplitContainerControl is not IChatSplitContainerMinimumInputHeight splitContainer)
+		{
+			return;
+		}
+
+		try
+		{
+			var minimumHeight = input.MinimumHeight;
+			splitContainer.MinimumInputHeight = minimumHeight;
+			if (SplitterPosition < minimumHeight)
+				SplitterPosition = minimumHeight;
+		}
+		catch (ArgumentOutOfRangeException)
+		{
+			// Very small host controls may not have enough room for the minimum input height.
+		}
+		catch (InvalidOperationException)
+		{
+			// The splitter may still be completing layout.
+		}
 	}
 
 	private static IEnumerable<Control> EnumerateDescendantControls(Control parent)
@@ -1536,14 +1570,21 @@ public partial class ChatControl : UserControl
 			attachmentInputControl.AttachmentPasteRequested += AttachmentInputControl_AttachmentPasteRequested;
 			attachmentInputControl.AttachmentsChanged += AttachmentInputControl_AttachmentsChanged;
 		}
+		ConfigureInputMenu(inputControl);
 		InputControl = (Control)inputControl;
 		ApplyInputFont(InputControl);
 		ApplyInputColors();
 		ApplyInputAppearance(InputControl);
 		ApplyInputLayout(InputControl);
+		UpdateInputMenuButton();
 
 		splitContainer?.ChatInputPanel?.Controls.Add(InputControl);
 		LayoutChatInputControl(InputControl);
+		if (inputControl is IChatInputMinimumHeightControl minimumHeightControl)
+		{
+			minimumHeightControl.MinimumHeightChanged += (_, _) => ApplyMinimumInputHeight();
+			ApplyMinimumInputHeight();
+		}
 		FlushInputAttachmentNotices();
 
 		ConfigureFileDropTarget(this);

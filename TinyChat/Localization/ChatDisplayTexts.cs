@@ -103,6 +103,36 @@ public sealed class ChatDisplayTexts
 	private bool ShouldSerializeFunctionResult() => _overrides.ContainsKey(nameof(FunctionResult));
 	private void ResetFunctionResult() => Set(nameof(FunctionResult), null);
 
+	/// <summary>Gets or sets the tooltip and accessible name of the menu button in the lower left corner of the input.</summary>
+	[Localizable(true)]
+	public string InputMenu { get => Get(nameof(InputMenu)); set => Set(nameof(InputMenu), value); }
+	private bool ShouldSerializeInputMenu() => _overrides.ContainsKey(nameof(InputMenu));
+	private void ResetInputMenu() => Set(nameof(InputMenu), null);
+
+	/// <summary>Gets or sets the text of the input menu entry that adds files to the draft.</summary>
+	[Localizable(true)]
+	public string AttachFiles { get => Get(nameof(AttachFiles)); set => Set(nameof(AttachFiles), value); }
+	private bool ShouldSerializeAttachFiles() => _overrides.ContainsKey(nameof(AttachFiles));
+	private void ResetAttachFiles() => Set(nameof(AttachFiles), null);
+
+	/// <summary>Gets or sets the title of the file dialog that adds files to the draft.</summary>
+	[Localizable(true)]
+	public string AttachFilesDialogTitle { get => Get(nameof(AttachFilesDialogTitle)); set => Set(nameof(AttachFilesDialogTitle), value); }
+	private bool ShouldSerializeAttachFilesDialogTitle() => _overrides.ContainsKey(nameof(AttachFilesDialogTitle));
+	private void ResetAttachFilesDialogTitle() => Set(nameof(AttachFilesDialogTitle), null);
+
+	/// <summary>Gets or sets the file dialog filter name of the files the attachment providers support.</summary>
+	[Localizable(true)]
+	public string SupportedAttachmentFiles { get => Get(nameof(SupportedAttachmentFiles)); set => Set(nameof(SupportedAttachmentFiles), value); }
+	private bool ShouldSerializeSupportedAttachmentFiles() => _overrides.ContainsKey(nameof(SupportedAttachmentFiles));
+	private void ResetSupportedAttachmentFiles() => Set(nameof(SupportedAttachmentFiles), null);
+
+	/// <summary>Gets or sets the file dialog filter name for all files.</summary>
+	[Localizable(true)]
+	public string AllFiles { get => Get(nameof(AllFiles)); set => Set(nameof(AllFiles), value); }
+	private bool ShouldSerializeAllFiles() => _overrides.ContainsKey(nameof(AllFiles));
+	private void ResetAllFiles() => Set(nameof(AllFiles), null);
+
 	internal string Format(ChatNotice notice) => string.Format(CultureInfo.CurrentCulture, Get(notice.Code.ToString()), notice.FileName ?? string.Empty, notice.Limit ?? 0);
 	/// <inheritdoc />
 	public override string ToString() => string.Empty;

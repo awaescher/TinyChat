@@ -6,7 +6,7 @@ namespace TinyChat;
 /// A specialized split container control designed for chat applications with a horizontal layout.
 /// The top panel is typically used for chat history and the bottom panel for input controls.
 /// </summary>
-public class ChatSplitContainerControl : SplitContainer, ISplitContainerControl, IChatSplitContainerLayoutControl
+public class ChatSplitContainerControl : SplitContainer, ISplitContainerControl, IChatSplitContainerLayoutControl, IChatSplitContainerMinimumInputHeight
 {
 	/// <summary>
 	/// Initializes a new instance of the <see cref="ChatSplitContainerControl"/> class.
@@ -40,5 +40,17 @@ public class ChatSplitContainerControl : SplitContainer, ISplitContainerControl,
 	{
 		get => Height - SplitterDistance;
 		set => SplitterDistance = Height - value;
+	}
+
+	int IChatSplitContainerMinimumInputHeight.MinimumInputHeight
+	{
+		get => Panel2MinSize;
+		set
+		{
+			if (Height - SplitterWidth - Panel1MinSize < value)
+				return;
+
+			Panel2MinSize = value;
+		}
 	}
 }

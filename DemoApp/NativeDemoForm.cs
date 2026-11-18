@@ -34,6 +34,15 @@ public partial class NativeDemoForm : Form, IMessageFilter
 
 		Application.AddMessageFilter(this);
 
+		chatControl.InputMenuOpening += (_, e) => e.Items.Add(
+		new ChatInputMenuItem(
+			ChatInputMenuItemKind.Custom,
+			"Show example ...",
+			() => MessageBox.Show("This entry was added by the demo application through the InputMenuOpening event."))
+		{
+			BeginGroup = true
+		});
+
 		chatControl.IncludeFunctionCalls = true;
 		chatControl.IncludeReasoning = true;
 		chatControl.ServiceProvider = DemoData.CreateDemoServiceProvider();

@@ -50,8 +50,8 @@
 
 	<ItemGroup>
 	  <PackageReference Include="MimeMapping" Version="4.0.0" />
-	  <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="10.7.0" />
-	  <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" />
+	  <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="11.0.0" />
+	  <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="11.0.0" />
 	</ItemGroup>
 
 </Project>

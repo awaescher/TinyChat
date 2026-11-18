@@ -26,4 +26,9 @@
   <data name="Reasoning" xml:space="preserve"><value>Razonamiento</value></data>
   <data name="FunctionArguments" xml:space="preserve"><value>Argumentos</value></data>
   <data name="FunctionResult" xml:space="preserve"><value>Resultado</value></data>
+  <data name="InputMenu" xml:space="preserve"><value>Más opciones</value></data>
+  <data name="AttachFiles" xml:space="preserve"><value>Adjuntar archivos ...</value></data>
+  <data name="AttachFilesDialogTitle" xml:space="preserve"><value>Adjuntar archivos</value></data>
+  <data name="SupportedAttachmentFiles" xml:space="preserve"><value>Archivos compatibles</value></data>
+  <data name="AllFiles" xml:space="preserve"><value>Todos los archivos</value></data>
 </root>
