@@ -115,7 +115,7 @@ public class ChatInputMenuTests
 			((IChatInputMenuControl)input).ShowMenuButton = true;
 			var glyph = GlyphOf(input);
 			var editor = EditorOf(input);
-			var textBox = editor is MemoEdit memo ? memo.MaskBox : editor;
+			var textBox = editor is MemoEdit memo ? memo.MaskBox ?? editor : editor;
 			var pointer = Point.Empty;
 			input.GetType().GetField("_pointerPositionProvider", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
 				.SetValue(input, (Func<Point>)(() => pointer));
@@ -128,6 +128,33 @@ public class ChatInputMenuTests
 			pointer = input.PointToScreen(new Point(glyph.Left + glyph.Width / 2, glyph.Top + glyph.Height / 2));
 			RaiseMouseMove(textBox);
 			IsShown(glyph).ShouldBeTrue();
+		}
+
+		[Test]
+		public void Works_With_DevExpress_Advanced_Mode_Editors_Without_An_Embedded_Text_Box()
+		{
+			var previous = DevExpress.XtraEditors.WindowsFormsSettings.UseAdvancedTextEdit;
+			DevExpress.XtraEditors.WindowsFormsSettings.UseAdvancedTextEdit = DevExpress.Utils.DefaultBoolean.True;
+			try
+			{
+				using var form = new Form { Size = new Size(500, 300), ShowInTaskbar = false };
+				using var chat = new DXChatControl { Dock = DockStyle.Fill };
+				form.Controls.Add(chat);
+				form.Show();
+				Application.DoEvents();
+
+				var editor = Descendants(chat.InputControl!).OfType<MemoEdit>().Single();
+				editor.MaskBox.ShouldBeNull();
+				((IChatInputDraftEditorControl)chat.InputControl!).SetDraft("draft", []);
+				editor.Text.ShouldBe("draft");
+				RaiseMouseMove(editor);
+				GlyphOf(chat.InputControl!).Invalidate();
+				Application.DoEvents();
+			}
+			finally
+			{
+				DevExpress.XtraEditors.WindowsFormsSettings.UseAdvancedTextEdit = previous;
+			}
 		}
 
 		/// <summary>Gets the visibility the control was given, independent of whether its form is shown.</summary>
@@ -147,7 +174,7 @@ public class ChatInputMenuTests
 		private static Rectangle TextBoundsInEditor(Control editor)
 		{
 			if (editor is MemoEdit memo)
-				return memo.MaskBox.Bounds;
+				return memo.MaskBox?.Bounds ?? memo.ClientRectangle;
 
 			var rect = new int[4];
 			SendMessage(editor.Handle, 0x00B2, IntPtr.Zero, rect);
