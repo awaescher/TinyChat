@@ -236,8 +236,12 @@ public class DXChatInputControl : Control, IChatInputControl, IChatAttachmentInp
 		_textBox.EditValueChanged += (_, _) => UpdateMenuGlyphVisibility();
 		_textBox.MouseMove += (_, _) => UpdateMenuGlyphVisibility();
 		_textBox.MouseLeave += (_, _) => UpdateMenuGlyphVisibility();
-		_textBox.MaskBox.MouseMove += (_, _) => UpdateMenuGlyphVisibility();
-		_textBox.MaskBox.MouseLeave += (_, _) => UpdateMenuGlyphVisibility();
+		// In DevExpress Advanced Mode the editor draws its text itself and has no embedded text box.
+		if (_textBox.MaskBox is { } maskBox)
+		{
+			maskBox.MouseMove += (_, _) => UpdateMenuGlyphVisibility();
+			maskBox.MouseLeave += (_, _) => UpdateMenuGlyphVisibility();
+		}
 		_menuGlyph.MouseLeave += (_, _) => UpdateMenuGlyphVisibility();
 		_textBox.Paint += (_, _) => _menuGlyph.Invalidate();
 		PositionSendButton();
@@ -484,13 +488,13 @@ public class DXChatInputControl : Control, IChatInputControl, IChatAttachmentInp
 	private Color GetEditorBackColor()
 	{
 		var color = _textBox.PaintBackColor;
-		return color.IsEmpty ? _textBox.MaskBox.BackColor : color;
+		return color.IsEmpty ? (_textBox.MaskBox ?? (Control)_textBox).BackColor : color;
 	}
 
 	private Color GetEditorForeColor()
 	{
 		var color = _textBox.PaintForeColor;
-		return color.IsEmpty ? _textBox.MaskBox.ForeColor : color;
+		return color.IsEmpty ? (_textBox.MaskBox ?? (Control)_textBox).ForeColor : color;
 	}
 
 	/// <summary>

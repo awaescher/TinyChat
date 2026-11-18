@@ -14,6 +14,8 @@ internal static class Program
 		Application.EnableVisualStyles();
 		Application.SetCompatibleTextRenderingDefault(false);
 
+		DevExpress.XtraEditors.WindowsFormsSettings.UseAdvancedTextEdit = DevExpress.Utils.DefaultBoolean.True;
+
 		new NativeDemoForm().Show();
 		new NativeOllamaDemoForm().Show();
 		new DXDemoForm().Show();
