@@ -100,7 +100,25 @@ When the pointer rests over a message, a small icon bar appears on its top-right
 
 The bar only shows icons: the native suite uses the Windows icon font like the tool-call icons, the DevExpress suite uses Fluent UI System Icons. You can also click the sender/header or message body and press <kbd>Ctrl</kbd>+<kbd>C</kbd> to copy the complete message.
 
-Use `ShowMessageActions` and `MessageActionsHoverDelay` to configure the bar. `RevertToMessage()` performs the revert in code, returns `false` while `IsBusy`, and raises `ConversationReverted` with the removed messages. Override `GetMessageActions()` to add or remove buttons (custom actions use `ChatMessageActionKind.Custom` with an `Image`), `CreateMessageActionButton()` to change their look, and `IsUserMessage()` to change which messages are treated as user messages. Custom input controls implement `IChatInputDraftEditorControl` to receive the reverted draft.
+Use `ShowMessageActions` and `MessageActionsHoverDelay` to configure the bar. `RevertToMessage()` performs the revert in code, returns `false` while `IsBusy`, and raises `ConversationReverted` with the removed messages. Handle `MessageActionsOpening` to edit the action list or set `Cancel` to suppress the bar. The event receives the message and the actions collected by `GetMessageActions()`. Override `IsUserMessage()` to change which messages are treated as user messages. Custom input controls implement `IChatInputDraftEditorControl` to receive the reverted draft.
+
+For a custom action, set `ToolTipText` to a localized label. The button also uses it as its accessible name. Set `SegoeFluentIcon` to a glyph from [Microsoft's catalogue](https://learn.microsoft.com/windows/apps/design/iconography/segoe-fluent-icons-font) or use a named constant from `SegoeFluentIcons`. DevExpress gives self-contained SVG markup in `SvgIcon` priority. WinForms uses `Image` or the Segoe glyph, in that order.
+
+```csharp
+chat.MessageActionsOpening += (_, e) =>
+{
+	if (e.Message is not { } message)
+		return;
+
+	e.Actions.Add(new ChatMessageAction(ChatMessageActionKind.Custom, () => savePrompt(message))
+	{
+		SegoeFluentIcon = SegoeFluentIcons.Bookmarks,
+		ToolTipText = localizedSavePromptText
+	});
+};
+```
+
+Override `CreateMessageActionButton()` when you need a different button control.
 
 ### File and image attachments
 

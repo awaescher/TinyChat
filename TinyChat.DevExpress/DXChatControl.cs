@@ -1,4 +1,6 @@
+using System.Text;
 using DevExpress.LookAndFeel;
+using DevExpress.Utils.Svg;
 using DevExpress.XtraEditors;
 using TinyChat.Messages.Formatting;
 
@@ -96,25 +98,41 @@ public class DXChatControl : ChatControl
 			Margin = new Padding(1, 0, 1, 0),
 			PaintStyle = DevExpress.XtraEditors.Controls.PaintStyles.Light,
 			Size = new Size(26, 24),
-			TabStop = false
+			TabStop = false,
+			ToolTip = action.ToolTipText ?? string.Empty,
+			AccessibleName = action.ToolTipText
 		};
 		button.ImageOptions.Location = ImageLocation.MiddleCenter;
-		if (action.Image is not null)
+		// The button is created before it is parented, so use the DPI of the chat control.
+		var iconPixels = Math.Max(16, (int)Math.Round(16 * DeviceDpi / 96f));
+		if (!string.IsNullOrWhiteSpace(action.SvgIcon))
+		{
+			using var stream = new MemoryStream(Encoding.UTF8.GetBytes(action.SvgIcon));
+			button.ImageOptions.SvgImage = SvgImage.FromStream(stream);
+		}
+		else if (action.Image is not null)
 		{
 			button.ImageOptions.Image = action.Image;
 		}
+		else if (!string.IsNullOrWhiteSpace(action.SegoeFluentIcon) && ChatIcons.IconFontName is not null)
+		{
+			var color = LookAndFeelHelper.GetSystemColor(UserLookAndFeel.Default, SystemColors.WindowText);
+			var glyphImage = ChatIcons.CreateImage(action.SegoeFluentIcon, iconPixels, color);
+			button.ImageOptions.Image = glyphImage;
+			button.Disposed += (_, _) => glyphImage.Dispose();
+		}
 		else
 		{
-			// The button is created before it is parented, so scale from the chat control's DPI.
-			var iconPixels = Math.Max(16, (int)Math.Round(16 * DeviceDpi / 96f));
 			button.ImageOptions.SvgImage = action.Kind switch
 			{
 				ChatMessageActionKind.CopyFormatted => FluentIcons.CopyFormatted(iconPixels),
 				ChatMessageActionKind.Revert => FluentIcons.Revert(iconPixels),
 				_ => FluentIcons.Copy(iconPixels)
 			};
-			button.ImageOptions.SvgImageSize = new Size(iconPixels, iconPixels);
 		}
+
+		if (button.ImageOptions.SvgImage is not null)
+			button.ImageOptions.SvgImageSize = new Size(iconPixels, iconPixels);
 
 		return button;
 	}
@@ -142,7 +160,10 @@ public class DXChatControl : ChatControl
 		{
 			actions.Insert(copyIndex + 1, new ChatMessageAction(
 				ChatMessageActionKind.CopyFormatted,
-				() => CopyMessageWithFormatting(formattedMessage)));
+				() => CopyMessageWithFormatting(formattedMessage))
+			{
+				ToolTipText = DisplayTexts.CopyFormattedMessage
+			});
 		}
 
 		return actions;

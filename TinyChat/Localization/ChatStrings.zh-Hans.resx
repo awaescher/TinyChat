@@ -22,6 +22,9 @@
 今天有什么可以帮你的吗?</value></data>
   <data name="RemoveAttachment" xml:space="preserve"><value>移除附件</value></data>
   <data name="OpenAttachment" xml:space="preserve"><value>打开附件</value></data>
+  <data name="CopyMessage" xml:space="preserve"><value>复制消息</value></data>
+  <data name="CopyFormattedMessage" xml:space="preserve"><value>保留格式复制</value></data>
+  <data name="RevertToMessage" xml:space="preserve"><value>返回到此消息</value></data>
   <data name="ShowFullText" xml:space="preserve"><value>显示全文</value></data>
   <data name="Reasoning" xml:space="preserve"><value>推理过程</value></data>
   <data name="FunctionArguments" xml:space="preserve"><value>参数</value></data>

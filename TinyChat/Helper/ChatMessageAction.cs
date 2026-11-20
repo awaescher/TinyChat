@@ -26,7 +26,26 @@ public enum ChatMessageActionKind
 public sealed record ChatMessageAction(ChatMessageActionKind Kind, Action Execute)
 {
 	/// <summary>
-	/// Gets or sets the image shown for a <see cref="ChatMessageActionKind.Custom"/> action.
+	/// Gets the application-provided bitmap or other <see cref="System.Drawing.Image"/>.
+	/// DevExpress gives <see cref="SvgIcon"/> priority when both are set.
+	/// <see href="https://learn.microsoft.com/windows/apps/design/iconography/segoe-fluent-icons-font">Microsoft catalogue</see>
 	/// </summary>
 	public Image? Image { get; init; }
+
+	/// <summary>
+	/// Gets the self-contained SVG markup for DevExpress, where it takes precedence over
+	/// <see cref="Image"/> and <see cref="SegoeFluentIcon"/>. WinForms uses those properties as fallbacks.
+	/// </summary>
+	public string? SvgIcon { get; init; }
+
+	/// <summary>
+	/// Gets a Unicode glyph from the Segoe Fluent Icons font, such as <see cref="SegoeFluentIcons.Bookmarks"/>.
+	/// It is used when no <see cref="Image"/> or SVG supported by the control is set.
+	/// </summary>
+	public string? SegoeFluentIcon { get; init; }
+
+	/// <summary>
+	/// Gets the localized text used for the tooltip and the accessible name of the button.
+	/// </summary>
+	public string? ToolTipText { get; init; }
 }

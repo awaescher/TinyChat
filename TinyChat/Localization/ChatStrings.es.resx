@@ -22,6 +22,9 @@
 ¿En qué puedo ayudarte hoy?</value></data>
   <data name="RemoveAttachment" xml:space="preserve"><value>Quitar adjunto</value></data>
   <data name="OpenAttachment" xml:space="preserve"><value>Abrir adjunto</value></data>
+  <data name="CopyMessage" xml:space="preserve"><value>Copiar mensaje</value></data>
+  <data name="CopyFormattedMessage" xml:space="preserve"><value>Copiar con formato</value></data>
+  <data name="RevertToMessage" xml:space="preserve"><value>Volver a este mensaje</value></data>
   <data name="ShowFullText" xml:space="preserve"><value>Mostrar texto completo</value></data>
   <data name="Reasoning" xml:space="preserve"><value>Razonamiento</value></data>
   <data name="FunctionArguments" xml:space="preserve"><value>Argumentos</value></data>

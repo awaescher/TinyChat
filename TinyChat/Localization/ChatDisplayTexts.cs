@@ -3,7 +3,7 @@ using System.Globalization;
 
 namespace TinyChat;
 
-/// <summary>Localizable designer overrides for the chat's explanations and attachment actions.</summary>
+/// <summary>Localizable designer overrides for the chat's explanations and actions.</summary>
 [TypeConverter(typeof(ExpandableObjectConverter))]
 public sealed class ChatDisplayTexts
 {
@@ -78,6 +78,24 @@ public sealed class ChatDisplayTexts
 	public string OpenAttachment { get => Get(nameof(OpenAttachment)); set => Set(nameof(OpenAttachment), value); }
 	private bool ShouldSerializeOpenAttachment() => _overrides.ContainsKey(nameof(OpenAttachment));
 	private void ResetOpenAttachment() => Set(nameof(OpenAttachment), null);
+
+	/// <summary>Gets or sets the tooltip and accessible name of the button that copies a message as plain text.</summary>
+	[Localizable(true)]
+	public string CopyMessage { get => Get(nameof(CopyMessage)); set => Set(nameof(CopyMessage), value); }
+	private bool ShouldSerializeCopyMessage() => _overrides.ContainsKey(nameof(CopyMessage));
+	private void ResetCopyMessage() => Set(nameof(CopyMessage), null);
+
+	/// <summary>Gets or sets the tooltip and accessible name of the button that copies a message with formatting.</summary>
+	[Localizable(true)]
+	public string CopyFormattedMessage { get => Get(nameof(CopyFormattedMessage)); set => Set(nameof(CopyFormattedMessage), value); }
+	private bool ShouldSerializeCopyFormattedMessage() => _overrides.ContainsKey(nameof(CopyFormattedMessage));
+	private void ResetCopyFormattedMessage() => Set(nameof(CopyFormattedMessage), null);
+
+	/// <summary>Gets or sets the tooltip and accessible name of the button that reverts the conversation to a message.</summary>
+	[Localizable(true)]
+	public string RevertToMessage { get => Get(nameof(RevertToMessage)); set => Set(nameof(RevertToMessage), value); }
+	private bool ShouldSerializeRevertToMessage() => _overrides.ContainsKey(nameof(RevertToMessage));
+	private void ResetRevertToMessage() => Set(nameof(RevertToMessage), null);
 
 	/// <summary>Gets or sets the tooltip and accessible name of the button that shows shortened reasoning or tool results in full.</summary>
 	[Localizable(true)]

@@ -23,6 +23,9 @@ Hallo Mensch.
 Wie kann ich dir helfen?</value></data>
   <data name="RemoveAttachment" xml:space="preserve"><value>Anhang entfernen</value></data>
   <data name="OpenAttachment" xml:space="preserve"><value>Anhang öffnen</value></data>
+  <data name="CopyMessage" xml:space="preserve"><value>Nachricht kopieren</value></data>
+  <data name="CopyFormattedMessage" xml:space="preserve"><value>Mit Formatierung kopieren</value></data>
+  <data name="RevertToMessage" xml:space="preserve"><value>Zu dieser Nachricht zurückkehren</value></data>
   <data name="ShowFullText" xml:space="preserve"><value>Vollständigen Text anzeigen</value></data>
   <data name="Reasoning" xml:space="preserve"><value>Gedankengang</value></data>
   <data name="FunctionArguments" xml:space="preserve"><value>Argumente</value></data>

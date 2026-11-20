@@ -22,6 +22,9 @@
 Waarmee kan ik je vandaag helpen?</value></data>
   <data name="RemoveAttachment" xml:space="preserve"><value>Bijlage verwijderen</value></data>
   <data name="OpenAttachment" xml:space="preserve"><value>Bijlage openen</value></data>
+  <data name="CopyMessage" xml:space="preserve"><value>Bericht kopiëren</value></data>
+  <data name="CopyFormattedMessage" xml:space="preserve"><value>Kopiëren met opmaak</value></data>
+  <data name="RevertToMessage" xml:space="preserve"><value>Teruggaan naar dit bericht</value></data>
   <data name="ShowFullText" xml:space="preserve"><value>Volledige tekst weergeven</value></data>
   <data name="Reasoning" xml:space="preserve"><value>Redenering</value></data>
   <data name="FunctionArguments" xml:space="preserve"><value>Argumenten</value></data>

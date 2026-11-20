@@ -772,6 +772,13 @@ public partial class ChatControl : UserControl
 	public long MaximumAttachmentFileSize { get; set; } = DEFAULT_MAXIMUM_ATTACHMENT_FILE_SIZE;
 
 	/// <summary>
+	/// Occurs before a message's hover action bar opens, after the built-in and overridden actions
+	/// have been collected. Handlers can edit the list or cancel the action bar.
+	/// </summary>
+	[Category("Chat")]
+	public event EventHandler<ChatMessageActionsOpeningEventArgs>? MessageActionsOpening;
+
+	/// <summary>
 	/// Gets or sets whether an action bar (copy, go back) is shown when the pointer rests over a message.
 	/// </summary>
 	[Category("Chat")]
@@ -2353,7 +2360,7 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 	{
 		ArgumentNullException.ThrowIfNull(action);
 
-		var button = new MessageActionButton
+		var button = new MessageActionButton(action.ToolTipText)
 		{
 			FlatStyle = FlatStyle.Flat,
 			Margin = new Padding(1, 0, 1, 0),
@@ -2369,13 +2376,16 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 		}
 		else
 		{
-			button.Glyph = action.Kind switch
-			{
-				ChatMessageActionKind.Revert => ChatIcons.Revert,
-				_ => ChatIcons.Copy
-			};
+			button.Glyph = action.Kind == ChatMessageActionKind.Revert ? ChatIcons.Revert : ChatIcons.Copy;
 			if (ChatIcons.IconFontName is not null)
-				button.Font = ChatIcons.CreateFont(10f);
+			{
+				if (!string.IsNullOrWhiteSpace(action.SegoeFluentIcon))
+					button.Glyph = action.SegoeFluentIcon;
+
+				var font = ChatIcons.CreateFont(10f);
+				button.Font = font;
+				button.Disposed += (_, _) => font.Dispose();
+			}
 		}
 
 		return button;
@@ -2394,10 +2404,29 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 		if (messageControl.Message is not { } message)
 			yield break;
 
-		yield return new ChatMessageAction(ChatMessageActionKind.Copy, () => CopyMessage(messageControl));
+		yield return new ChatMessageAction(ChatMessageActionKind.Copy, () => CopyMessage(messageControl))
+		{
+			ToolTipText = DisplayTexts.CopyMessage
+		};
 
 		if (!IsBusy)
-			yield return new ChatMessageAction(ChatMessageActionKind.Revert, () => RevertToMessage(message));
+		{
+			yield return new ChatMessageAction(ChatMessageActionKind.Revert, () => RevertToMessage(message))
+			{
+				ToolTipText = DisplayTexts.RevertToMessage
+			};
+		}
+	}
+
+	internal IReadOnlyList<ChatMessageAction> PrepareMessageActions(IChatMessageControl messageControl)
+	{
+		var actions = GetMessageActions(messageControl).ToList();
+		if (MessageActionsOpening is not { } opening)
+			return actions;
+
+		var args = new ChatMessageActionsOpeningEventArgs(messageControl, actions);
+		opening(this, args);
+		return args.Cancel ? [] : actions;
 	}
 
 	/// <summary>
@@ -2590,9 +2619,10 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 
 	private void DisplayMessageActionBar()
 	{
+		var target = _messageActionsTarget;
 		if (_messageActionBar is null ||
-			_messageActionsTarget is not Control messageControl ||
-			_messageActionsTarget.Message is null ||
+			target is not Control messageControl ||
+			target.Message is null ||
 			MessageHistoryControl is null ||
 			messageControl.IsDisposed ||
 			!messageControl.Visible ||
@@ -2604,8 +2634,8 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 			return;
 		}
 
-		var actions = GetMessageActions(_messageActionsTarget).ToArray();
-		if (actions.Length == 0)
+		var actions = PrepareMessageActions(target);
+		if (actions.Count == 0 || !ReferenceEquals(target, _messageActionsTarget) || messageControl.IsDisposed)
 			return;
 
 		PopulateMessageActionBar(actions);
@@ -2749,9 +2779,26 @@ IChatMessage message) => new FunctionCallMessageControl { Message = message, All
 
 	private sealed class MessageActionButton : Button
 	{
-		public MessageActionButton()
+		private readonly ToolTip? _toolTip;
+
+		public MessageActionButton(string? toolTipText)
 		{
 			SetStyle(ControlStyles.Selectable, false);
+
+			if (!string.IsNullOrEmpty(toolTipText))
+			{
+				AccessibleName = toolTipText;
+				_toolTip = new ToolTip();
+				_toolTip.SetToolTip(this, toolTipText);
+			}
+		}
+
+		protected override void Dispose(bool disposing)
+		{
+			if (disposing)
+				_toolTip?.Dispose();
+
+			base.Dispose(disposing);
 		}
 
 		/// <summary>
