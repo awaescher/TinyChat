@@ -142,6 +142,48 @@ public class MessageActionsTests
 				.ShouldBe([ChatMessageActionKind.Copy, ChatMessageActionKind.CopyFormatted, ChatMessageActionKind.Revert]);
 		}
 
+		[TestCase(false)]
+		[TestCase(true)]
+		public void Lets_The_Host_Edit_The_Actions_For_The_Hovered_Message(bool useDevExpress)
+		{
+			using var control = useDevExpress ? (ChatControl)new DXChatControl() : new ChatControl();
+			var messageControl = control.AddMessage(new NamedSender("Assistant"), new StringMessageContent("Hello"));
+			var handled = false;
+			var customAction = new ChatMessageAction(ChatMessageActionKind.Custom, () => handled = true);
+			control.MessageActionsOpening += (sender, args) =>
+			{
+				sender.ShouldBeSameAs(control);
+				args.Message.ShouldBeSameAs(messageControl.Message);
+				args.MessageControl.ShouldBeSameAs(messageControl);
+				var defaults = useDevExpress
+					? new[] { ChatMessageActionKind.Copy, ChatMessageActionKind.CopyFormatted, ChatMessageActionKind.Revert }
+					: [ChatMessageActionKind.Copy, ChatMessageActionKind.Revert];
+				args.Actions.Select(action => action.Kind).ShouldBe(defaults);
+				args.Actions.RemoveAt(0);
+				args.Actions.Add(customAction);
+			};
+
+			var actions = control.PrepareMessageActions(messageControl);
+
+			var expected = useDevExpress
+				? new[] { ChatMessageActionKind.CopyFormatted, ChatMessageActionKind.Revert, ChatMessageActionKind.Custom }
+				: [ChatMessageActionKind.Revert, ChatMessageActionKind.Custom];
+			actions.Select(action => action.Kind).ShouldBe(expected);
+			actions[^1].Execute();
+			handled.ShouldBeTrue();
+		}
+
+		[TestCase(false)]
+		[TestCase(true)]
+		public void Suppresses_The_Hover_Bar_When_Opening_Is_Cancelled(bool useDevExpress)
+		{
+			using var control = useDevExpress ? (ChatControl)new DXChatControl() : new ChatControl();
+			var messageControl = control.AddMessage(new NamedSender("Assistant"), new StringMessageContent("Hello"));
+			control.MessageActionsOpening += (_, args) => args.Cancel = true;
+
+			control.PrepareMessageActions(messageControl).ShouldBeEmpty();
+		}
+
 		[Test]
 		public void Copies_Markdown_Messages_As_Readable_Plain_Text()
 		{
@@ -151,16 +193,105 @@ public class MessageActionsTests
 			control.PlainText(messageControl).ShouldBe("Bold and link");
 		}
 
-		[TestCase(false, ChatMessageActionKind.Copy)]
-		[TestCase(false, ChatMessageActionKind.Revert)]
-		[TestCase(true, ChatMessageActionKind.Copy)]
-		[TestCase(true, ChatMessageActionKind.CopyFormatted)]
-		[TestCase(true, ChatMessageActionKind.Revert)]
-		public void Shows_Icon_Only_Buttons(bool useDevExpress, ChatMessageActionKind kind)
+		[SetUICulture("de-DE")]
+		[TestCase(false, ChatMessageActionKind.Copy, "Nachricht kopieren")]
+		[TestCase(false, ChatMessageActionKind.Revert, "Zu dieser Nachricht zurückkehren")]
+		[TestCase(true, ChatMessageActionKind.Copy, "Nachricht kopieren")]
+		[TestCase(true, ChatMessageActionKind.CopyFormatted, "Mit Formatierung kopieren")]
+		[TestCase(true, ChatMessageActionKind.Revert, "Zu dieser Nachricht zurückkehren")]
+		public void Shows_Icon_Only_Buttons_With_Localized_Tooltips(bool useDevExpress, ChatMessageActionKind kind, string caption)
 		{
 			using var control = useDevExpress ? (ChatControl)new DXActionsChatControl() : new ActionsChatControl();
-			var action = new ChatMessageAction(kind, () => { });
+			var messageControl = control.AddMessage(new NamedSender("Assistant"), new StringMessageContent("Hello"));
+			var action = control.PrepareMessageActions(messageControl).Single(action => action.Kind == kind);
 
+			using var button = useDevExpress
+				? ((DXActionsChatControl)control).Button(action)
+				: ((ActionsChatControl)control).Button(action);
+
+			button.AccessibleName.ShouldBe(caption);
+			button.Text.ShouldBeNullOrEmpty();
+			if (useDevExpress)
+			{
+				var simpleButton = button.ShouldBeOfType<DevExpress.XtraEditors.SimpleButton>();
+				simpleButton.ToolTip.ShouldBe(caption);
+				simpleButton.ImageOptions.SvgImage.ShouldNotBeNull();
+			}
+			else
+			{
+				var toolTip = (ToolTip)button.GetType().GetField("_toolTip", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(button)!;
+				toolTip.GetToolTip(button).ShouldBe(caption);
+				((string)button.GetType().GetProperty("Glyph")!.GetValue(button)!).Length.ShouldBe(1);
+				button.Font.Name.ShouldBe(ChatIcons.IconFontName ?? button.Font.Name);
+			}
+		}
+
+		[Test]
+		public void Uses_The_Host_Text_Overrides_For_Built_In_Actions()
+		{
+			using var control = new DXChatControl();
+			control.DisplayTexts.CopyMessage = "Plain text";
+			control.DisplayTexts.CopyFormattedMessage = "Formatted text";
+			control.DisplayTexts.RevertToMessage = "Rewind";
+			var messageControl = control.AddMessage(new NamedSender("Assistant"), new StringMessageContent("Hello"));
+
+			control.PrepareMessageActions(messageControl).Select(action => action.ToolTipText)
+				.ShouldBe(["Plain text", "Formatted text", "Rewind"]);
+		}
+
+		[TestCase(false, SegoeFluentIcons.Bookmarks)]
+		[TestCase(false, "\uE721")]
+		[TestCase(true, SegoeFluentIcons.Bookmarks)]
+		[TestCase(true, "\uE721")]
+		public void Shows_An_Arbitrary_Segoe_Glyph_And_The_Localized_Tooltip(bool useDevExpress, string glyph)
+		{
+			const string caption = "Als Prompt speichern ...";
+			using var control = useDevExpress ? (ChatControl)new DXActionsChatControl() : new ActionsChatControl();
+			var action = new ChatMessageAction(ChatMessageActionKind.Custom, () => { })
+			{
+				SegoeFluentIcon = glyph,
+				ToolTipText = caption
+			};
+			using var button = useDevExpress
+				? ((DXActionsChatControl)control).Button(action)
+				: ((ActionsChatControl)control).Button(action);
+
+			button.AccessibleName.ShouldBe(caption);
+			button.Text.ShouldBeNullOrEmpty();
+			if (useDevExpress)
+			{
+				var simpleButton = button.ShouldBeOfType<DevExpress.XtraEditors.SimpleButton>();
+				simpleButton.ToolTip.ShouldBe(caption);
+				if (ChatIcons.IconFontName is not null)
+				{
+					simpleButton.ImageOptions.Image.ShouldNotBeNull();
+					simpleButton.ImageOptions.SvgImage.ShouldBeNull();
+				}
+				else
+				{
+					simpleButton.ImageOptions.SvgImage.ShouldNotBeNull();
+				}
+			}
+			else
+			{
+				var toolTip = (ToolTip)button.GetType().GetField("_toolTip", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(button)!;
+				toolTip.GetToolTip(button).ShouldBe(caption);
+				var displayedGlyph = (string)button.GetType().GetProperty("Glyph")!.GetValue(button)!;
+				displayedGlyph.ShouldBe(ChatIcons.IconFontName is null ? ChatIcons.Copy : glyph);
+			}
+		}
+
+		[TestCase(false)]
+		[TestCase(true)]
+		public void Prefers_The_Application_Image_Over_The_Segoe_Glyph(bool useDevExpress)
+		{
+			using var control = useDevExpress ? (ChatControl)new DXActionsChatControl() : new ActionsChatControl();
+			using var image = new Bitmap(16, 16);
+			var action = new ChatMessageAction(ChatMessageActionKind.Custom, () => { })
+			{
+				Image = image,
+				SegoeFluentIcon = SegoeFluentIcons.Bookmarks
+			};
 			using var button = useDevExpress
 				? ((DXActionsChatControl)control).Button(action)
 				: ((ActionsChatControl)control).Button(action);
@@ -168,16 +299,52 @@ public class MessageActionsTests
 			if (useDevExpress)
 			{
 				var simpleButton = button.ShouldBeOfType<DevExpress.XtraEditors.SimpleButton>();
-				simpleButton.Text.ShouldBeNullOrEmpty();
-				simpleButton.ToolTip.ShouldBeNullOrEmpty();
-				simpleButton.ImageOptions.SvgImage.ShouldNotBeNull();
+				simpleButton.ImageOptions.Image.ShouldBeSameAs(image);
+				simpleButton.ImageOptions.SvgImage.ShouldBeNull();
 			}
 			else
 			{
-				button.Text.ShouldBeEmpty();
-				((string)button.GetType().GetProperty("Glyph")!.GetValue(button)!).Length.ShouldBe(1);
-				button.Font.Name.ShouldBe(TinyChat.ChatIcons.IconFontName ?? button.Font.Name);
+				((Button)button).Image.ShouldBeSameAs(image);
+				button.GetType().GetProperty("Glyph")!.GetValue(button).ShouldBe(string.Empty);
 			}
+		}
+
+		[Test]
+		public void Prefers_Svg_Over_An_Image_And_Glyph_In_DevExpress()
+		{
+			using var control = new DXActionsChatControl();
+			using var image = new Bitmap(16, 16);
+			var action = new ChatMessageAction(ChatMessageActionKind.Custom, () => { })
+			{
+				SvgIcon = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16"/></svg>""",
+				SegoeFluentIcon = SegoeFluentIcons.Bookmarks,
+				Image = image
+			};
+
+			using var button = control.Button(action);
+			var imageOptions = button.ShouldBeOfType<DevExpress.XtraEditors.SimpleButton>().ImageOptions;
+			imageOptions.SvgImage.ShouldNotBeNull();
+			imageOptions.Image.ShouldBeNull();
+		}
+
+		[TestCase(false)]
+		[TestCase(true)]
+		public void Uses_The_Image_Or_Glyph_When_An_Action_Includes_Svg_In_WinForms(bool setImage)
+		{
+			using var control = new ActionsChatControl();
+			using var image = new Bitmap(16, 16);
+			var action = new ChatMessageAction(ChatMessageActionKind.Custom, () => { })
+			{
+				SvgIcon = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16"/></svg>""",
+				SegoeFluentIcon = SegoeFluentIcons.Bookmarks,
+				Image = setImage ? image : null
+			};
+
+			using var button = control.Button(action);
+			((Button)button).Image.ShouldBe(setImage ? image : null);
+			var glyph = (string)button.GetType().GetProperty("Glyph")!.GetValue(button)!;
+			var expectedGlyph = ChatIcons.IconFontName is null ? ChatIcons.Copy : SegoeFluentIcons.Bookmarks;
+			glyph.ShouldBe(setImage ? string.Empty : expectedGlyph);
 		}
 
 		[Test]

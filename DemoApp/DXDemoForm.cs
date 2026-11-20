@@ -26,6 +26,15 @@ public partial class DXDemoForm : ToolbarForm, IMessageFilter
 	{
 		InitializeComponent();
 		KeyPreview = true;
+
+		dxChatControl.MessageActionsOpening += (_, e) =>
+		{
+			if (e.Actions.Count > 0)
+			{
+				e.Actions.Add(DemoMessageActions.CreateHeart(
+					() => XtraMessageBox.Show(this, DemoMessageActions.LikeMessageConfirmation)));
+			}
+		};
 	}
 
 	/// <summary>

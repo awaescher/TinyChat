@@ -16,31 +16,31 @@ internal static class ChatIcons
 	/// <summary>Gets the name of the installed icon font, or <see langword="null"/> if none is installed.</summary>
 	internal static string? IconFontName => _iconFontName.Value;
 
-	internal static string Tool => IconFontName is null ? "\u26a1" : "\ue945";
+	internal static string Tool => IconFontName is null ? "\u26a1" : SegoeFluentIcons.LightningBolt;
 
-	internal static string Skill => IconFontName is null ? "\U0001f4d6" : "\ue736";
+	internal static string Skill => IconFontName is null ? "\U0001f4d6" : SegoeFluentIcons.ReadingMode;
 
-	internal static string Reasoning => IconFontName is null ? "\U0001f4ad" : "\uea80";
+	internal static string Reasoning => IconFontName is null ? "\U0001f4ad" : SegoeFluentIcons.Lightbulb;
 
-	internal static string Result => IconFontName is null ? "\U0001f86a" : "\ue72a";
+	internal static string Result => IconFontName is null ? "\U0001f86a" : SegoeFluentIcons.Forward;
 
-	internal static string Send => IconFontName is null ? "\u27A4" : "\ue725";
+	internal static string Send => IconFontName is null ? "\u27A4" : SegoeFluentIcons.SendFill;
 
-	internal static string Stop => IconFontName is null ? "\u25A0" : "\ue73b";
+	internal static string Stop => IconFontName is null ? "\u25A0" : SegoeFluentIcons.CheckboxFill;
 
-	internal static string Attach => IconFontName is null ? "\U0001f4ce" : "\ue723";
+	internal static string Attach => IconFontName is null ? "\U0001f4ce" : SegoeFluentIcons.Attach;
 
-	internal static string Copy => IconFontName is null ? "\u29C9" : "\ue8c8";
+	internal static string Copy => IconFontName is null ? "\u29C9" : SegoeFluentIcons.Copy;
 
-	internal static string Revert => IconFontName is null ? "\u21B6" : "\ue7a7";
+	internal static string Revert => IconFontName is null ? "\u21B6" : SegoeFluentIcons.Undo;
 
-	internal static string ShowFullText => IconFontName is null ? "\u2197" : "\ue8a7";
+	internal static string ShowFullText => IconFontName is null ? "\u2197" : SegoeFluentIcons.OpenInNewWindow;
 
-	internal static string StatusSucceeded => "\ue73e";
+	internal static string StatusSucceeded => SegoeFluentIcons.CheckMark;
 
-	internal static string StatusFailed => "\ue814";
+	internal static string StatusFailed => SegoeFluentIcons.Error;
 
-	internal static string StatusRejected => "\ue711";
+	internal static string StatusRejected => SegoeFluentIcons.Cancel;
 
 	/// <summary>Gets the accent colors used for the icons, matching the DevExpress Fluent icons.</summary>
 	internal static readonly Color ToolColor = Color.FromArgb(0xFF, 0xB1, 0x15);

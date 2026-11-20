@@ -1,4 +1,5 @@
 using System;
+using System.Drawing;
 using System.Windows.Forms;
 using TinyChat;
 
@@ -22,6 +23,18 @@ public partial class NativeDemoForm : Form, IMessageFilter
 	{
 		InitializeComponent();
 		KeyPreview = true;
+
+		Bitmap? heartImage = null;
+		chatControl.Disposed += (_, _) => heartImage?.Dispose();
+		chatControl.MessageActionsOpening += (_, e) =>
+		{
+			if (e.Actions.Count > 0)
+			{
+				e.Actions.Add(DemoMessageActions.CreateHeart(
+					() => MessageBox.Show(this, DemoMessageActions.LikeMessageConfirmation),
+					heartImage ??= DemoMessageActions.CreateHeartImage()));
+			}
+		};
 	}
 
 	/// <summary>
